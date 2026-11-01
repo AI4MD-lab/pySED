@@ -22,6 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pySED.console import print_detail
 
 def qpoint_batches(num_qpoints, num_workers, max_batch_size=None):
     """Return non-overlapping (start, stop) ranges covering all q points.
@@ -116,10 +117,9 @@ def print_qpoints(reduced_qpoints, q_start, q_stop):
     num_qpoints = len(reduced_qpoints)
     for q_index in range(q_start, q_stop):
         qpoint = reduced_qpoints[q_index]
-        print(
-            "        Now calculating q-point "
-            f"{q_index + 1}/{num_qpoints}:\t"
-            f"q = ({qpoint[0]:.4f}, {qpoint[1]:.4f}, "
+        print_detail(
+            f"q-point {q_index + 1}/{num_qpoints}",
+            f"({qpoint[0]:.4f}, {qpoint[1]:.4f}, "
             f"{qpoint[2]:.4f})"
         )
 
@@ -153,8 +153,5 @@ def print_cpu_memory_estimate(
         persistent_arrays + prefetched_block + shared_velocities + queued_results
         + active_workers * worker_peak
     )
-    print(
-        "        Estimated peak CPU array memory: "
-        f"{estimated_bytes / 1e9:.2f} GB "
-        "(trajectory block reading + SED arrays; excluding Python overhead)."
-    )
+    print_detail("Estimated CPU array RAM", f"{estimated_bytes / 1e9:.2f} GB")
+    print("            Includes trajectory blocks and SED arrays; excludes Python overhead.")

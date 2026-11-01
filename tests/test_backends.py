@@ -213,7 +213,7 @@ class BackendTests(unittest.TestCase):
                     backend.compute(self.vels, self.cell_vecs, result)
                 self.assertEqual((backend.num_workers, backend.num_threads), (1, 4))
         self.assertEqual(output.getvalue().count("CPU allocation"), 1)
-        self.assertIn("        CPU allocation      : 1 process × 4 threads", output.getvalue())
+        self.assertIn("        CPU allocation          : 1 process × 4 threads", output.getvalue())
 
     def test_shared_buffer_is_removed_after_an_exception(self):
         with self.assertRaisesRegex(RuntimeError, "deliberate failure"):

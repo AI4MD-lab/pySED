@@ -23,6 +23,7 @@ from fractions import Fraction
 import numpy as np
 
 from pySED.structure import generate_data
+from pySED.console import print_detail, print_matrix, print_section, terminal_label
 
 
 class BZ_methods(object):
@@ -126,33 +127,19 @@ class BZ_methods(object):
 
         if getattr(params, "dump_group_supercell", None) is not None:
             if self.box_info:
+                print_section("Structural information")
+                print_detail("Mode", "local-group SED")
+                print_detail("Q-point cell", "dump_group_supercell from input")
                 print(
-                    "\n    ************************** Structural information "
-                    "*****************************"
-                )
-                print("\n    🚀 Local-group SED mode is active.")
-                print(
-                    "        The Q-point grid is built from the local cell "
-                    "specified by dump_group_supercell in the input file."
-                )
-                print(
-                    "        Atom positions and velocities are read unchanged "
+                    "            Atom positions and velocities are read unchanged "
                     "from the trajectory."
                 )
                 print(
-                    "        The full simulation cell stored in the trajectory "
+                    "            The full simulation cell stored in the trajectory "
                     "is not used for this local Q grid."
                 )
-                print(
-                    "\n        Local cell specified for this dumped group "
-                    "is (Angstrom):"
-                )
-                for row in self.supercell:
-                    print(
-                        "            {: .8e}    {: .8e}    {: .8e}".format(
-                            row[0], row[1], row[2]
-                        )
-                    )
+                print()
+                print_matrix("Local-group cell (Angstrom)", self.supercell)
             return
 
         expected_prim_unitcell = params.prim_unitcell
@@ -167,44 +154,38 @@ class BZ_methods(object):
             expected_prim_unitcell = generate_data.structure_maker.calculate_restricted_cell(expected_prim_unitcell)
 
         if self.box_info:
-            print("\n    ************************** Structural information *****************************")
-            print("        Primitive unit cell matrix is (Angstrom):")
-            for row in params.prim_unitcell:
-                print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
-
-            print("\n        MD simulation cell matrix is (Angstrom):")
-            for row in box_in_traj:
-                print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+            print_section("Structural information")
+            print_matrix("Primitive unit cell (Angstrom)", params.prim_unitcell)
+            print()
+            print_matrix("MD simulation cell (Angstrom)", box_in_traj)
 
         if np.allclose(box_in_traj, expected_box, atol=1e-4):
             params.prim_unitcell = expected_prim_unitcell
             if self.box_info:
-                print(
-                    "\n    ⚠️ pySED identified that structural optimization is likely performed using the NVT ensemble.")
+                print()
+                print_detail("Cell check", "matches primitive cell × supercell dimensions")
 
         else:
             if self.box_info:
-                print(
-                    "\n    ⚠️Warning⚠️: The cell matrix in the trajectory is different from calculated "
-                    "by the primitive cell and supercell dimensions.")
-                print("        This suggests that structural optimization is likely performed using the NPT ensemble.")
+                print_section("Cell mismatch", "⚠")
+                print("        Trajectory cell differs from primitive cell × supercell dimensions.")
 
             if params.rescale_prim:
                 # Attempt to reconstruct the primitive cell
                 params.prim_unitcell = self._reconstruct_primitive_cell(box_in_traj, params.supercell_dim)
                 if self.box_info:
-                    print("\n        Now, pySED have reconstructed primitive unit cell matrix from MD simulation cell (Angstrom):")
-                    for row in params.prim_unitcell:
-                        print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+                    print_detail("Cell handling", "reconstructed primitive cell from trajectory")
+                    print_matrix("Reconstructed primitive cell (Angstrom)", params.prim_unitcell)
+            elif self.box_info:
+                print_detail("Cell handling", "keeping input primitive cell (rescale_prim = 0)")
 
         # see ref: https://phonopy.github.io/phonopy/setting-tags.html#primitive-axes
         if params.prim_axis is not None:
             params.prim_unitcell = params.prim_unitcell @ params.prim_axis
             if self.box_info:
-                print("\n    Transformation from the input unit cell to the primitive cell is performed according \'prim_axis\'.")
-                print("        Now primitive unit cell is transformed to (Angstrom):")
-                for row in params.prim_unitcell:
-                    print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+                print()
+                print_detail("Cell transformation", "prim_axis applied")
+                print_matrix("Transformed primitive cell (Angstrom)", params.prim_unitcell)
 
     def _construct_BZ_path(self, params):
 
@@ -252,7 +233,7 @@ class BZ_methods(object):
             return np.linalg.norm(dq_cart)  # The Euclidean norm (length) of the difference vector
 
         if self.qpoints_info:
-            print("\n    ***************************** Q-point information *****************************")
+            print_section("Q-point information")
 
         cumulative_distance = 0.0
         last_delta = 0.0
@@ -270,8 +251,10 @@ class BZ_methods(object):
             qpoints_cart, _ = BZ_Path.build_commensurate_path(q_start, q_end)
 
             if not len(qpoints_cart):
-                print(f'\n    ⚠️Warnings⚠️: \n        No commensurate q-points found along path'
-                      f' segment {i}: from {start_label}: {fmt_vec(q_start)} to {end_label}: {fmt_vec(q_end)}')
+                print_section(f"No commensurate q-points in path segment {i}", "⚠")
+                print_detail("Path", f"{terminal_label(start_label)} → {terminal_label(end_label)}")
+                print_detail("Start", fmt_vec(q_start))
+                print_detail("End", fmt_vec(q_end))
 
                 if q_labels and prev_end_label is not None and prev_end_distance is not None:
 
@@ -321,21 +304,21 @@ class BZ_methods(object):
             q_distances.extend(distances_segment)
 
             if self.qpoints_info:
-                print(f'\n        Path segment {i}: from {start_label}: {fmt_vec(q_start)} to {end_label}: {fmt_vec(q_end)}')
-                print(f'        Number of q-points generated: {len(reduced_qpoints)}')
+                if i:
+                    print()
+                print_detail(f"Path segment {i}", f"{terminal_label(start_label)} → {terminal_label(end_label)}")
+                print_detail("Start", fmt_vec(q_start))
+                print_detail("End", fmt_vec(q_end))
+                print_detail("Number of q-points", len(reduced_qpoints))
                 print('        Reduced q-points:')
                 for q in reduced_qpoints:
-                    print(f'            (reduced) q = {fmt_vec(q)}')
+                    print(f'            {fmt_vec(q)}')
 
         self.qpoints = np.vstack(qpoints_list)
         self.reduced_qpoints = np.vstack(reduced_qpoints_list)
         self.num_qpoints = len(self.qpoints)
         self.q_distances = np.array(q_distances)
         self.q_labels = q_labels
-
-        # End q-point information section with asterisks
-        if self.qpoints_info:
-            print("\n    **************** The total number of q-points generated is {}  ****************".format(self.num_qpoints))
 
     def _validate_dump_group_supercell(self, params, bz_path):
         """Compare the local cell repetition count with the count encoded in basis.in.

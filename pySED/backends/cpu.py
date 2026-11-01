@@ -24,6 +24,7 @@ from multiprocessing import get_context, shared_memory
 import numpy as np
 from threadpoolctl import threadpool_limits
 
+from pySED.console import print_detail
 from pySED.sed.sed_kernel import calculate_q_batch
 from pySED.backends.common import (
     available_cpu_memory, estimate_kernel_working_bytes,
@@ -181,8 +182,10 @@ class CPUBackend:
         ):
             workers -= 1
         self._configure(workers, threads)
-        print(
-            f"\n        CPU allocation      : {workers} process{'es' if workers > 1 else ''} "
+        print()
+        print_detail(
+            "CPU allocation",
+            f"{workers} process{'es' if workers > 1 else ''} "
             f"× {threads} thread{'s' if threads > 1 else ''}"
         )
 
