@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import time
+import warnings
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from uuid import uuid4
@@ -177,6 +178,61 @@ def _numeric_property(rows, selection, dtype, name, columns):
         raise ValueError(f"extended XYZ property '{name}' is not numeric") from error
 
 
+def _fast_gpumd_frame(lines, declared, dtype, type_ids):
+    """Use MDtrace's bulk numeric parsing for standard GPUMD XYZ layouts.
+
+    Other Properties layouts and Python-only numeric spellings use the
+    general reader. Keep per-row validation and float64-to-dtype rounding
+    from that reader, including when the requested storage is float32.
+    """
+    if declared is None or np.dtype(dtype) not in (
+        np.dtype("float32"), np.dtype("float64")
+    ):
+        return None
+    properties, n_columns = declared
+    standard = {"species": (slice(0, 1), "S"), "pos": (slice(1, 4), "R")}
+    if n_columns == 7:
+        standard["vel"] = (slice(4, 7), "R")
+    if n_columns not in (4, 7) or properties != standard:
+        return None
+
+    labels = []
+    numeric_parts = []
+    for line in lines:
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2 or len(parts[1].split()) != n_columns - 1:
+            raise ValueError("GPUMD XYZ atom columns do not match Properties=")
+        labels.append(parts[0])
+        numeric_parts.append(parts[1])
+    try:
+        # Older NumPy warns on unmatched text; newer NumPy raises ValueError.
+        # Fall back in either case so float()-compatible input still works.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            values = np.fromstring(" ".join(numeric_parts), sep=" ", dtype=np.float64)
+    except (ValueError, DeprecationWarning):
+        return None
+    if values.size != len(lines) * (n_columns - 1):
+        return None
+    # NumPy accepts NaN payloads and may discard a NaN sign unlike float().
+    if not np.isfinite(values).all():
+        return None
+    values = values.reshape(len(lines), n_columns - 1).astype(dtype, copy=False)
+    atom_types = np.empty(len(lines), dtype=np.int32)
+    for atom_index, label in enumerate(labels):
+        if label not in type_ids:
+            type_ids[label] = len(type_ids)
+        atom_types[atom_index] = type_ids[label]
+    frame = {
+        POSITIONS: values[:, :3],
+        TYPES: atom_types,
+        ATOM_IDS: np.arange(1, len(lines) + 1, dtype=np.int64),
+    }
+    if n_columns == 7:
+        frame[VELOCITIES] = values[:, 3:6] * 100000.0
+    return frame
+
+
 def _stack_batch(start: int, frames: list[dict[str, np.ndarray]]):
     """Stack matching frame fields into one TrajectoryBatch.
 
@@ -243,81 +299,86 @@ def iter_gpumd_xyz(
             if not comment:
                 raise EOFError("truncated GPUMD XYZ comment line")
 
-            rows = []
+            lines = []
             for _ in range(n_atoms):
                 line = stream.readline()
                 if not line:
                     raise EOFError("truncated GPUMD XYZ atom block")
-                rows.append(line.split())
+                lines.append(line)
 
             declared = _properties_from_comment(comment)
-            if declared is None:
-                # Legacy GPUMD XYZ convention: species, xyz, then optional vxyz.
-                n_columns = len(rows[0])
-                if n_columns < 4:
-                    raise ValueError("GPUMD XYZ requires species and x y z")
-                if any(len(row) != n_columns for row in rows):
-                    raise ValueError("inconsistent GPUMD XYZ column count")
-                properties = {
-                    "species": (slice(0, 1), "S"),
-                    "pos": (slice(1, 4), "R"),
-                }
-                if n_columns >= 7:
-                    properties["vel"] = (slice(4, 7), "R")
+            frame = _fast_gpumd_frame(lines, declared, dtype, type_ids)
+            if frame is not None:
+                n_columns = declared[1]
             else:
-                properties, n_columns = declared
-                if any(len(row) != n_columns for row in rows):
-                    raise ValueError(
-                        "GPUMD XYZ atom columns do not match Properties="
+                rows = [line.split() for line in lines]
+                if declared is None:
+                    # Legacy GPUMD XYZ convention: species, xyz, then optional vxyz.
+                    n_columns = len(rows[0])
+                    if n_columns < 4:
+                        raise ValueError("GPUMD XYZ requires species and x y z")
+                    if any(len(row) != n_columns for row in rows):
+                        raise ValueError("inconsistent GPUMD XYZ column count")
+                    properties = {
+                        "species": (slice(0, 1), "S"),
+                        "pos": (slice(1, 4), "R"),
+                    }
+                    if n_columns >= 7:
+                        properties["vel"] = (slice(4, 7), "R")
+                else:
+                    properties, n_columns = declared
+                    if any(len(row) != n_columns for row in rows):
+                        raise ValueError(
+                            "GPUMD XYZ atom columns do not match Properties="
+                        )
+                position_slice = _property_slice(
+                    properties, "pos", "position", "positions"
+                )
+                frame = {
+                    POSITIONS: _numeric_property(
+                        rows, position_slice, dtype, "pos", 3
+                    ),
+                    ATOM_IDS: np.arange(1, n_atoms + 1, dtype=np.int64),
+                }
+                species_slice = _property_slice(
+                    properties, "species", "element", "symbol"
+                )
+                if species_slice is not None:
+                    if species_slice.stop - species_slice.start != 1:
+                        raise ValueError("extended XYZ species must have one column")
+                    atom_types = np.empty(n_atoms, dtype=np.int32)
+                    for atom_index, row in enumerate(rows):
+                        label = row[species_slice.start]
+                        if label not in type_ids:
+                            type_ids[label] = len(type_ids)
+                        atom_types[atom_index] = type_ids[label]
+                    frame[TYPES] = atom_types
+                else:
+                    type_slice = _property_slice(properties, "type", "types")
+                    if type_slice is not None:
+                        frame[TYPES] = _numeric_property(
+                            rows, type_slice, np.int32, "type", 1
+                        ).reshape(n_atoms)
+
+                id_slice = _property_slice(properties, "id", "atom_id", "atomid")
+                if id_slice is not None:
+                    frame[ATOM_IDS] = _numeric_property(
+                        rows, id_slice, np.int64, "id", 1
+                    ).reshape(n_atoms)
+
+                velocity_slice = _property_slice(
+                    properties, "vel", "velo", "velocity", "velocities"
+                )
+                if velocity_slice is not None:
+                    frame[VELOCITIES] = (
+                        _numeric_property(rows, velocity_slice, dtype, "vel", 3)
+                        * 100000.0
                     )
             if expected_columns is None:
                 expected_columns = n_columns
             elif n_columns != expected_columns:
                 raise ValueError("GPUMD XYZ columns changed between frames")
 
-            position_slice = _property_slice(
-                properties, "pos", "position", "positions"
-            )
-            frame = {
-                POSITIONS: _numeric_property(
-                    rows, position_slice, dtype, "pos", 3
-                ),
-                ATOM_IDS: np.arange(1, n_atoms + 1, dtype=np.int64),
-            }
-            species_slice = _property_slice(
-                properties, "species", "element", "symbol"
-            )
-            if species_slice is not None:
-                if species_slice.stop - species_slice.start != 1:
-                    raise ValueError("extended XYZ species must have one column")
-                atom_types = np.empty(n_atoms, dtype=np.int32)
-                for atom_index, row in enumerate(rows):
-                    label = row[species_slice.start]
-                    if label not in type_ids:
-                        type_ids[label] = len(type_ids)
-                    atom_types[atom_index] = type_ids[label]
-                frame[TYPES] = atom_types
-            else:
-                type_slice = _property_slice(properties, "type", "types")
-                if type_slice is not None:
-                    frame[TYPES] = _numeric_property(
-                        rows, type_slice, np.int32, "type", 1
-                    ).reshape(n_atoms)
-
-            id_slice = _property_slice(properties, "id", "atom_id", "atomid")
-            if id_slice is not None:
-                frame[ATOM_IDS] = _numeric_property(
-                    rows, id_slice, np.int64, "id", 1
-                ).reshape(n_atoms)
-
-            velocity_slice = _property_slice(
-                properties, "vel", "velo", "velocity", "velocities"
-            )
-            if velocity_slice is not None:
-                frame[VELOCITIES] = (
-                    _numeric_property(rows, velocity_slice, dtype, "vel", 3)
-                    * 100000.0
-                )
             cell = _lattice_from_comment(comment)
             if cell is not None:
                 frame[CELLS] = cell

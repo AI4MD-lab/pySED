@@ -9,7 +9,7 @@ import numpy as np
 
 from pySED.io.netcdf import NetCDFReader
 from pySED.io.prepare import default_converted_path, prepare_trajectory
-from pySED.io.schema import ATOM_IDS, POSITIONS, TYPES, VELOCITIES
+from pySED.io.schema import ATOM_IDS, CELLS, POSITIONS, TYPES, VELOCITIES
 from pySED.io.text import (
     GPUMD_XYZ,
     LAMMPS_DUMP,
@@ -59,6 +59,89 @@ ITEM: ATOMS id type x y z vx vy vz
 
 
 class GPUMDPropertiesTests(unittest.TestCase):
+    def _read(self, text, **kwargs):
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / "dump.xyz"
+            source.write_text(text, encoding="utf-8")
+            return list(iter_gpumd_xyz(source, **kwargs))
+
+    def test_standard_layout_matches_python_float_parsing_exactly(self):
+        rows = [
+            "1.123456789012345 -0.0 2.2250738585072014e-308 0.001234567890123456 -1e-9 3e-4",
+            "1.000000059604644775390625 2.0000000000000004 4.9e-324 -0.0 0.00050000001 1e-6",
+        ]
+        comment = 'Lattice="10 0 0 0 11 0 0 0 12" Properties=species:S:1:pos:R:3:vel:R:3'
+        text = f"2\n{comment}\nSr {rows[0]}\nTi {rows[1]}\n"
+        for dtype in (np.float32, np.float64):
+            with self.subTest(dtype=dtype):
+                data = self._read(text, dtype=dtype)[0].data
+                expected = np.asarray([[float(x) for x in row.split()] for row in rows], dtype=dtype)
+                # Byte equality also checks signed zero and dtype, not just tolerance.
+                self.assertEqual(data[POSITIONS].tobytes(), expected[:, :3].tobytes())
+                self.assertEqual(data[VELOCITIES].tobytes(), (expected[:, 3:] * 100000.0).tobytes())
+                np.testing.assert_array_equal(data[TYPES], [[0, 1]])
+                np.testing.assert_array_equal(data[ATOM_IDS], [1, 2])
+                np.testing.assert_array_equal(data[CELLS], [np.diag([10., 11., 12.])])
+
+    def test_position_only_and_type_order_across_batch_boundaries(self):
+        text = (
+            '2\nProperties="SPECIES:s:1:POS:r:3"\nTi 1 2 3\nSr 4 5 6\n'
+            '2\nProperties=species:S:1:pos:R:3\nO 7 8 9\nTi 10 11 12'
+        )
+        batches = self._read(text, batch_size=1)
+        self.assertEqual([batch.start for batch in batches], [0, 1])
+        np.testing.assert_array_equal(batches[0].data[TYPES], [[0, 1]])
+        np.testing.assert_array_equal(batches[1].data[TYPES], [[2, 0]])
+        self.assertNotIn(VELOCITIES, batches[0].data)
+        self.assertNotIn(CELLS, batches[0].data)
+        np.testing.assert_array_equal(batches[1].data[POSITIONS], [[[7, 8, 9], [10, 11, 12]]])
+
+    def test_general_layouts_keep_extra_fields_aliases_and_legacy_input(self):
+        cases = (
+            ("Properties=species:S:1:pos:R:3:label:S:1:vel:R:3", "Sr 1 2 3 mobile .001 .002 .003", 1, 0),
+            ("Properties=id:I:1:type:I:1:positions:R:3:velocities:R:3", "42 7 1 2 3 .001 .002 .003", 42, 7),
+            ("Properties=velocity:R:3:element:S:1:position:R:3", ".001 .002 .003 Sr 1 2 3", 1, 0),
+            ("legacy comment", "Sr 1 2 3 .001 .002 .003 ignored", 1, 0),
+            ("Properties=species:S:1:pos:R:3:vel:R:3:force:R:3", "Sr 1 2 3 .001 .002 .003 4 5 6", 1, 0),
+        )
+        for comment, row, atom_id, atom_type in cases:
+            with self.subTest(comment=comment):
+                data = self._read(f"1\n{comment}\n{row}\n", dtype=np.float64)[0].data
+                np.testing.assert_array_equal(data[POSITIONS], [[[1, 2, 3]]])
+                np.testing.assert_array_equal(data[VELOCITIES], [[[100, 200, 300]]])
+                np.testing.assert_array_equal(data[ATOM_IDS], [atom_id])
+                np.testing.assert_array_equal(data[TYPES], [[atom_type]])
+
+    def test_python_numeric_spellings_and_whitespace_remain_accepted(self):
+        for row in ("Sr 1_000 ２ 3", "Sr\t1\u20032\u20033"):
+            with self.subTest(row=row):
+                data = self._read(f"1\nProperties=species:S:1:pos:R:3\n{row}\n")[0].data
+                expected = np.asarray([float(x) for x in row.split()[1:]], dtype=np.float32)
+                np.testing.assert_array_equal(data[POSITIONS][0, 0], expected)
+
+    def test_nonfinite_values_match_python_float(self):
+        row = "-nan +inf -Infinity"
+        for dtype in (np.float32, np.float64):
+            data = self._read(f"1\nProperties=species:S:1:pos:R:3\nSr {row}\n", dtype=dtype)[0].data
+            expected = np.asarray([float(x) for x in row.split()], dtype=dtype)
+            np.testing.assert_array_equal(data[POSITIONS][0, 0], expected)
+            np.testing.assert_array_equal(np.signbit(data[POSITIONS][0, 0]), np.signbit(expected))
+
+    def test_invalid_numeric_tokens_and_compensating_ragged_rows_are_rejected(self):
+        comment = "Properties=species:S:1:pos:R:3"
+        for token in ("3junk", "nan(payload)", "1e", "1_", "bad"):
+            with self.subTest(token=token), self.assertRaises(ValueError):
+                self._read(f"1\n{comment}\nSr 1 2 {token}\n")
+        with self.assertRaisesRegex(ValueError, "columns do not match"):
+            self._read(f"2\n{comment}\nSr 1 2\nTi 3 4 5 6\n")
+        with self.assertRaises(EOFError):
+            self._read(f"2\n{comment}\nSr 1 2 3\n")
+
+    def test_layout_changes_still_validate_columns_and_fields(self):
+        first = "1\nProperties=species:S:1:pos:R:3\nSr 1 2 3\n"
+        with self.assertRaisesRegex(ValueError, "columns changed"):
+            self._read(first + "1\nProperties=species:S:1:pos:R:3:vel:R:3\nSr 1 2 3 4 5 6\n")
+
     def test_extxyz_uses_the_declared_properties_order(self) -> None:
         text = """\
 2
