@@ -15,6 +15,7 @@ import numpy as np
 
 from pySED.backends import create_backend
 from pySED.backends.cpu import CPUBackend, _share_numpy_array
+from pySED.backends.common import qpoint_batches
 from pySED.sed.Phonon import spectral_energy_density
 from pySED.io.schema import POSITIONS, VELOCITIES, TrajectoryBatch
 from pySED.sed.sed_kernel import SEDKernelConfig, calculate_q_batch
@@ -35,6 +36,58 @@ class BackendTests(unittest.TestCase):
             output_partial=False,
             amu_2_kg=1.66054e-27,
         )
+
+    def test_q_batches_cover_small_and_large_paths_under_a_memory_cap(self):
+        for count in (0, 1, 2, 7, 55, 1001):
+            for workers in (1, 4, 64):
+                for limit in (1, 3, 16, None):
+                    with self.subTest(count=count, workers=workers, limit=limit):
+                        batches = qpoint_batches(count, workers, limit)
+                        covered = [q for start, stop in batches for q in range(start, stop)]
+                        self.assertEqual(covered, list(range(count)))
+                        sizes = [stop - start for start, stop in batches]
+                        if sizes:
+                            self.assertLessEqual(max(sizes) - min(sizes), 1)
+                            if limit is not None:
+                                self.assertLessEqual(max(sizes), limit)
+
+    def test_cpu_batches_respond_to_frames_available_memory_and_prefetch(self):
+        config = replace(self.config, qpoints=np.zeros((55, 3)))
+        backend = CPUBackend(config, config.qpoints, 1)
+        longer = np.tile(self.vels, (128, 1, 1))
+        with patch("pySED.backends.cpu.available_cpu_memory", return_value=2_000_000):
+            self.assertEqual(backend._q_batches(self.vels), [(0, 55)])
+            batches = backend._q_batches(longer)
+            self.assertGreater(len(batches), 1)
+            backend._prefetch = True
+            self.assertGreater(len(backend._q_batches(longer)), len(batches))
+        with patch("pySED.backends.cpu.available_cpu_memory", return_value=10**9):
+            self.assertEqual(backend._q_batches(longer), [(0, 55)])
+        with patch("pySED.backends.cpu.available_cpu_memory", return_value=None):
+            self.assertTrue(all(stop - start <= 5 for start, stop in backend._q_batches(longer)))
+        with patch("pySED.backends.cpu.available_cpu_memory", return_value=0):
+            self.assertEqual(len(backend._q_batches(longer)), 55)
+
+    def test_memory_limited_batches_preserve_total_and_partial_sed(self):
+        for partial in (False, True):
+            config = replace(self.config, output_partial=partial)
+            expected = calculate_q_batch(
+                self.vels, self.cell_vecs, config.qpoints, config.basis_ids, config,
+            )
+            for cores in (1, 2):
+                for available in (0, 10**9):
+                    with self.subTest(partial=partial, cores=cores, available=available):
+                        with redirect_stdout(StringIO()), patch(
+                            "pySED.backends.cpu.available_cpu_memory", return_value=available,
+                        ):
+                            with CPUBackend(config, config.qpoints, cores) as backend:
+                                result = np.empty_like(expected)
+                                backend.prepare(
+                                    self.vels, self.cell_vecs, result,
+                                    np.zeros_like(result), prefetch=False,
+                                )
+                                backend.compute(self.vels, self.cell_vecs, result)
+                                np.testing.assert_allclose(result, expected, rtol=1e-13)
 
     def test_serial_and_persistent_cpu_backends_match_for_two_blocks(self):
         for partial_output in (False, True):
