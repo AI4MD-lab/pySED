@@ -72,9 +72,9 @@ def _print_run_summary(input_file, params) -> None:
     if params.device == "gpu":
         device = "GPU (single CUDA device)"
     elif params.max_cores == 1:
-        device = "CPU (1 process)"
+        device = "CPU (1 compute thread)"
     else:
-        device = f"CPU (up to {params.max_cores} processes)"
+        device = f"CPU (up to {params.max_cores} compute threads; auto)"
 
     border = f"{_BANNER_INDENT}{'=' * _BANNER_WIDTH}"
     divider = f"{_BANNER_INDENT}{'-' * _BANNER_WIDTH}"

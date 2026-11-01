@@ -3,6 +3,7 @@
 import subprocess
 import sys
 import unittest
+from threadpoolctl import threadpool_info, threadpool_limits
 from contextlib import redirect_stdout
 from dataclasses import replace
 from io import StringIO
@@ -14,7 +15,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 from pySED.backends import create_backend
-from pySED.backends.cpu import CPUBackend, _share_numpy_array
+from pySED.backends.cpu import CPUBackend, _share_numpy_array, _cpu_budget
 from pySED.backends.common import qpoint_batches
 from pySED.sed.Phonon import spectral_energy_density
 from pySED.io.schema import POSITIONS, VELOCITIES, TrajectoryBatch
@@ -96,6 +97,7 @@ class BackendTests(unittest.TestCase):
                 with self.subTest(partial=partial_output, cores=cores):
                     with redirect_stdout(StringIO()):
                         with CPUBackend(config, config.qpoints, cores) as backend:
+                            backend._configure(cores, 1)
                             pool = backend._executor
                             for scale in (1.0, 2.0):
                                 vels = self.vels * scale
@@ -118,8 +120,87 @@ class BackendTests(unittest.TestCase):
         with redirect_stdout(StringIO()):
             with self.assertRaises(IndexError):
                 with backend:
+                    backend._configure(2, 1)
                     backend.compute(self.vels, self.cell_vecs, np.zeros((8, 7)))
         self.assertIsNone(backend._executor)
+
+    def test_cpu_budget_respects_affinity(self):
+        with patch("pySED.backends.cpu.os.sched_getaffinity", return_value={2, 4, 6}, create=True):
+            self.assertEqual(_cpu_budget(8), 3)
+            self.assertEqual(_cpu_budget(2), 2)
+        with patch("pySED.backends.cpu.os.sched_getaffinity", side_effect=OSError, create=True), patch(
+            "pySED.backends.cpu.os.cpu_count", return_value=2,
+        ):
+            self.assertEqual(_cpu_budget(8), 2)
+
+    def test_candidates_respect_cpu_and_full_block_memory(self):
+        config = replace(self.config, qpoints=np.zeros((55, 3)))
+        with patch("pySED.backends.cpu._cpu_budget", return_value=8):
+            backend = CPUBackend(config, config.qpoints, 8)
+        with patch("pySED.backends.cpu.available_cpu_memory", return_value=10**10):
+            candidates = backend._candidates(self.vels)
+        self.assertIn((1, 4), candidates)
+        self.assertIn((2, 4), candidates)
+        self.assertIn((8, 1), candidates)
+        self.assertTrue(all(workers * threads <= 8 for workers, threads in candidates))
+        for available in (0, None):
+            with patch("pySED.backends.cpu.available_cpu_memory", return_value=available):
+                self.assertTrue(all(workers == 1 for workers, _ in backend._candidates(self.vels)))
+        with patch("pySED.backends.cpu.available_cpu_memory", return_value=600 * 1024**2):
+            self.assertIn((2, 4), backend._candidates(self.vels))
+            large = np.broadcast_to(self.vels[:1], (1000000, 6, 3))
+            self.assertTrue(all(workers == 1 for workers, _ in backend._candidates(large)))
+
+    def test_selection_runs_once_and_reuses_a_budgeted_pool(self):
+        timings = {(1, 1): .4, (1, 4): .3, (2, 2): .2, (4, 1): .25}
+        with patch("pySED.backends.cpu._cpu_budget", return_value=4), patch(
+            "pySED.backends.cpu.available_cpu_memory", return_value=10**10,
+        ), redirect_stdout(StringIO()):
+            with CPUBackend(self.config, self.config.qpoints, 4) as backend:
+                with patch.object(backend, "_benchmark", side_effect=lambda v, c, p, t: timings[p, t]) as probe:
+                    result = np.zeros((8, 7))
+                    backend.compute(self.vels, self.cell_vecs, result)
+                    self.assertEqual((backend.num_workers, backend.num_threads), (2, 2))
+                    calls, pool = probe.call_count, backend._executor
+                    backend.compute(self.vels * 2, self.cell_vecs, result)
+                    self.assertEqual(probe.call_count, calls)
+                    self.assertIs(backend._executor, pool)
+                    info = pool.submit(threadpool_info).result(timeout=30)
+                    self.assertTrue(info)
+                    self.assertTrue(all(item["num_threads"] <= 2 for item in info))
+                    expected = calculate_q_batch(self.vels * 2, self.cell_vecs,
+                                                 self.config.qpoints, self.config.basis_ids, self.config)
+                    np.testing.assert_allclose(result, expected, rtol=1e-13)
+            self.assertIsNone(backend._executor)
+
+    def test_probe_executes_the_parallel_path_and_closes_workers(self):
+        with CPUBackend(self.config, self.config.qpoints, 2) as backend:
+            elapsed = backend._benchmark(self.vels, self.cell_vecs, 2, 1)
+            self.assertGreater(elapsed, 0)
+            self.assertIsNone(backend._executor)
+
+    def test_serial_native_limits_are_restored_even_on_error(self):
+        with threadpool_limits(limits=2):
+            before = threadpool_info()
+            with CPUBackend(self.config, self.config.qpoints, 1) as backend:
+                def fail(*args, **kwargs):
+                    self.assertTrue(all(item["num_threads"] == 1 for item in threadpool_info()))
+                    raise RuntimeError("kernel failure")
+                with patch("pySED.backends.cpu.calculate_q_batch", side_effect=fail):
+                    with self.assertRaisesRegex(RuntimeError, "kernel failure"), redirect_stdout(StringIO()):
+                        backend.compute(self.vels, self.cell_vecs, np.zeros((8, 7)))
+            self.assertEqual(threadpool_info(), before)
+
+    def test_one_core_skips_tuning_and_tiny_blocks_skip_process_trials(self):
+        with redirect_stdout(StringIO()):
+            with CPUBackend(self.config, self.config.qpoints, 1) as backend:
+                with patch.object(backend, "_benchmark") as probe:
+                    backend.compute(self.vels, self.cell_vecs, np.zeros((8, 7)))
+                    probe.assert_not_called()
+            with CPUBackend(self.config, self.config.qpoints, 2) as backend:
+                with patch.object(backend, "_benchmark", return_value=.001):
+                    backend._select(self.vels, self.cell_vecs)
+                    self.assertTrue(all(p == 1 for p, t, seconds in backend.tuning_results))
 
     def test_shared_buffer_is_removed_after_an_exception(self):
         with self.assertRaisesRegex(RuntimeError, "deliberate failure"):

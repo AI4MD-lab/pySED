@@ -122,8 +122,8 @@ coordinates or the ``basis.in`` mapping.
 Backends and partial SED
 ------------------------
 
-``device = cpu`` uses one process at ``max_cores = 1`` and persistent
-worker processes otherwise. ``device = gpu`` uses one CUDA GPU for the SED
+``device = cpu`` automatically selects processes/native threads within the
+``max_cores`` budget; ``max_cores = 1`` disables tuning. ``device = gpu`` uses one CUDA GPU for the SED
 kernel; plotting and fitting remain CPU operations.
 
 Set ``output_partial = 1`` during computation to preserve element- and

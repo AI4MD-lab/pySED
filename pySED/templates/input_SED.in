@@ -37,7 +37,7 @@ q_path      = 0.0 0.0 0.0  0.0 0.5 0.0  0.5 0.5 0.0  0.0 0.0 0.0  0.5 0.5 0.5  0
 
 # ==================== Computation ====================
 num_blocks     = 5  # Equal time blocks; average their SED spectra
-max_cores      = 8  # Maximum CPU worker processes; unused on GPU
+max_cores      = 8  # CPU compute-thread budget; automatic processes/threads; unused on GPU
 output_partial = 1  # Also save element/direction-resolved SED
 # Saved frames (total_num_steps / output_data_stride) must divide into full blocks.
 

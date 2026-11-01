@@ -25,7 +25,7 @@ Parameter replacements
    * - ``compress``, ``output_hdf5``
      - ``trajectory_read_mode`` and an automatic ``.pysed.nc`` cache.
    * - ``use_parallel``
-     - ``max_cores = 1`` for serial or a larger value for multiprocessing.
+     - ``max_cores`` is the total CPU compute-thread budget; processes/threads are selected automatically.
    * - ``peak_height``, ``peak_prominence``
      - Dimensionless ``peak_min_significance``.
    * - ``lorentz_fit_cutoff``

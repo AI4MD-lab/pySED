@@ -8,8 +8,9 @@ device
    device = cpu
 
 **Meaning**
-   Selects the device for SED computation. ``cpu`` uses NumPy with one process when
-   ``max_cores = 1`` and persistent CPU workers when ``max_cores > 1``.
+   Selects the device for SED computation. ``cpu`` uses NumPy and automatically
+   selects processes/native threads within the ``max_cores`` budget.
+   ``max_cores = 1`` uses one process and one native thread without tuning.
    ``gpu`` uses CuPy with one CUDA GPU per pySED process. Plotting, peak detection,
    and spectral fitting remain CPU operations.
 
