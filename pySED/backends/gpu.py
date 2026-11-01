@@ -124,7 +124,7 @@ class GPUBackend:
             self.close()
             raise
         print(
-            "\n****************** Using CuPy GPU backend for "
+            "\n    ****************** Using CuPy GPU backend for "
             "computing SED *****************"
         )
         return self
@@ -294,7 +294,7 @@ class GPUBackend:
         self._gpu_q_batch_size = selected_batch
         used_bytes = total_bytes - free_bytes
         print(
-            "\n  🚀🚀 GPU memory before SED: "
+            "\n        🚀🚀 GPU memory before SED: "
             f"{used_bytes / 1e9:.2f} GB used; "
             f"{free_bytes / 1e9:.2f} GB available "
             f"of {total_bytes / 1e9:.2f} GB."
@@ -329,7 +329,7 @@ class GPUBackend:
         other_sed_work = max(0.0, total_elapsed - profiled_total)
 
         print(
-            "\n****************** CuPy SED timing profile "
+            "\n    ****************** CuPy SED timing profile "
             "******************"
         )
         for label, seconds in stages:
@@ -339,21 +339,21 @@ class GPUBackend:
                 else 0.0
             )
             print(
-                f"  {label:<30}: {seconds:8.2f} s "
+                f"        {label:<30}: {seconds:8.2f} s "
                 f"({percentage:5.1f}%)"
             )
         print(
-            f"  {'Sum of the six rows above':<30}: "
+            f"        {'Sum of the six rows above':<30}: "
             f"{profiled_total:8.2f} s"
         )
         print(
-            f"  {'Other SED work':<30}: "
+            f"        {'Other SED work':<30}: "
             f"{other_sed_work:8.2f} s"
         )
         if self._gpu_total_bytes:
             print(
-                "\n  🚀🚀 Observed GPU memory after SED blocks: "
+                "\n        🚀🚀 Observed GPU memory after SED blocks: "
                 f"{self._gpu_observed_used_bytes / 1e9:.2f} GB used "
                 f"of {self._gpu_total_bytes / 1e9:.2f} GB."
             )
-        print("\n  🚀🚀 CuPy cached GPU memory has been released.")
+        print("\n    🚀🚀 CuPy cached GPU memory has been released.")

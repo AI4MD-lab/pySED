@@ -90,11 +90,11 @@ class spectral_energy_density:
             )
 
         print(
-            "\nThe number of frames used to calculate SED is "
+            "\n        The number of frames used to calculate SED is "
             f"{self.num_frame}."
         )
         print(
-            f"\nThe {self.num_frame} frame trajectories were divided into "
+            f"\n        The {self.num_frame} frame trajectories were divided into "
             f"{params.num_blocks} blocks for averaging."
         )
 
@@ -111,11 +111,11 @@ class spectral_energy_density:
         self.amu_2_kg = 1.66054e-27
 
         print(
-            "\n****** Velocity unit normalized to m/s; "
+            "\n    ****** Velocity unit normalized to m/s; "
             f"SED output scale: {self.sed_unit} ******"
         )
         if self.legacy_unit:
-            print(f"  Note: {LEGACY_UNIT_NOTICE}")
+            print(f"        Note: {LEGACY_UNIT_NOTICE}")
 
         # scipy.fftpack.fftfreq returns Hz; expose the frequency axis in THz.
         self.freq_fft = (
@@ -153,7 +153,7 @@ class spectral_energy_density:
         elapsed = time.time() - start_time
         backend.report(elapsed, self._trajectory_wait)
         print(
-            "\n************ Total SED calculation time: "
+            "\n    ************ Total SED calculation time: "
             f"{elapsed:.2f} seconds. ************"
         )
 
@@ -229,11 +229,11 @@ class spectral_energy_density:
 
         if self.output_partial:
             print(
-                "\n******* Output partial SED for each atom type and "
+                "\n    ******* Output partial SED for each atom type and "
                 "different directions *******"
             )
             print(
-                "  🚀🚀 Element -> mass mapping "
+                "        🚀🚀 Element -> mass mapping "
                 "(mass in amu; used for partial SED filenames):"
             )
             for type_index, mass in enumerate(unique_masses):
@@ -291,7 +291,7 @@ class spectral_energy_density:
                     prefetch=self.trajectory_prefetch and self.num_blocks > 1,
                 )
             print(
-                "\n**************** Now calculate on averaging blocks "
+                "\n    **************** Now calculate on averaging blocks "
                 f"{block_index + 1}/{self.num_blocks} ... ****************\n"
             )
             backend.compute(vels, cell_vecs, qdot)

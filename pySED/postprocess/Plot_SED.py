@@ -87,7 +87,7 @@ def _prepare_sed_for_log_scale(sed, vmin, vmax):
 def _print_plot_detail(label, value):
     """Print one plot detail using the pipeline's column alignment."""
 
-    print(f"      {label:<16}: {value}")
+    print(f"        {label:<16}: {value}")
 
 
 def _input_filename(params):

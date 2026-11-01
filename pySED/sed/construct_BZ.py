@@ -127,29 +127,29 @@ class BZ_methods(object):
         if getattr(params, "dump_group_supercell", None) is not None:
             if self.box_info:
                 print(
-                    "\n************************** Structural information "
+                    "\n    ************************** Structural information "
                     "*****************************"
                 )
-                print("\n🚀 Local-group SED mode is active.")
+                print("\n    🚀 Local-group SED mode is active.")
                 print(
-                    "   The Q-point grid is built from the local cell "
+                    "        The Q-point grid is built from the local cell "
                     "specified by dump_group_supercell in the input file."
                 )
                 print(
-                    "   Atom positions and velocities are read unchanged "
+                    "        Atom positions and velocities are read unchanged "
                     "from the trajectory."
                 )
                 print(
-                    "   The full simulation cell stored in the trajectory "
+                    "        The full simulation cell stored in the trajectory "
                     "is not used for this local Q grid."
                 )
                 print(
-                    "\nLocal cell specified for this dumped group "
+                    "\n        Local cell specified for this dumped group "
                     "is (Angstrom):"
                 )
                 for row in self.supercell:
                     print(
-                        "  {: .8e}    {: .8e}    {: .8e}".format(
+                        "            {: .8e}    {: .8e}    {: .8e}".format(
                             row[0], row[1], row[2]
                         )
                     )
@@ -167,44 +167,44 @@ class BZ_methods(object):
             expected_prim_unitcell = generate_data.structure_maker.calculate_restricted_cell(expected_prim_unitcell)
 
         if self.box_info:
-            print("\n************************** Structural information *****************************")
-            print("Primitive unit cell matrix is (Angstrom):")
+            print("\n    ************************** Structural information *****************************")
+            print("        Primitive unit cell matrix is (Angstrom):")
             for row in params.prim_unitcell:
-                print("  {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+                print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
 
-            print("\nMD simulation cell matrix is (Angstrom):")
+            print("\n        MD simulation cell matrix is (Angstrom):")
             for row in box_in_traj:
-                print("  {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+                print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
 
         if np.allclose(box_in_traj, expected_box, atol=1e-4):
             params.prim_unitcell = expected_prim_unitcell
             if self.box_info:
                 print(
-                    "\n⚠️ pySED identified that structural optimization is likely performed using the NVT ensemble.")
+                    "\n    ⚠️ pySED identified that structural optimization is likely performed using the NVT ensemble.")
 
         else:
             if self.box_info:
                 print(
-                    "\n⚠️Warning⚠️: The cell matrix in the trajectory is different from calculated "
+                    "\n    ⚠️Warning⚠️: The cell matrix in the trajectory is different from calculated "
                     "by the primitive cell and supercell dimensions.")
-                print("This suggests that structural optimization is likely performed using the NPT ensemble.")
+                print("        This suggests that structural optimization is likely performed using the NPT ensemble.")
 
             if params.rescale_prim:
                 # Attempt to reconstruct the primitive cell
                 params.prim_unitcell = self._reconstruct_primitive_cell(box_in_traj, params.supercell_dim)
                 if self.box_info:
-                    print("\nNow, pySED have reconstructed primitive unit cell matrix from MD simulation cell (Angstrom):")
+                    print("\n        Now, pySED have reconstructed primitive unit cell matrix from MD simulation cell (Angstrom):")
                     for row in params.prim_unitcell:
-                        print("  {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+                        print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
 
         # see ref: https://phonopy.github.io/phonopy/setting-tags.html#primitive-axes
         if params.prim_axis is not None:
             params.prim_unitcell = params.prim_unitcell @ params.prim_axis
             if self.box_info:
-                print("\nTransformation from the input unit cell to the primitive cell is performed according \'prim_axis\'.")
-                print("Now primitive unit cell is transformed to (Angstrom):")
+                print("\n    Transformation from the input unit cell to the primitive cell is performed according \'prim_axis\'.")
+                print("        Now primitive unit cell is transformed to (Angstrom):")
                 for row in params.prim_unitcell:
-                    print("  {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
+                    print("            {: .8e}    {: .8e}    {: .8e}".format(row[0], row[1], row[2]))
 
     def _construct_BZ_path(self, params):
 
@@ -252,7 +252,7 @@ class BZ_methods(object):
             return np.linalg.norm(dq_cart)  # The Euclidean norm (length) of the difference vector
 
         if self.qpoints_info:
-            print("\n***************************** Q-point information *****************************")
+            print("\n    ***************************** Q-point information *****************************")
 
         cumulative_distance = 0.0
         last_delta = 0.0
@@ -270,7 +270,7 @@ class BZ_methods(object):
             qpoints_cart, _ = BZ_Path.build_commensurate_path(q_start, q_end)
 
             if not len(qpoints_cart):
-                print(f'\n⚠️Warnings⚠️: \nNo commensurate q-points found along path'
+                print(f'\n    ⚠️Warnings⚠️: \n        No commensurate q-points found along path'
                       f' segment {i}: from {start_label}: {fmt_vec(q_start)} to {end_label}: {fmt_vec(q_end)}')
 
                 if q_labels and prev_end_label is not None and prev_end_distance is not None:
@@ -321,11 +321,11 @@ class BZ_methods(object):
             q_distances.extend(distances_segment)
 
             if self.qpoints_info:
-                print(f'\nPath segment {i}: from {start_label}: {fmt_vec(q_start)} to {end_label}: {fmt_vec(q_end)}')
-                print(f'Number of q-points generated: {len(reduced_qpoints)}')
-                print('Reduced q-points:')
+                print(f'\n        Path segment {i}: from {start_label}: {fmt_vec(q_start)} to {end_label}: {fmt_vec(q_end)}')
+                print(f'        Number of q-points generated: {len(reduced_qpoints)}')
+                print('        Reduced q-points:')
                 for q in reduced_qpoints:
-                    print(f'\t(reduced) q = {fmt_vec(q)}')
+                    print(f'            (reduced) q = {fmt_vec(q)}')
 
         self.qpoints = np.vstack(qpoints_list)
         self.reduced_qpoints = np.vstack(reduced_qpoints_list)
@@ -335,7 +335,7 @@ class BZ_methods(object):
 
         # End q-point information section with asterisks
         if self.qpoints_info:
-            print("\n**************** The total number of q-points generated is {}  ****************".format(self.num_qpoints))
+            print("\n    **************** The total number of q-points generated is {}  ****************".format(self.num_qpoints))
 
     def _validate_dump_group_supercell(self, params, bz_path):
         """Compare the local cell repetition count with the count encoded in basis.in.
