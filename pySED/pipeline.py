@@ -28,6 +28,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pySED.console import print_detail as _print_detail, print_section
 from pySED.io.netcdf import is_netcdf
 from pySED.io.prepare import prepare_trajectory
 from pySED.io.schema import CELLS
@@ -35,8 +36,6 @@ from pySED.io.trajectory import prefetch_one, trajectory_block_source
 from pySED.parameters import validate_qpoint_slice_index
 from pySED.postprocess import FileIO, Lorentz, output_files, Plot_SED
 from pySED.sed import Phonon, construct_BZ
-
-_FIT_BLOCK_SEPARATOR = "  " + "-" * 58
 
 # ── step detectors ──────────────────────────────────────────────
 
@@ -83,12 +82,6 @@ def _fit_ready(params):
     return output.is_file()
 
 
-def _print_detail(label, value):
-    """Print one aligned detail row for the current pipeline step."""
-
-    print(f"      {label:<16}: {value}")
-
-
 def _sed_component_description(params):
     """Describe the total or partial SED selected for plotting."""
 
@@ -124,12 +117,12 @@ def step_prepare_trajectory(params):
     params.trajectory_path = str(prepared)
     elapsed = time.perf_counter() - t0
     if prepared == source and is_netcdf(prepared):
-        print(f"  ✓  Reading NetCDF trajectory: {prepared}\n")
+        print(f"    ✓  Reading NetCDF trajectory: {prepared}")
     elif prepared == source:
-        print(f"  ✓  Reading text trajectory directly: {prepared}")
-        print("      NetCDF cache         : disabled\n")
+        print(f"    ✓  Reading text trajectory directly: {prepared}")
+        _print_detail("NetCDF cache", "disabled")
     else:
-        print(f"  ✓  Trajectory ready: {prepared} ({elapsed:.1f} s)\n")
+        print(f"    ✓  Trajectory ready: {prepared} ({elapsed:.1f} s)")
 
 
 def step_compute_sed(params):
@@ -141,7 +134,7 @@ def step_compute_sed(params):
     overlaps subsequent reads. FileIO writes the finished spectrum and its scale.
     """
     step_prepare_trajectory(params)
-    print("  ▶  Computing phonon SED ...")
+    print_section("Computing phonon SED", "🚀")
     t0 = time.perf_counter()
 
     trajectory = trajectory_block_source(params)
@@ -159,7 +152,7 @@ def step_compute_sed(params):
         prefetch_status = "OFF (only one block to process)"
     else:
         prefetch_status = "OFF (blocks load when needed)"
-    print(f"      Trajectory prefetch : {prefetch_status}")
+    _print_detail("Trajectory prefetch", prefetch_status)
     with prefetch_one(raw_blocks, enabled=prefetch_enabled) as blocks:
         try:
             first_block = next(blocks)
@@ -189,16 +182,10 @@ def step_compute_sed(params):
     FileIO.write_output(sed, params, BZ_info)
     finished = time.perf_counter()
     elapsed = finished - t0
-    print(f"  ✓  SED compute done ({elapsed:.1f} s)")
-    print(f"      Initial read/setup : {setup_done - t0:.1f} s")
-    print(
-        "      SED calculation    : "
-        f"{calculation_done - setup_done:.1f} s"
-    )
-    print(
-        "      Output/finalization: "
-        f"{finished - calculation_done:.1f} s"
-    )
+    print_section(f"SED compute done ({elapsed:.1f} s)", "✓")
+    _print_detail("Initial read/setup", f"{setup_done - t0:.1f} s")
+    _print_detail("SED calculation", f"{calculation_done - setup_done:.1f} s")
+    _print_detail("Output/finalization", f"{finished - calculation_done:.1f} s")
 
 
 def step_plot_sed(params):
@@ -214,7 +201,7 @@ def step_plot_sed(params):
     if params.plot_slice:
         validate_qpoint_slice_index(params, data.qpoints)
 
-    print("  ▶  Plotting SED dispersion")
+    print_section("Plotting SED dispersion", "▶")
     _print_detail("Component", _sed_component_description(params))
     Plot_SED.plot_bands(data, params)
 
@@ -233,7 +220,7 @@ def step_plot_sed(params):
         frequency_guidance = (
             f"adjust with {frequency_parameter} in {input_name}"
         )
-        print("\n  ▶  Plotting single-q SED")
+        print_section("Plotting single-q SED", "▶")
         _print_detail("q-point index", f"{q_index} (zero-based)")
         _print_detail(
             "q-point",
@@ -250,7 +237,7 @@ def step_plot_sed(params):
         )
         Plot_SED.plot_slice(data, params)
 
-    print("\n  ✓  SED plotting complete")
+    print_section("SED plotting complete", "✓")
 
 
 def _fit_one_qpoint(data, params):
@@ -258,7 +245,7 @@ def _fit_one_qpoint(data, params):
     fit_result = Lorentz.lorentz(data, params)
     lifetime_file = FileIO.write_phonon_lifetime(fit_result, params)
     Plot_SED.plot_slice(data, params, fit_result=fit_result)
-    print(f"\n  [OK] Lifetime data written: {lifetime_file}")
+    print_section(f"Lifetime data written: {lifetime_file}", "✓")
     return fit_result
 
 
@@ -275,17 +262,13 @@ def step_fit_sed(params):
     lifetime_figure_action = "written"
 
     if params.lorentz_fit_all_qpoint:
-        print("  ▶  Fitting spectral peaks at all Q-points ...")
+        print_section("Fitting spectral peaks at all Q-points", "▶")
         data = FileIO.load_data(params)
         total_qpoints = len(data.q_distances)
         incomplete_qpoints = []
-        print(f"      Total Q-points       : {total_qpoints}")
+        _print_detail("Total Q-points", total_qpoints)
         for j in range(total_qpoints):
-            print(f"\n{_FIT_BLOCK_SEPARATOR}")
-            print(
-                f"  ▶  Fitting Q-point #{j} "
-                f"({j + 1}/{total_qpoints}) ..."
-            )
+            print_section(f"Fitting Q-point #{j} ({j + 1}/{total_qpoints})", "▶")
             q_params = copy(params)
             q_params.qpoint_slice_index = j
             q_params.if_show_figures = False
@@ -309,15 +292,12 @@ def step_fit_sed(params):
                 lifetime,
                 params,
             )
-        print("\n  ▶  All-Q fitting summary")
-        print(f"      {'Q-points processed':<20}: {total_qpoints}")
-        print(f"      {'Fitted modes':<20}: {total_modes}")
-        print(f"      {'Lifetime data':<20}: {total_file}")
-        print(
-            f"      {'Q-point figures':<20}: "
-            f"{output_files.FITTING_QPOINT_DIRECTORY}"
-        )
-        print("\n  ✓  All-Q spectral fitting complete")
+        print_section("All-Q fitting summary")
+        _print_detail("Q-points processed", total_qpoints)
+        _print_detail("Fitted modes", total_modes)
+        _print_detail("Lifetime data", total_file)
+        _print_detail("Q-point figures", output_files.FITTING_QPOINT_DIRECTORY)
+        print_section("All-Q spectral fitting complete", "✓")
         if incomplete_qpoints:
             incomplete_peak_count = sum(
                 len(peaks) for _, peaks in incomplete_qpoints
@@ -326,9 +306,9 @@ def step_fit_sed(params):
             qpoint_word = (
                 "Q-point" if len(incomplete_qpoints) == 1 else "Q-points"
             )
-            print("\n  >  Q-points to inspect")
+            print_section("Q-points to inspect", "⚠")
             print(
-                "      Incomplete line shapes: "
+                "        Incomplete line shapes: "
                 f"{incomplete_peak_count} {peak_word} across "
                 f"{len(incomplete_qpoints)} {qpoint_word}"
             )
@@ -338,25 +318,25 @@ def step_fit_sed(params):
                 )
                 peak_list = ", ".join(str(number) for number in peak_numbers)
                 print(
-                    f"      Q-point #{qpoint_index:<8}: "
+                    f"        Q-point #{qpoint_index:<8}: "
                     f"{fitted_peak_word} {peak_list}"
                 )
-            print("      Check these figures in Fitting-Qpoint/.")
-            print("      Adjust peak_min_significance if needed.")
+            print("        Check these figures in Fitting-Qpoint/.")
+            print("        Adjust peak_min_significance if needed.")
         print(
-            "\n  Tip: Check all fit figures. To refine one Q point, set its"
+            "\n    Tip: Check all fit figures. To refine one Q point, set its"
         )
         print(
-            "       qpoint_slice_index, adjust peak_min_significance and"
+            "         qpoint_slice_index, adjust peak_min_significance and"
         )
         print(
-            "       fitting_function = auto | lorentz | dho, then set"
+            "         fitting_function = auto | lorentz | dho, then set"
         )
-        print("       lorentz_fit_all_qpoint = 0 and")
-        print("       re_output_total_freq_lifetime = 1.")
+        print("         lorentz_fit_all_qpoint = 0 and")
+        print("         re_output_total_freq_lifetime = 1.")
     else:
         # single Q-point fit
-        print(f"  ▶  Fitting Q-point #{params.qpoint_slice_index} ...")
+        print_section(f"Fitting Q-point #{params.qpoint_slice_index}", "▶")
         data = FileIO.load_data(params)
         validate_qpoint_slice_index(params, data.qpoints)
         _fit_one_qpoint(data, params)
@@ -374,14 +354,14 @@ def step_fit_sed(params):
                 )
                 lifetime_figure_action = "redrawn"
             print(
-                "  ✓  Combined lifetime data rebuilt → "
+                "    ✓  Combined lifetime data rebuilt → "
                 f"{total_file} ({total_modes} modes)"
             )
-        print("\n  ✓  Single-Q spectral fit done")
+        print_section("Single-Q spectral fit done", "✓")
 
     if lifetime_figure is not None:
         print(
-            f"\n  🖼  Lifetime figure {lifetime_figure_action}: {lifetime_figure}"
+            f"\n    🖼  Lifetime figure {lifetime_figure_action}: {lifetime_figure}"
         )
 
 
@@ -413,7 +393,7 @@ def run(params):
         # ── explicit action ──
         steps[action](params)
 
-    print("\n  ✅ pySED task finished successfully.\n")
+    print("\n    ✅ pySED task finished successfully.\n")
 
 
 def _run_thinking(params, steps):
@@ -426,23 +406,23 @@ def _run_thinking(params, steps):
     """
 
     if not _plot_data_ready(params):
-        print("  💡 thinking: incomplete SED data → compute + plot")
+        print("    💡 thinking: incomplete SED data → compute + plot")
         steps["compute"](params)
         steps["plot"](params)
         return
 
     if not _plot_ready(params):
-        print("  💡 thinking: SED data found, plot missing → plot")
+        print("    💡 thinking: SED data found, plot missing → plot")
         steps["plot"](params)
         return
 
     if not _fit_ready(params):
-        print("  💡 thinking: SED data and plots ready → fit")
+        print("    💡 thinking: SED data and plots ready → fit")
         steps["fit"](params)
         return
 
-    print("  ✅  All steps already complete!")
-    print("      SED data, requested plots, and lifetime data all exist.")
-    print("      To replot, use action = plot.")
-    print("      To compute, use action = compute.")
-    print("      To fit, use action = fit.")
+    print("    ✅  All steps already complete!")
+    print("        SED data, requested plots, and lifetime data all exist.")
+    print("        To replot, use action = plot.")
+    print("        To compute, use action = compute.")
+    print("        To fit, use action = fit.")

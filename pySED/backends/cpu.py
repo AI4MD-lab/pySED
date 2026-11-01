@@ -16,12 +16,15 @@
 
 """CPU execution: serial Q batches or a persistent shared-memory pool."""
 
+import os
 from concurrent.futures import ProcessPoolExecutor, as_completed, wait
 from contextlib import contextmanager
-from multiprocessing import shared_memory
+from multiprocessing import get_context, shared_memory
 
 import numpy as np
+from threadpoolctl import threadpool_limits
 
+from pySED.console import print_detail
 from pySED.sed.sed_kernel import calculate_q_batch
 from pySED.backends.common import (
     available_cpu_memory, estimate_kernel_working_bytes,
@@ -30,13 +33,16 @@ from pySED.backends.common import (
 
 
 _CPU_WORKER_CONFIG = None
+_CPU_WORKER_LIMIT = None
+_WORKER_OVERHEAD = 128 * 1024**2
 
 
-def _initialize_cpu_worker(config):
+def _initialize_cpu_worker(config, num_threads):
     """Install static topology metadata once in each persistent CPU worker."""
 
-    global _CPU_WORKER_CONFIG
+    global _CPU_WORKER_CONFIG, _CPU_WORKER_LIMIT
     _CPU_WORKER_CONFIG = config
+    _CPU_WORKER_LIMIT = threadpool_limits(limits=num_threads)
 
 
 def _compute_shared_q_batch(
@@ -104,53 +110,88 @@ def _share_numpy_array(values):
         segment.unlink()
 
 
-class CPUBackend:
-    """Compute SED blocks serially or with a reusable pool of CPU workers.
+def _cpu_budget(requested):
+    """Respect the process CPU affinity without depending on a job scheduler."""
+    try:
+        available = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        available = os.cpu_count() or 1
+    return max(1, min(requested, available))
 
-    Use as a context manager. A parallel calculation shares each velocity
-    block once and sends q-point ranges to workers, rather than copying the
-    whole block for every task. Workers return unnormalized power arrays;
-    compute() places them in the caller's result array in q-point order.
+
+class CPUBackend:
+    """Allocate process/BLAS parallelism once, then reuse the CPU backend.
+
+    max_cores bounds processes * native threads, capped by CPU affinity.
+    Each process uses up to four threads; q count and memory cap workers.
+    The SED kernel and production trajectory frames are unchanged.
     """
 
     def __init__(self, config, reduced_qpoints, max_cores):
-        """Store the topology and choose the CPU worker count."""
         self.config = config
         self.reduced_qpoints = reduced_qpoints
-        self.max_cores = max_cores
-        self.num_workers = min(
-            max_cores, max(1, config.qpoints.shape[0] // 2),
-        )
+        self.max_cores = _cpu_budget(max_cores)
+        self.num_workers = self.num_threads = 1
         self._executor = None
         self._prefetch = False
+        self._configured = False
 
     def __enter__(self):
-        """Start the worker pool when parallel execution is enabled."""
-        if self.max_cores > 1:
-            self._executor = ProcessPoolExecutor(
-                max_workers=self.num_workers,
-                initializer=_initialize_cpu_worker,
-                initargs=(self.config,),
-            )
-            print(
-                f"\n****************** Using {self.num_workers} CPU processes "
-                "for computing SED *****************"
-            )
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        """Shut down workers when leaving the computation context."""
         self.close()
 
     def close(self):
-        """Wait for outstanding worker tasks and shut down the process pool."""
         if self._executor is not None:
             self._executor.shutdown()
             self._executor = None
 
+    def _configure(self, workers, threads):
+        """Only one pool may be alive; spawn avoids forking an active BLAS pool."""
+        self.close()
+        self.num_workers, self.num_threads = workers, threads
+        if workers > 1:
+            self._executor = ProcessPoolExecutor(
+                max_workers=workers, mp_context=get_context("spawn"),
+                initializer=_initialize_cpu_worker,
+                initargs=(self.config, threads),
+            )
+        self._configured = True
+
+    def _reserved_bytes(self, vels, workers):
+        parallel = workers > 1
+        reserved = (int(parallel) + 2 * int(self._prefetch)) * vels.nbytes
+        if parallel:
+            components = self.config.num_types * 3 if self.config.output_partial else 1
+            reserved += vels.shape[0] * len(self.config.qpoints) * components * 8
+            reserved += workers * _WORKER_OVERHEAD
+        return reserved
+
+    def _allocate(self, vels):
+        """Use a fixed four-thread rule, reducing workers to fit q count and RAM."""
+        if self._configured:
+            return
+        threads = min(4, self.max_cores)
+        workers = max(1, min(self.max_cores // threads, len(self.config.qpoints)))
+        available = available_cpu_memory()
+        working = estimate_kernel_working_bytes(vels, self.config, 1, cpu=True)
+        while workers > 1 and (
+            available is None
+            or self._reserved_bytes(vels, workers) + workers * working > available // 2
+        ):
+            workers -= 1
+        self._configure(workers, threads)
+        print()
+        print_detail(
+            "CPU allocation",
+            f"{workers} process{'es' if workers > 1 else ''} "
+            f"× {threads} thread{'s' if threads > 1 else ''}"
+        )
+
     def prepare(self, vels, cell_vecs, result, accumulator, *, prefetch):
-        """Report the estimated memory needed for a trajectory block."""
         self._prefetch = prefetch
+        self._allocate(vels)
         max_q_batch = max(stop - start for start, stop in self._q_batches(vels))
         print_cpu_memory_estimate(
             vels, cell_vecs, self.config, accumulator, result,
@@ -160,46 +201,30 @@ class CPUBackend:
         )
 
     def _q_batches(self, vels):
-        """Balance work across existing workers within a free-memory budget.
-
-        Reserve shared/prefetched input and queued results, leaving half of
-        available RAM for other allocations. If RAM cannot be queried, retain
-        the old five-q limit. One q is the minimum even above the budget.
-        """
-        parallel = self._executor is not None
-        workers = self.num_workers if parallel else 1
+        """Use half of available RAM for worker workspaces and extra buffers."""
+        workers = self.num_workers
         available = available_cpu_memory()
         if available is None:
             return qpoint_batches(len(self.config.qpoints), workers, 5)
-        reserved = (int(parallel) + 2 * int(self._prefetch)) * vels.nbytes
-        if parallel:
-            components = self.config.num_types * 3 if self.config.output_partial else 1
-            reserved += vels.shape[0] * len(self.config.qpoints) * components * 8
-        budget = max(0, available // 2 - reserved) // workers
+        budget = max(0, available // 2 - self._reserved_bytes(vels, workers)) // workers
         fixed = estimate_kernel_working_bytes(vels, self.config, 0, cpu=True)
         per_q = estimate_kernel_working_bytes(vels, self.config, 1, cpu=True) - fixed
         limit = max(1, (budget - fixed) // per_q)
         return qpoint_batches(len(self.config.qpoints), workers, limit)
 
     def compute(self, vels, cell_vecs, result):
-        """Fill the caller's result array with one block of FFT power.
-
-        vels has shape (frames, atoms, 3), and cell_vecs is (cells, 3).
-        result has shape (frames, q_points), with extra (types, 3) axes for partial
-        SED. Parallel workers may finish out of order; their results are assigned
-        to the correct q slices before this method returns.
-        """
+        self._allocate(vels)
         batches = self._q_batches(vels)
         if self._executor is None:
-            for start, stop in batches:
-                print_qpoints(self.reduced_qpoints, start, stop)
-                result[:, start:stop, ...] = calculate_q_batch(
-                    vels, cell_vecs, self.config.qpoints[start:stop],
-                    self.config.basis_ids, self.config,
-                )
+            with threadpool_limits(limits=self.num_threads):
+                for start, stop in batches:
+                    print_qpoints(self.reduced_qpoints, start, stop)
+                    result[:, start:stop, ...] = calculate_q_batch(
+                        vels, cell_vecs, self.config.qpoints[start:stop],
+                        self.config.basis_ids, self.config,
+                    )
             return
 
-        # Only metadata and small Q ranges are sent through the process queue.
         with _share_numpy_array(vels) as shared:
             name, shape, dtype_string = shared
             futures = []
@@ -214,8 +239,6 @@ class CPUBackend:
                     start, stop, values = future.result()
                     result[:, start:stop, ...] = values
             finally:
-                # Keep the shared segment alive until every submitted reader
-                # is done, even when one worker raises an exception.
                 for future in futures:
                     future.cancel()
                 wait(futures)

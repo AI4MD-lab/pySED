@@ -15,7 +15,7 @@
 
 """Select the CPU or GPU implementation used by the SED driver.
 
-Both backends are context managers: entering prepares reusable resources,
+Both backends are context managers that own reusable resources,
 and leaving releases them even when calculation fails. The driver calls
 prepare() once to check memory, compute() for each trajectory block, and
 report() after all blocks. compute() fills a NumPy result array in place;
