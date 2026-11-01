@@ -24,6 +24,7 @@ import numpy as np
 
 from pySED.sed.sed_kernel import calculate_q_batch
 from pySED.backends.common import (
+    available_cpu_memory, estimate_kernel_working_bytes,
     print_cpu_memory_estimate, print_qpoints, qpoint_batches,
 )
 
@@ -121,6 +122,7 @@ class CPUBackend:
             max_cores, max(1, config.qpoints.shape[0] // 2),
         )
         self._executor = None
+        self._prefetch = False
 
     def __enter__(self):
         """Start the worker pool when parallel execution is enabled."""
@@ -148,11 +150,36 @@ class CPUBackend:
 
     def prepare(self, vels, cell_vecs, result, accumulator, *, prefetch):
         """Report the estimated memory needed for a trajectory block."""
+        self._prefetch = prefetch
+        max_q_batch = max(stop - start for start, stop in self._q_batches(vels))
         print_cpu_memory_estimate(
             vels, cell_vecs, self.config, accumulator, result,
             backend="numpy", num_workers=self.num_workers,
             parallel=self._executor is not None, prefetch=prefetch,
+            max_q_batch=max_q_batch,
         )
+
+    def _q_batches(self, vels):
+        """Balance work across existing workers within a free-memory budget.
+
+        Reserve shared/prefetched input and queued results, leaving half of
+        available RAM for other allocations. If RAM cannot be queried, retain
+        the old five-q limit. One q is the minimum even above the budget.
+        """
+        parallel = self._executor is not None
+        workers = self.num_workers if parallel else 1
+        available = available_cpu_memory()
+        if available is None:
+            return qpoint_batches(len(self.config.qpoints), workers, 5)
+        reserved = (int(parallel) + 2 * int(self._prefetch)) * vels.nbytes
+        if parallel:
+            components = self.config.num_types * 3 if self.config.output_partial else 1
+            reserved += vels.shape[0] * len(self.config.qpoints) * components * 8
+        budget = max(0, available // 2 - reserved) // workers
+        fixed = estimate_kernel_working_bytes(vels, self.config, 0, cpu=True)
+        per_q = estimate_kernel_working_bytes(vels, self.config, 1, cpu=True) - fixed
+        limit = max(1, (budget - fixed) // per_q)
+        return qpoint_batches(len(self.config.qpoints), workers, limit)
 
     def compute(self, vels, cell_vecs, result):
         """Fill the caller's result array with one block of FFT power.
@@ -162,7 +189,7 @@ class CPUBackend:
         SED. Parallel workers may finish out of order; their results are assigned
         to the correct q slices before this method returns.
         """
-        batches = qpoint_batches(len(self.config.qpoints), self.num_workers)
+        batches = self._q_batches(vels)
         if self._executor is None:
             for start, stop in batches:
                 print_qpoints(self.reduced_qpoints, start, stop)

@@ -17,32 +17,26 @@
 """Backend-only helpers: Q batches, progress, and memory estimates."""
 
 import math
+import os
+from pathlib import Path
 
 import numpy as np
 
 
-def qpoint_batches(num_qpoints, num_workers):
+def qpoint_batches(num_qpoints, num_workers, max_batch_size=None):
     """Return non-overlapping (start, stop) ranges covering all q points.
 
-    Stop indices are exclusive. For two or more q points, distribute work
-    into batches of two to five points where possible, balancing the remainder
-    to avoid a tiny final batch. A single q point gets the range (0, 1).
+    Prefer one balanced batch per worker, splitting further only to respect
+    max_batch_size. Stop indices are exclusive; every q point appears once.
     """
 
     if num_qpoints < 1:
         return []
-    if num_qpoints == 1:
-        return [(0, 1)]
-
-    # Choose enough batches to cap each at five Q points, but not so many that
-    # a batch contains only one. Evenly distributing the remainder avoids a
-    # short final batch.
-    minimum_batches = math.ceil(num_qpoints / 5)
-    maximum_batches = num_qpoints // 2
-    num_batches = max(
-        minimum_batches,
-        min(num_workers, maximum_batches),
-    )
+    num_batches = min(num_qpoints, max(1, num_workers))
+    if max_batch_size is not None:
+        num_batches = max(
+            num_batches, math.ceil(num_qpoints / max(1, max_batch_size)),
+        )
     base_size, extra = divmod(num_qpoints, num_batches)
 
     batches = []
@@ -55,12 +49,41 @@ def qpoint_batches(num_qpoints, num_workers):
     return batches
 
 
-def estimate_kernel_working_bytes(vels, config, max_q_batch):
+def available_cpu_memory():
+    """Return available physical RAM in bytes, or None if unavailable."""
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class MemoryStatus(ctypes.Structure):
+                _fields_ = [
+                    ("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
+                    ("total", ctypes.c_ulonglong), ("available", ctypes.c_ulonglong),
+                    ("unused", ctypes.c_ulonglong * 5),
+                ]
+
+            status = MemoryStatus()
+            status.length = ctypes.sizeof(status)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                return status.available
+        else:
+            # MemAvailable includes reclaimable cache, unlike MemFree.
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def estimate_kernel_working_bytes(vels, config, max_q_batch, *, cpu=False):
     """Estimate temporary array storage for one q-point batch, in bytes.
 
     Count the selected basis velocities, complex phase/projection/FFT arrays,
     and real power/output arrays. The estimate depends on frame count, input
     dtype, and partial-output channels; it excludes Python and library overhead.
+    CPU tensordot may also pack the selected velocities and promote them to
+    complex128 for the mixed real/complex matrix multiplication.
     """
 
     num_frames = vels.shape[0]
@@ -68,6 +91,10 @@ def estimate_kernel_working_bytes(vels, config, max_q_batch):
     basis_velocities = (
         num_frames * max_basis_atoms * 3 * vels.dtype.itemsize
     )
+    if cpu:
+        basis_velocities += num_frames * max_basis_atoms * 3 * (
+            vels.dtype.itemsize + np.dtype(np.complex128).itemsize
+        )
     phases = max_basis_atoms * max_q_batch * np.dtype(np.complex128).itemsize
     spectral_values = num_frames * 3 * max_q_batch
     transforms = spectral_values * (
@@ -100,25 +127,30 @@ def print_qpoints(reduced_qpoints, q_start, q_stop):
 def print_cpu_memory_estimate(
     vels, cell_vecs, config, accumulator, result, *,
     backend, num_workers=1, parallel=False, prefetch=False,
+    max_q_batch=None,
 ):
     """Print estimated peak host-array storage in decimal GB.
 
     Include the current trajectory block, output and accumulated spectra,
-    shared-memory copies, and a possible prefetched block. CPU execution also
-    includes active workers' temporary arrays; GPU working memory is reported
-    separately by the GPU backend.
+    shared-memory copies, queued results, and a possible prefetched block.
+    CPU execution also includes active workers' temporary arrays; GPU working
+    memory is reported separately by the GPU backend.
     """
-    batches = qpoint_batches(config.qpoints.shape[0], num_workers)
-    max_q_batch = max(stop - start for start, stop in batches)
-    worker_peak = estimate_kernel_working_bytes(vels, config, max_q_batch)
+    if max_q_batch is None:
+        batches = qpoint_batches(config.qpoints.shape[0], num_workers)
+        max_q_batch = max(stop - start for start, stop in batches)
+    worker_peak = estimate_kernel_working_bytes(
+        vels, config, max_q_batch, cpu=backend != "cupy",
+    )
     persistent_arrays = (
         accumulator.nbytes + result.nbytes + vels.nbytes + cell_vecs.nbytes
     )
     prefetched_block = 2 * vels.nbytes + cell_vecs.nbytes if prefetch else 0
     shared_velocities = vels.nbytes if parallel else 0
+    queued_results = result.nbytes if parallel else 0
     active_workers = 0 if backend == "cupy" else (num_workers if parallel else 1)
     estimated_bytes = (
-        persistent_arrays + prefetched_block + shared_velocities
+        persistent_arrays + prefetched_block + shared_velocities + queued_results
         + active_workers * worker_peak
     )
     print(
