@@ -122,9 +122,11 @@ coordinates or the ``basis.in`` mapping.
 Backends and partial SED
 ------------------------
 
-``device = cpu`` automatically selects processes/native threads within the
-``max_cores`` budget; ``max_cores = 1`` disables tuning. ``device = gpu`` uses one CUDA GPU for the SED
-kernel; plotting and fitting remain CPU operations.
+``device = cpu`` uses fixed process/thread allocation within the ``max_cores``
+budget, with up to four native threads per process and no timing probes.
+The worker count is limited by q count and memory. ``max_cores = 1`` uses one
+process and one thread. ``device = gpu`` uses one CUDA GPU for the SED kernel;
+plotting and fitting remain CPU operations.
 
 Set ``output_partial = 1`` during computation to preserve element- and
 Cartesian-resolved components. Use ``plot_partial_SED = Si`` for an element

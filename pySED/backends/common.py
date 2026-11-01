@@ -117,7 +117,7 @@ def print_qpoints(reduced_qpoints, q_start, q_stop):
     for q_index in range(q_start, q_stop):
         qpoint = reduced_qpoints[q_index]
         print(
-            "\tNow calculating q-point "
+            "        Now calculating q-point "
             f"{q_index + 1}/{num_qpoints}:\t"
             f"q = ({qpoint[0]:.4f}, {qpoint[1]:.4f}, "
             f"{qpoint[2]:.4f})"
@@ -154,7 +154,7 @@ def print_cpu_memory_estimate(
         + active_workers * worker_peak
     )
     print(
-        "\n  🚀🚀 Estimated peak CPU array memory: "
+        "\n        Estimated peak CPU array memory: "
         f"{estimated_bytes / 1e9:.2f} GB "
         "(trajectory block reading + SED arrays; excluding Python overhead)."
     )

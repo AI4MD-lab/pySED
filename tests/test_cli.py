@@ -131,6 +131,9 @@ class CommandLineTests(unittest.TestCase):
                         status, output, error = self.invoke(str(path))
                     self.assertEqual(status, 0, error)
                     self.assertIn(f"Device  : {label}", output)
+                    if device == "cpu":
+                        self.assertIn("Device  : CPU (max_cores = 4)", output)
+                        self.assertNotIn("; auto", output)
                     self.assertNotIn("Backend", output)
                     params = run.call_args.args[0]
                     self.assertEqual(params.device, device)

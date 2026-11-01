@@ -30,7 +30,7 @@ Module responsibilities
        output_files.py   Names of all analysis output files
      backends/
        __init__.py       Select CPU or GPU execution
-       cpu.py            CPU tuning, thread limits, worker pool, and shared memory
+       cpu.py            Fixed CPU allocation, thread limits, pool, shared memory
        gpu.py            CuPy arrays, GPU batches, memory checks, and timing
        common.py         Backend memory estimates and progress messages
      io/                 Trajectory formats, cache, and block iteration
@@ -121,14 +121,14 @@ There are two concrete backend classes, without a plugin registry or an
 inheritance hierarchy. Both provide:
 
 * A context manager to open and reliably release their resources.
-* ``prepare`` for first-block CPU tuning, memory estimates and GPU batch selection.
+* ``prepare`` for fixed CPU allocation, memory estimates and GPU batch selection.
 * ``compute(velocities, cell_vectors, result)`` to fill one NumPy result array.
 * ``report`` for optional timing information after the calculation.
 
-The CPU backend selects a bounded process/thread configuration on the first
-block and owns its persistent spawn worker pool and shared velocity buffers.
-Native thread limits are applied with ``threadpoolctl``; the SED kernel is shared
-by timing samples and production calculations. The GPU
+The CPU backend allocates up to four native threads per process, limiting
+workers by the CPU budget, q count and first-block memory estimate. It owns its
+persistent spawn worker pool and shared velocity buffers. Native thread limits
+are applied with ``threadpoolctl``; no timing probes are performed. The GPU
 backend owns its device arrays, CUDA events, and memory pools. Neither
 backend changes physical normalization, frequency selection, or output files.
 Timing wrappers are supplied to the kernel as ordinary projection/FFT

@@ -8,42 +8,46 @@ max_cores
    max_cores = 4
 
 **Meaning**
-   CPU parallelism budget for SED computation. pySED automatically selects the
-   number of processes and native BLAS/OpenMP threads per process, keeping their
-   product at or below ``max_cores``. The budget is also capped by the process's
+   CPU parallelism budget for SED computation. pySED uses a fixed rule to set
+   processes and native BLAS/OpenMP threads per process, keeping their product
+   at or below ``max_cores``. The budget is also capped by the process's
    CPU affinity where available. It is a compute-thread budget, not CPU pinning
    or a request to a cluster scheduler.
 
 **Default**
    ``4``.
 
-**Automatic selection**
-   On the first trajectory block, pySED times a few configurations sequentially
-   using a view of at most 128 frames (about 32 MiB of velocities) and 64 q points.
-   Candidate process counts are 1, 2, 4 and up to 8, limited by the CPU budget,
-   q count and available memory. One-process configurations with fewer threads
-   are also considered: using the entire budget is not always faster.
+**Fixed allocation**
+   Each process uses ``min(4, CPU budget)`` native threads. The process count
+   starts at ``CPU budget // threads per process`` and is limited by the number
+   of q points. The first full trajectory block supplies the memory estimate;
+   workers are reduced one at a time until they fit the estimate or only one
+   process remains. The resulting allocation is reused for all blocks.
 
-   Each candidate is warmed up and timed twice. A change must improve the best
-   time by at least 5% to avoid switching for measurement noise. Blocks estimated
-   to take less than 0.25 seconds serially
-   skip process-pool trials; further pool trials stop once selection has taken
-   about three seconds. An individual trial, worker startup or system I/O can
-   take longer. Selection is performed once per calculation, not cached across
-   users or jobs. The chosen configuration is printed and reused for all blocks.
+   With sufficient q points, available CPUs and memory, ``max_cores = 4`` uses
+   1 process x 4 threads, ``8`` uses 2 x 4, and ``16`` uses 4 x 4.
+   ``max_cores = 1`` uses 1 x 1. Budgets that are not multiples of four can leave
+   spare capacity: for example, ``6`` uses 1 x 4 and ``10`` uses 2 x 4.
+   Reducing the worker count does not increase threads per process.
 
-   All production frames and q points are still calculated. The sample affects
-   scheduling only. ``max_cores = 1`` uses one process and one native thread and
-   skips tuning. Short calculations may not recover the one-time tuning cost;
-   selection is a bounded search, not a guarantee of the global fastest setup.
+   There are no timing probes or trial calculations. This predictable default
+   avoids tuning overhead; it does not guarantee the fastest configuration on
+   every machine. Native thread limits are handled internally, so users need
+   only set ``max_cores``.
+
+   The startup summary shows the requested budget, for example
+   ``Device : CPU (max_cores = 8)``. Before computing the first block, the backend
+   prints the actual allocation, for example
+   ``CPU allocation : 2 processes × 4 threads``. It can be lower than the request
+   because of CPU affinity, q count or available memory.
 
 **Memory**
-   Worker candidates are checked against the full trajectory block, not only the
-   small timing sample. The budget reserves shared/prefetched input, queued
-   results and an allowance for worker runtime memory, then limits q batches
+   The worker count is checked against the full trajectory block. The budget
+   reserves shared/prefetched input, queued results and an allowance for worker
+   runtime memory, then limits q batches
    using half of available system RAM. Workers share the input velocity block
    but each needs its own projection/FFT workspace. More processes can therefore
-   use more memory. If RAM cannot be queried, only one-process candidates are used.
+   use more memory. If RAM cannot be queried, one process is used.
 
    These are estimates, not a scheduler memory reservation or a hard memory cap.
    Even one q point needs workspace. Increase ``num_blocks`` if a full block is

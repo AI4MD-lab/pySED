@@ -196,7 +196,7 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Set zlib compression for generated NetCDF caches.
    * - `max_cores <input_parameters/max_cores.html>`_
      - Parallelization
-     - CPU compute-thread budget; automatic process/thread selection.
+     - CPU compute-thread budget; fixed process/thread allocation.
    * - `device <input_parameters/device.html>`_
      - Parallelization
      - Select CPU or GPU computation.
