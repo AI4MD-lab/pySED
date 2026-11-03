@@ -17,6 +17,21 @@ Recommended Workflow
    ``basis.in`` maps every atom in the MD supercell to its unit-cell index,
    basis index, and mass. pySED needs this mapping for reciprocal-space SED.
 
+   For LAMMPS output, use ``atom_order`` to choose the element-to-type
+   numbering when writing the generated structure:
+
+   .. code-block:: python
+
+      structure.write_lammps_data(
+          lammps_data_types='metal',
+          atom_order=['Te', 'Pb', 'Sr'],
+      )
+
+   This assigns Te to type 1, Pb to type 2, and Sr to type 3. List each species
+   in your structure once, in the order required by your LAMMPS potential.
+   ``atom_order`` changes type numbering only; it does not reorder atom rows
+   or change the atom mapping in ``basis.in``.
+
 3. **Run the MD simulation.**
    Use GPUMD or LAMMPS. Equilibrate first, then run an NVE production trajectory
    for SED.
