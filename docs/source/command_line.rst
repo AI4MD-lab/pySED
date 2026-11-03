@@ -61,7 +61,8 @@ The ``action`` parameter controls work performed by one invocation:
    * - Value
      - Behavior
    * - ``thinking``
-     - Inspect existing outputs and run the next missing SED stage.
+     - Inspect existing outputs and run the next missing SED stage. Missing
+       SED data triggers trajectory preparation, SED calculation, and plotting.
    * - ``compute``
      - Read the trajectory and overwrite the main numerical SED outputs.
    * - ``plot``

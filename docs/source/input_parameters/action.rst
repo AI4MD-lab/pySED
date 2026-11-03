@@ -15,6 +15,9 @@ action
    - ``plot`` redraws figures from existing SED data;
    - ``fit`` detects and fits peaks in existing SED data.
 
+   When SED data are missing, ``thinking`` prepares the trajectory, computes
+   SED, and plots the results in one invocation.
+
    ``thinking`` does not compare the parameters used to create an existing
    output with the current input file. Use an explicit action to force a
    recalculation, redraw, or refit after changing settings.

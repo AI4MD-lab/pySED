@@ -24,6 +24,7 @@ import os
 import sys
 import time
 from copy import copy
+from itertools import chain
 from pathlib import Path
 
 import numpy as np
@@ -97,12 +98,14 @@ def step_prepare_trajectory(params):
     """Select the trajectory source and attach its path and format to params.
 
     Reuse/convert a text cache or select direct reading according to the input.
+    Name the cache after the output prefix's basename, beside the input file.
     Set params.trajectory_path and params.source_format for trajectory_block_source;
     no SED calculation is performed in this step.
     """
     source = Path(params.trajectory_file)
     input_directory = Path(params.input_file).parent
-    converted_path = input_directory / f"{source.name}.pysed.nc"
+    cache_name = f"{Path(params.out_files_name).name}.pysed.nc"
+    converted_path = input_directory / cache_name
 
     t0 = time.perf_counter()
     prepared, source_format = prepare_trajectory(
@@ -133,6 +136,7 @@ def step_compute_sed(params):
     The same first block is then included in the calculation. Optional prefetch
     overlaps subsequent reads. FileIO writes the finished spectrum and its scale.
     """
+    Path(params.out_files_name).parent.mkdir(parents=True, exist_ok=True)
     step_prepare_trajectory(params)
     print_section("Computing phonon SED", "🚀")
     t0 = time.perf_counter()
@@ -163,16 +167,19 @@ def step_compute_sed(params):
         bz_cell = (
             np.asarray(dump_group_supercell, dtype=float)
             if dump_group_supercell is not None
-            else first_block.data[CELLS][0]
+            else first_block.data[CELLS][0].copy()
         )
         BZ_info = construct_BZ.BZ_methods(params, bz_cell)
         sed = Phonon.spectral_energy_density(params, trajectory.info)
+        # An exhausted iterator releases its first block; a tuple passed to
+        # chain directly would keep that block alive until the final block.
+        trajectory_blocks = chain(iter((first_block,)), blocks)
+        del first_block
         setup_done = time.perf_counter()
         sed.compute_sed(
             params,
             BZ_info,
-            first_block,
-            blocks,
+            trajectory_blocks,
         )
         calculation_done = time.perf_counter()
 
@@ -268,7 +275,11 @@ def step_fit_sed(params):
         incomplete_qpoints = []
         _print_detail("Total Q-points", total_qpoints)
         for j in range(total_qpoints):
-            print_section(f"Fitting Q-point #{j} ({j + 1}/{total_qpoints})", "▶")
+            q = ", ".join(f"{value:.4f}" for value in data.qpoints[j])
+            print("\n    " + "-" * 72)
+            print(
+                f"    ▶  Fitting Q-point #{j} ({j + 1}/{total_qpoints}): q = ({q})"
+            )
             q_params = copy(params)
             q_params.qpoint_slice_index = j
             q_params.if_show_figures = False
@@ -294,7 +305,7 @@ def step_fit_sed(params):
             )
         print_section("All-Q fitting summary")
         _print_detail("Q-points processed", total_qpoints)
-        _print_detail("Fitted modes", total_modes)
+        _print_detail("Fitted peaks", total_modes)
         _print_detail("Lifetime data", total_file)
         _print_detail("Q-point figures", output_files.FITTING_QPOINT_DIRECTORY)
         print_section("All-Q spectral fitting complete", "✓")
@@ -321,7 +332,7 @@ def step_fit_sed(params):
                     f"        Q-point #{qpoint_index:<8}: "
                     f"{fitted_peak_word} {peak_list}"
                 )
-            print("        Check these figures in Fitting-Qpoint/.")
+            print("\n        Check these figures in Fitting-Qpoint/.")
             print("        Adjust peak_min_significance if needed.")
         print(
             "\n    Tip: Check all fit figures. To refine one Q point, set its"
@@ -336,28 +347,47 @@ def step_fit_sed(params):
         print("         re_output_total_freq_lifetime = 1.")
     else:
         # single Q-point fit
-        print_section(f"Fitting Q-point #{params.qpoint_slice_index}", "▶")
         data = FileIO.load_data(params)
         validate_qpoint_slice_index(params, data.qpoints)
+        q = ", ".join(f"{value:.4f}" for value in data.qpoints[params.qpoint_slice_index])
+        print("\n    " + "-" * 72)
+        print(f"    ▶  Fitting Q-point #{params.qpoint_slice_index}: q = ({q})")
         _fit_one_qpoint(data, params)
         if getattr(params, "re_output_total_freq_lifetime", False):
-            total_file, total_modes = FileIO.deal_total_fre_lifetime(
-                params,
-                len(data.q_distances),
+            total_qpoints = len(data.q_distances)
+            available = sum(
+                output_files.qpoint_lifetime_data(i).is_file()
+                for i in range(total_qpoints)
             )
-            if total_modes:
-                frequency, lifetime = FileIO.read_lifetime_data(total_file)
-                lifetime_figure = Plot_SED.plot_lifetime_summary(
-                    frequency,
-                    lifetime,
+            if available < total_qpoints:
+                print_section("Combined phonon lifetime update skipped", "⚠")
+                _print_detail("Q-point lifetime files", f"{available}/{total_qpoints}")
+                print("        The selected q-point's phonon lifetime data have been saved.")
+                print("        Cannot combine phonon lifetime data: some q-point files were not found.")
+                print("        Run action = fit with lorentz_fit_all_qpoint = 1 first.")
+            else:
+                total_file, total_modes = FileIO.deal_total_fre_lifetime(
                     params,
+                    total_qpoints,
                 )
-                lifetime_figure_action = "redrawn"
-            print(
-                "    ✓  Combined lifetime data rebuilt → "
-                f"{total_file} ({total_modes} modes)"
-            )
+                if total_modes:
+                    frequency, lifetime = FileIO.read_lifetime_data(total_file)
+                    lifetime_figure = Plot_SED.plot_lifetime_summary(
+                        frequency,
+                        lifetime,
+                        params,
+                    )
+                    lifetime_figure_action = "redrawn"
+                print(
+                    "    ✓  Combined phonon lifetime data updated → "
+                    f"{total_file} ({total_modes} peaks)"
+                )
         print_section("Single-Q spectral fit done", "✓")
+        if not getattr(params, "re_output_total_freq_lifetime", False):
+            fit_figure = output_files.fitting_qpoint_figure(params.qpoint_slice_index)
+            print(f"\n    Tip: Check the fit in {fit_figure}.")
+            print("         If satisfactory, set action = fit and")
+            print("         lorentz_fit_all_qpoint = 1 to fit all q-points.")
 
     if lifetime_figure is not None:
         print(
@@ -406,7 +436,7 @@ def _run_thinking(params, steps):
     """
 
     if not _plot_data_ready(params):
-        print("    💡 thinking: incomplete SED data → compute + plot")
+        print("    💡 thinking: process trajectory + compute + plot")
         steps["compute"](params)
         steps["plot"](params)
         return

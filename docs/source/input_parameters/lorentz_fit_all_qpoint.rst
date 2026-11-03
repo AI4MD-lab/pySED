@@ -98,6 +98,13 @@ origin or quality of a particular fitted mode must be inspected.
    using their lifetimes. If peak detection selected an unsuitable local
    basin, refine that Q point by adjusting ``peak_min_significance``.
 
+   After all-Q fitting, select the Q point to improve with
+   ``qpoint_slice_index``, set ``action = fit``,
+   ``lorentz_fit_all_qpoint = 0``, and ``re_output_total_freq_lifetime = 1``.
+   pySED repeats peak detection and lifetime fitting only for that Q point,
+   then updates the combined phonon lifetime data using its new result and
+   the saved results for all other Q points. See :doc:`../peak_fitting`.
+
 :doc:`Back to Parameter Index <../input_parameters>`
 
 Related parameters

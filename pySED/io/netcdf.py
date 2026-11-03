@@ -452,6 +452,8 @@ class NetCDFWriter:
         dataset.pysed_source_path = str(self.source.resolve())
         if self.source_format:
             dataset.pysed_source_format = self.source_format
+        if self.source_format == "lammps_dump":
+            dataset.pysed_lammps_integer_ids = 1
         dataset.pysed_source_size = int(stat.st_size)
         dataset.pysed_source_mtime_ns = int(stat.st_mtime_ns)
 
@@ -598,6 +600,11 @@ def converted_file_is_current(
                 == storage_dtype
                 and getattr(dataset, "pysed_lammps_unit", None)
                 == lammps_unit
+                # Older LAMMPS caches may contain atom IDs rounded through floats.
+                and (
+                    getattr(dataset, "pysed_source_format", None) != "lammps_dump"
+                    or getattr(dataset, "pysed_lammps_integer_ids", 0) == 1
+                )
                 and (
                     source_format is None
                     or getattr(dataset, "pysed_source_format", None)

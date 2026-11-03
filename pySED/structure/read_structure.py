@@ -21,21 +21,23 @@ from pySED.structure.atoms import atom_data
 
 def mass_to_symbol(mass, tolerance=5e-2):
 
-    """Match a mass to an element within tolerance, falling back to H."""
+    """Match a mass in amu to an element within tolerance, or raise ValueError."""
     for element in atom_data:
-        if element[3] is not None and abs(mass - element[3]) < tolerance:
+        if element[3] is not None and element[3] > 0 and abs(mass - element[3]) < tolerance:
             return element[1]
 
-    return 'H'           # If no match is found, use H as the wildcard
+    raise ValueError(
+        f"No element matches atomic mass {mass!r} amu within {tolerance:g} amu."
+    )
 
 def symbol_to_mass(symbol):
 
-    """Return an element mass, falling back to 1 amu for an unknown symbol."""
+    """Return an element's positive mass in amu, or raise ValueError if unavailable."""
     for element in atom_data:
-        if element[1] is not None and symbol==element[1]:
+        if symbol == element[1] and element[3] is not None and element[3] > 0:
             return element[3]
 
-    return 1           # If no match is found, use H mass as the wildcard
+    raise ValueError(f"Unknown element symbol or unavailable atomic mass: {symbol!r}.")
 
 def get_units(lammps_input_file):
     """Read the units command from a LAMMPS input file.
@@ -200,6 +202,7 @@ def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3
         elif coordinates_type.startswith('c'):
             positions = np.array([data_lines[8 + k].split()[0:3]
                                   for k in range(sum(number_of_types))], dtype=float)
+            positions *= multiply
 
         else:
             print('*********** [ERROR] Coordinates type not recognized in POSCAR file! **********\n')
@@ -305,8 +308,10 @@ def read_from_file_structure_xyz(file_name='model.xyz'):
 
         atom_line = lines[line_idx].strip().split()
         if len(atom_line) < total_cols:
-            print(f'*********** [WARNING] Atom {i+1} columns insufficient (expected {total_cols})\n')
-            continue
+            raise ValueError(
+                f"{file_name}: atom {i + 1} on line {line_idx + 1} has "
+                f"{len(atom_line)} columns; expected at least {total_cols}."
+            )
 
         pos = [float(atom_line[pos_start + j]) for j in range(3)]
         sym = atom_line[symbol_col].strip()

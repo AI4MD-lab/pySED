@@ -25,17 +25,16 @@ and exposes the final spectrum for FileIO to write.
 """
 
 import time
-from itertools import chain
 
 import numpy as np
 from scipy.fftpack import fftfreq
 
 from pySED.backends import create_backend
-from pySED.console import print_detail, print_section
+from pySED.console import SED_PROGRESS_WIDTH, print_detail, print_section
 from pySED.io.schema import POSITIONS, VELOCITIES
 from pySED.sed.sed_kernel import (
     SEDKernelConfig, block_normalization, finalize_spectrum,
-    SED_UNIT, LEGACY_SED_UNIT, LEGACY_UNIT_NOTICE,
+    SED_UNIT, LEGACY_SED_UNIT,
 )
 from pySED.structure.atoms import atomic_masses
 
@@ -107,36 +106,40 @@ class spectral_energy_density:
             fftfreq(self.num_frames_per_block, self.dt) / 1e12
         )
 
-    def compute_sed(
-        self, params, lattice_info, first_trajectory_block,
-        remaining_trajectory_blocks,
-    ):
+    def compute_sed(self, params, lattice_info, trajectory_blocks):
         """Consume trajectory blocks and store the final spectrum on this object.
 
         ``lattice_info`` supplies atom-to-basis indices and Cartesian q points.
-        ``first_trajectory_block`` is the block already read while preparing
-        the geometry; ``remaining_trajectory_blocks`` is consumed in order.
+        ``trajectory_blocks`` yields every block in order, including the first
+        block already read while preparing the geometry.
         One backend context spans all blocks so workers or GPU buffers can
         be reused. Output files are written separately by the pipeline.
         """
         start_time = time.time()
         self.trajectory_prefetch = bool(params.trajectory_prefetch)
         print_section("SED calculation setup")
-        print_detail("Total q-points", lattice_info.num_qpoints)
-        print_detail("Frames", self.num_frame)
-        print_detail("Averaging blocks", f"{params.num_blocks} × {self.num_frames_per_block} frames")
-        print_detail("Velocity unit", "m/s")
-        print_detail("SED unit", self.sed_unit)
-        print_detail("Partial SED", "element × direction" if getattr(params, "output_partial", 0) else "disabled")
-        if self.legacy_unit:
-            print(f"            {LEGACY_UNIT_NOTICE}")
+        print_detail("Total q-points", lattice_info.num_qpoints, width=48)
+        print_detail("Total trajectory frames for calculating SED", self.num_frame, width=48)
+        print_detail(
+            "Trajectories divided into blocks for averaging",
+            f"{params.num_blocks} ({self.num_frames_per_block} frames per block)",
+            width=48,
+        )
+        print()
+        print_detail("Velocity unit converted to", "m/s", width=48)
+        print_detail(
+            "SED unit",
+            f"{self.sed_unit} (for pySED 2.x comparison)" if self.legacy_unit else
+            f"{self.sed_unit} (phonon kinetic energy per unit frequency)",
+            width=48,
+        )
         kernel_config = self._prepare_kernel(params, lattice_info)
 
         # The trajectory source owns disk I/O. This generator only reduces
         # each supplied block to velocity and its averaged phase references.
         trajectory_blocks = (
             self._get_simulation_data(block, lattice_info)
-            for block in chain((first_trajectory_block,), remaining_trajectory_blocks)
+            for block in trajectory_blocks
         )
         with create_backend(
             params.device, kernel_config, self.reduced_qpoints, params.max_cores,
@@ -213,27 +216,32 @@ class spectral_energy_density:
         """Allocate the running sum on the full, two-sided FFT grid.
 
         Its shape is (frames_per_block, q_points), or
-        (frames_per_block, q_points, types, 3) for partial output. Only one
+        (frames_per_block, types, 3, q_points) for partial output. Only one
         running sum is retained, rather than a spectrum for every block.
         """
 
         if self.output_partial:
-            print("\n        Atomic masses (amu):")
+            print_section(
+                f"{'Partial SED':<25}: enabled (per atom type and x/y/z direction)", "▶",
+            )
+            print("        Element -> mass mapping (used for partial SED filenames):")
+            print(f"            {'Element':<8}  {'Mass (amu)':>12}")
+            print("            --------  ------------")
             for type_index, mass in enumerate(unique_masses):
                 symbol = self.type_symbols[type_index]
-                print(
-                    f"            {symbol:<8}: {mass}"
-                )
+                print(f"            {symbol:<8}  {str(mass):>12}")
 
+            # Match the kernel layout: (frequency, type, xyz, q).
             self._sed_sum = np.zeros(
                 (
                     self.num_frames_per_block,
-                    lattice_info.num_qpoints,
                     self.num_types,
                     3,
+                    lattice_info.num_qpoints,
                 )
             )
         else:
+            print_detail("Partial SED", "disabled (total SED only)")
             self._sed_sum = np.zeros(
                 (
                     self.num_frames_per_block,
@@ -244,7 +252,7 @@ class spectral_energy_density:
     def _loop_over_blocks(self, backend, trajectory_blocks):
         """Compute each full block, apply its normalization, and add to the sum.
 
-        ``trajectory_blocks`` yields (velocities, cell_vectors) pairs.
+        ``trajectory_blocks`` yields (velocities, cell_vectors, block_bytes).
         The backend fills ``qdot`` in place with unnormalized FFT power;
         this method applies the physical or legacy factor before accumulation.
         Reading fewer than ``num_blocks`` blocks raises EOFError. Division
@@ -260,7 +268,7 @@ class spectral_energy_density:
             qdot = np.zeros_like(self._sed_sum)
             read_start = time.perf_counter()
             try:
-                vels, cell_vecs = next(trajectory_blocks)
+                vels, cell_vecs, trajectory_bytes = next(trajectory_blocks)
             except StopIteration as error:
                 raise EOFError(
                     f"Trajectory supplied only {block_index} of "
@@ -272,12 +280,18 @@ class spectral_energy_density:
                 backend.prepare(
                     vels, cell_vecs, qdot, self._sed_sum,
                     prefetch=self.trajectory_prefetch and self.num_blocks > 1,
+                    trajectory_bytes=trajectory_bytes,
                 )
-            print_section(f"Computing block {block_index + 1}/{self.num_blocks}", "▶")
+            print_section(
+                f" Now calculate on averaging blocks {block_index + 1}/{self.num_blocks} ... ".center(
+                    SED_PROGRESS_WIDTH - 3, "*",
+                ),
+                "▶",
+            )
             backend.compute(vels, cell_vecs, qdot)
             qdot *= scaling_const
             self._sed_sum += qdot
-            del qdot
+            del qdot, vels, cell_vecs
 
     def _average_blocks_and_frequencies(self):
         """Finalize the accumulated spectrum and release the accumulator name.
@@ -291,15 +305,20 @@ class spectral_energy_density:
             self._sed_sum, self.freq_fft, self.num_blocks,
             legacy_unit=getattr(self, "legacy_unit", False),
         )
+        if self.output_partial:
+            # Expose (frequency, q, type, xyz) to file output and plotting.
+            # This is a view; the spectrum data are not copied.
+            self.sed_avg = self.sed_avg.transpose(0, 3, 1, 2)
         del self._sed_sum
 
     def _get_simulation_data(self, block, lattice_info):
-        """Return velocities and time-averaged cell reference positions.
+        """Return velocities, averaged cell references, and trajectory array bytes.
 
         The returned arrays have shapes (frames, atoms, 3), in m/s, and
         (cells, 3), in Angstrom. ``cell_ref_ids`` selects one reference atom
         per cell; its mean position provides the spatial Fourier phase.
         Array indices must refer to the same atom order as basis.in.
+        The byte count includes positions, velocities, and the stored cells.
         """
 
         try:
@@ -308,7 +327,8 @@ class spectral_energy_density:
 
             # Reference atoms identify corresponding cells across the block.
             cell_vecs = pos[:, lattice_info.cell_ref_ids, :].mean(axis=0)
-            return vels, cell_vecs
+            trajectory_bytes = sum(array.nbytes for array in block.data.values())
+            return vels, cell_vecs, trajectory_bytes
         except Exception as error:
             raise EOFError(
                 "******* Can't prepare a trajectory block\n"

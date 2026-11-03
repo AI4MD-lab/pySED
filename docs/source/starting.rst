@@ -75,8 +75,9 @@ In ``input.in``, use:
 LAMMPS Trajectory
 -----------------
 
-LAMMPS writes positions and velocities together in one custom dump for
-pySED 3.0. The required dump format is sorted by atom id:
+For pySED 3.0, LAMMPS must write positions and velocities together in the
+same custom text dump. Separate position and velocity files are not supported.
+Use one dump sorted by atom id:
 
 .. code-block:: text
 

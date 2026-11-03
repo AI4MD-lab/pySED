@@ -298,8 +298,9 @@ def iter_lammps_dump(
     remain in Angstrom; scaled xs/ys/zs coordinates are not supported.
     Atom count and sorted IDs must remain consistent across frames.
 
-    dtype sets numeric atom-column parsing precision. Cell bounds are parsed
-    as float64, including triclinic tilts. The final batch may be shorter than
+    Atom IDs are parsed directly as positive int64 integers, independently
+    of dtype, which sets the other atom columns' precision. Cell bounds use
+    float64, including triclinic tilts. The final batch may be shorter than
     batch_size; progress receives (frames_read, source_bytes_read).
     """
 
@@ -328,6 +329,8 @@ def iter_lammps_dump(
 
             _expect(stream, "ITEM: NUMBER OF ATOMS")
             n_atoms = int(stream.readline())
+            if n_atoms < 1:
+                raise ValueError("LAMMPS atom count must be positive")
             if expected_atoms is None:
                 expected_atoms = n_atoms
             elif n_atoms != expected_atoms:
@@ -370,33 +373,44 @@ def iter_lammps_dump(
             if position_names is None:
                 raise ValueError("LAMMPS dump must include x y z or xu yu zu")
 
-            text = "".join(stream.readline() for _ in range(n_atoms))
-            values = np.fromstring(text, sep=" ", dtype=dtype)
-            if values.size != n_atoms * len(columns):
+            lines = list(islice(iter(stream.readline, ""), n_atoms))
+            if len(lines) != n_atoms:
                 raise ValueError("invalid or truncated LAMMPS atom block")
-            values = values.reshape(n_atoms, len(columns))
+            try:
+                atoms = np.loadtxt(
+                    lines,
+                    dtype=[(name, np.int64 if name == "id" else dtype) for name in columns],
+                    converters={index["id"]: int}, comments=None, ndmin=1,
+                )
+            except (ValueError, OverflowError) as error:
+                raise ValueError(
+                    "invalid LAMMPS atom block; id must be a positive 64-bit integer: "
+                    f"{error}"
+                ) from error
+            if len(atoms) != n_atoms:
+                raise ValueError("invalid or truncated LAMMPS atom block")
 
-            atom_ids = values[:, index["id"]].astype(np.int64)
+            atom_ids = atoms["id"]
             order = np.argsort(atom_ids, kind="stable")
             atom_ids = atom_ids[order]
+            if atom_ids[0] <= 0 or np.any(atom_ids[1:] == atom_ids[:-1]):
+                raise ValueError("LAMMPS atom IDs must be positive and unique")
             if expected_ids is None:
                 expected_ids = atom_ids.copy()
             elif not np.array_equal(atom_ids, expected_ids):
                 raise ValueError("LAMMPS atom IDs changed between frames")
 
             frame = {
-                POSITIONS: values[
-                    :, [index[name] for name in position_names]
-                ][order],
+                POSITIONS: np.column_stack([atoms[name] for name in position_names])[order],
                 ATOM_IDS: atom_ids,
                 CELLS: cell,
             }
             if "type" in index:
-                frame[TYPES] = values[:, index["type"]][order].astype(np.int32)
+                frame[TYPES] = atoms["type"][order].astype(np.int32)
             velocity_names = ("vx", "vy", "vz")
             if all(name in index for name in velocity_names):
                 frame[VELOCITIES] = (
-                    values[:, [index[name] for name in velocity_names]][order]
+                    np.column_stack([atoms[name] for name in velocity_names])[order]
                     * velocity_factors[lammps_unit]
                 )
             pending.append(frame)

@@ -14,7 +14,8 @@ plot_partial_SED
    component.
 
 **Default**
-   ``0``.
+   Disabled (total SED). Omit this parameter or comment out its line to disable
+   partial SED selection. Explicit ``0`` and ``False`` values are not accepted.
 
 **Allowed directions**
    ``x``, ``y``, or ``z``.
@@ -24,6 +25,10 @@ plot_partial_SED
    example, ``plot_partial_SED = O y`` reads
    ``<out_files_name>_partial_SED/<basename>.SED_O_y``, where ``basename`` is
    the final path component of ``out_files_name``.
+
+   With ``action = plot`` or ``action = fit``, pySED checks the selected partial
+   files when loading them; ``basis.in`` is not required. Computation still
+   requires the basis mapping.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

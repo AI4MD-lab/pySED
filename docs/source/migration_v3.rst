@@ -54,7 +54,9 @@ for the periodicity condition.
 LAMMPS migration
 ----------------
 
-Replace two dumps such as ``pos.dat`` and ``vels.dat`` with one:
+pySED 3.0 does not accept separate position and velocity files or merge them
+automatically. Replace two dumps such as ``pos.dat`` and ``vels.dat`` with
+one custom text dump containing both positions and velocities:
 
 .. code-block:: text
 

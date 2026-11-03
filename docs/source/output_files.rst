@@ -55,5 +55,8 @@ Trajectory cache
 ----------------
 
 For text input with ``trajectory_read_mode = cache``, pySED creates or reuses
-``<trajectory-name>.pysed.nc`` beside the source. Native NetCDF and direct
-text reading do not create this cache.
+``<basename>.pysed.nc`` beside the pySED input file. ``basename`` is the final
+path component of ``out_files_name``: ``results/SrTiO3`` gives
+``SrTiO3.pysed.nc`` in the input-file directory. Prefix directories continue
+to apply to the numerical SED outputs, relative to the working directory.
+Native NetCDF and direct text reading do not create this cache.

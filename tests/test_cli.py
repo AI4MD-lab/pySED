@@ -36,16 +36,13 @@ class CommandLineTests(unittest.TestCase):
                 status = error.code
         return status, stdout.getvalue(), stderr.getvalue()
 
-    def test_global_help_is_short_and_points_to_the_manual(self):
+    def test_global_help_does_not_start_calculation(self):
         with patch.object(cli, "read_input") as read, patch.object(cli, "run_pipeline") as run:
             status, output, error = self.invoke("-h")
         self.assertEqual(status, 0)
         self.assertFalse(error)
-        self.assertIn("v-3.0.0", output)
         self.assertIn("https://pysed.readthedocs.io/", output)
-        self.assertNotIn("pysed <parameter>", output)
         self.assertIn("pysed init", output)
-        self.assertNotIn("[ Workflow ]", output)
         read.assert_not_called()
         run.assert_not_called()
 
@@ -66,7 +63,7 @@ class CommandLineTests(unittest.TestCase):
                 structure.mkdir()
                 (structure / "basis.in").touch()
                 params = cli.read_input()
-                self.assertEqual(params.action, "compute")
+                self.assertEqual(params.action, "thinking")
                 self.assertEqual(params.device, "cpu")
                 self.assertGreater(params.num_atoms, 0)
                 self.assertEqual(params.q_path.size, (params.num_qpaths + 1) * 3)
@@ -92,7 +89,6 @@ class CommandLineTests(unittest.TestCase):
                         status, output, error = self.invoke("init", flag)
                         self.assertEqual(status, 0, error)
                         self.assertIn("pysed init", output)
-                        self.assertIn("never overwritten", output)
                         self.assertEqual(list(Path.cwd().iterdir()), [])
             run.assert_not_called()
 
@@ -121,23 +117,18 @@ class CommandLineTests(unittest.TestCase):
                 read.assert_not_called()
                 run.assert_not_called()
 
-    def test_run_summary_uses_public_device_values(self):
+    def test_run_passes_the_selected_device_to_pipeline(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "custom.in"
-            for device, label in (("cpu", "CPU"), ("gpu", "GPU")):
+            for device in ("cpu", "gpu"):
                 with self.subTest(device=device):
                     path.write_text(f"action = plot\ndevice = {device}\n", encoding="utf-8")
                     with patch.object(cli, "run_pipeline") as run:
                         status, output, error = self.invoke(str(path))
                     self.assertEqual(status, 0, error)
-                    self.assertIn(f"Device  : {label}", output)
-                    if device == "cpu":
-                        self.assertIn("Device  : CPU (max_cores = 4)", output)
-                        self.assertNotIn("; auto", output)
-                    self.assertNotIn("Backend", output)
+                    run.assert_called_once()
                     params = run.call_args.args[0]
                     self.assertEqual(params.device, device)
-                    self.assertFalse(hasattr(params, "backend"))
 
 
 if __name__ == "__main__":

@@ -98,6 +98,8 @@ def _show_help() -> None:
         pySED [input_file]      or    pysed [input_file]
         pySED -h                or    pysed --help
 
+        If no input_file is given, defaults to `input_SED.in` in the current directory.
+
     {section_rule}
     ℹ DESCRIPTION:
 
@@ -105,8 +107,6 @@ def _show_help() -> None:
         and phonon lifetimes from Molecular Dynamics (MD) simulation trajectories.
 
         It supports GPUMD/LAMMPS trajectories output formats.
-
-        If no input_file is given, defaults to `input_SED.in` in the current directory.
 
     {section_rule}
     ⚙ INPUT PARAMETERS (input_SED.in):
@@ -121,7 +121,7 @@ def _show_help() -> None:
             {_MANUAL_URL}
 
     {section_rule}
-    ▣ REFERENCE:
+    ▣ REFERENCES:
 
         [1] Liang et al., J. Appl. Phys. 138, 075101 (2025). (For pySED paper)
             https://doi.org/10.1063/5.0278798

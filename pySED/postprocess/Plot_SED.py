@@ -28,6 +28,7 @@ import seaborn as sns
 
 from pySED.postprocess import output_files
 from pySED.console import print_detail as _print_plot_detail
+from pySED.sed.sed_kernel import LEGACY_SED_UNIT
 
 # Use one Seaborn theme for every pySED figure in this plotting module.
 sns.set_theme(
@@ -98,7 +99,12 @@ def _print_color_scale(params, vmin, vmax, unit="eV/THz"):
     max_source = "user-defined" if params.colorbar_max is not None else "automatic"
     input_name = _input_filename(params)
     _print_plot_detail(
+        "SED unit",
+        f"{unit} (for pySED 2.x comparison)" if unit == LEGACY_SED_UNIT else unit,
+    )
+    _print_plot_detail(
         "Colorbar",
+        f"ln[SED] ({unit})" if unit == LEGACY_SED_UNIT else
         f"ln[SED / ({unit})] (dimensionless)",
     )
     _print_plot_detail(
@@ -222,7 +228,8 @@ def plot_bands(data, params):
     colorbar_label = (
         r'$\ln\!\left[\mathrm{SED}(\mathbf{q},\omega)'
         r'/(\mathrm{eV/THz})\right]$'
-        if unit == 'eV/THz' else f'ln[SED / ({unit})]'
+        if unit == 'eV/THz' else
+        r'$\log(\Phi(\mathbf{q},\omega))$ (J$\cdot$s)'
     )
     bar.set_label(colorbar_label, fontsize=13.5)
 
@@ -270,6 +277,8 @@ def plot_bands(data, params):
 
     if params.if_show_figures:
         plt.show()
+
+    plt.close(fig)
 
 def plot_slice(data, params, fit_result=None):
     """Write one q-point intensity spectrum, optionally with fitted curves.
@@ -347,8 +356,10 @@ def plot_slice(data, params, fit_result=None):
                 labelspacing=0.6,
             )
 
+    unit = getattr(data, 'sed_unit', 'eV/THz')
+    unit_label = r'J$\cdot$s' if unit == LEGACY_SED_UNIT else unit
     ax.set_ylabel(
-        r'$\Phi(\mathbf{q},\omega)$' + f" ({getattr(data, 'sed_unit', 'eV/THz')})",
+        r'$\Phi(\mathbf{q},\omega)$' + f" ({unit_label})",
         fontsize=16,
     )
     ax.set_xlabel('Frequency (THz)', fontsize=16)

@@ -93,6 +93,11 @@ def prepare_trajectory(
         if converted_path is not None
         else default_converted_path(source)
     )
+    if output.resolve() == source.resolve():
+        raise ValueError(
+            "NetCDF cache path must differ from the source trajectory; "
+            "choose a different out_files_name or cache path."
+        )
     if force or not converted_file_is_current(
         output,
         source,

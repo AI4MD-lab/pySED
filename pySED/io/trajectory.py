@@ -64,11 +64,12 @@ class NetCDFBlockSource:
             )
 
     def iter_blocks(self, block_size: int, num_blocks: int):
-        """Yield num_blocks consecutive batches of exactly block_size frames.
+        """Yield consecutive frame slices using the caller-supplied block layout.
 
         Read positions, velocities, and cells through NetCDFReader, so returned
-        batches use canonical units. Require block_size*num_blocks to equal the
-        requested frame count; trailing frames in a longer trajectory are ignored.
+        batches use canonical units. The caller must ensure block_size*num_blocks
+        equals required_frames; this method does not validate the layout.
+        Frames beyond the requested blocks are not read.
         """
 
         with NetCDFReader(self.path) as trajectory:

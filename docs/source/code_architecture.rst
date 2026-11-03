@@ -83,6 +83,12 @@ Names prefixed with ``sed.Phonon.`` in steps 3 and 4 refer to methods of
 ``spectral_energy_density``. There is no need to read the GPU implementation
 to understand the SED formula.
 
+``compute_sed(params, lattice_info, trajectory_blocks)`` consumes one iterator
+containing all blocks, including the first block used for geometry setup. The
+pipeline releases its separate first-block reference before calculation. Host
+array estimates include the actual position, velocity and cell array sizes of
+the current block, plus another block when prefetch is enabled.
+
 The numerical core
 ------------------
 
