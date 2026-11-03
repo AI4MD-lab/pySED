@@ -179,7 +179,7 @@ class load_data(object):
         self.sed_avg = sum(values for values, _ in components)
         self.sed_unit = LEGACY_SED_UNIT if self.legacy_unit else SED_UNIT
         if self.legacy_unit:
-            print(f"  Note: {LEGACY_UNIT_NOTICE}")
+            print(f"    Note: {LEGACY_UNIT_NOTICE}")
 
         self.qpoints = np.loadtxt(qpoints_path, ndmin=2)
         self.freq_fft = np.loadtxt(frequency_path, ndmin=1)
@@ -282,7 +282,7 @@ def deal_total_fre_lifetime(params, total_qpoints):
 
         if not frequency.size:
             print(
-                f"\n  Warning: {load_file_name} contains no fitted "
+                f"\n    Warning: {load_file_name} contains no fitted "
                 "lifetimes; skipping."
             )
             continue

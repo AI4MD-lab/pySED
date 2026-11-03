@@ -29,6 +29,7 @@ from scipy.optimize import curve_fit
 from scipy.signal import find_peaks, windows
 
 from pySED.postprocess import output_files
+from pySED.console import print_detail, print_section
 
 _PEAK_DETECTION_SMOOTH_WINDOW = 7
 _PEAK_DETECTION_NOISE_WINDOW = 31
@@ -574,10 +575,10 @@ class lorentz:
             self.lorentz_fit_freq_min is not None
             or self.lorentz_fit_freq_max is not None
         ):
-            print(
-                "      Frequency range      : "
+            print_detail(
+                "Frequency range",
                 f"{selected_frequency.min():.3f}-"
-                f"{selected_frequency.max():.3f} THz\n"
+                f"{selected_frequency.max():.3f} THz"
             )
 
         # Mirror only a spectrum that starts at zero.  This keeps a possible
@@ -609,20 +610,14 @@ class lorentz:
         # fitter below receives self.sed, preserving the original peak widths.
         valley_signal = _smoothed_log_sed(self.sed)
 
-        print("  >  Peak detection")
-        print(f"      Peaks found          : {len(peaks)}")
-        print(
-            "      Minimum significance : "
-            f"{params.peak_min_significance:g}"
-        )
+        print_section("Peak detection")
+        print_detail("Peaks found", len(peaks))
+        print_detail("Minimum significance", f"{params.peak_min_significance:g}")
         if self.fitting_function == "auto":
-            print("      Line shape           : automatic Lorentz or DHO")
+            print_detail("Line shape", "automatic Lorentz or DHO")
         else:
-            print(f"      Line shape           : {self.fitting_function}")
-        print(
-            "      Fit figure           : "
-            f"{output_files.slice_figure(params, fitting=True)}"
-        )
+            print_detail("Line shape", self.fitting_function)
+        print_detail("Fit figure", output_files.slice_figure(params, fitting=True))
 
         self.peak_fits = []
         for peak_number, peak in enumerate(peaks, start=1):
@@ -651,7 +646,7 @@ class lorentz:
                 )
             except RuntimeError as error:
                 print(
-                    "  WARNING: spectrum fit failed for peak at "
+                    "    WARNING: spectrum fit failed for peak at "
                     f"{self.thz[peak]:.6f} THz: {error}"
                 )
                 continue
@@ -662,14 +657,14 @@ class lorentz:
             result["peak_number"] = peak_number
             self.peak_fits.append(result)
 
-        print("\n  >  Independent peak fits")
+        print_section("Independent peak fits")
         range_width = 19
         print(
-            f"      {'No.':>3}   {'Fit range (THz)':^{range_width}}   "
+            f"        {'No.':>3}   {'Fit range (THz)':^{range_width}}   "
             f"{'Data points':>11}"
         )
         print(
-            f"      {'---':>3}   {'-' * range_width}   "
+            f"        {'---':>3}   {'-' * range_width}   "
             f"{'-' * 11}"
         )
         for result in self.peak_fits:
@@ -678,7 +673,7 @@ class lorentz:
                 f"{result['fit_end']:<8.4f}"
             )
             print(
-                f"      {result['peak_number']:3d}   "
+                f"        {result['peak_number']:3d}   "
                 f"{fit_range}   "
                 f"{result['num_points']:11d}"
             )
@@ -694,27 +689,27 @@ class lorentz:
         ]
         if upper_bound_peaks:
             print(
-                "  Note: fitted HWHM reached peak_max_hwhm for peak(s): "
+                "    Note: fitted HWHM reached peak_max_hwhm for peak(s): "
                 + ", ".join(upper_bound_peaks)
             )
         if incomplete_peaks:
             peak_list = ", ".join(incomplete_peaks)
             if len(incomplete_peaks) == 1:
                 print(
-                    f"  Note: peak {peak_list} is incomplete; HWHM is "
+                    f"    Note: peak {peak_list} is incomplete; HWHM is "
                     "model-extrapolated."
                 )
                 print(
-                    "        Lifetime is qualitative. Adjust "
+                    "          Lifetime is qualitative. Adjust "
                     "peak_min_significance if needed."
                 )
             else:
                 print(
-                    f"  Note: peaks {peak_list} are incomplete; HWHMs are "
+                    f"    Note: peaks {peak_list} are incomplete; HWHMs are "
                     "model-extrapolated."
                 )
                 print(
-                    "        Lifetimes are qualitative. Adjust "
+                    "          Lifetimes are qualitative. Adjust "
                     "peak_min_significance if needed."
                 )
 
@@ -767,14 +762,14 @@ class lorentz:
             self.peak_significance = np.empty(0, dtype=float)
 
         lifetimes = hwhm_to_lifetime_ps(self.popt[:, 2])
-        print("\n  >  Spectral fitting results")
-        print("      Lifetime definition  : tau_SED = 1 / (2*pi*HWHM)")
+        print_section("Spectral fitting results")
+        print_detail("Lifetime definition", "tau_SED = 1 / (2*pi*HWHM)")
         print(
-            "      Frequency (THz)      HWHM (THz)      Tau_SED (ps)"
+            "        Frequency (THz)      HWHM (THz)      Tau_SED (ps)"
             "        Model"
         )
         print(
-            "      ---------------      ----------      -----------"
+            "        ---------------      ----------      -----------"
             "        -------"
         )
         for frequency, hwhm, lifetime, model in zip(
@@ -785,7 +780,7 @@ class lorentz:
         ):
             if np.isfinite(lifetime):
                 print(
-                    f"      {frequency:15.6f}      {hwhm:10.6f}      "
+                    f"        {frequency:15.6f}      {hwhm:10.6f}      "
                     f"{lifetime:11.8f}        {model}"
                 )
         overdamped_dho = (
@@ -794,6 +789,6 @@ class lorentz:
         )
         if np.any(overdamped_dho):
             print(
-                "  Note: overdamped DHO lifetimes are included for "
+                "    Note: overdamped DHO lifetimes are included for "
                 "qualitative comparison only."
             )

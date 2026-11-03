@@ -22,6 +22,7 @@ import os
 import sys
 from importlib.resources import files
 from pathlib import Path
+from textwrap import indent
 
 from pySED import __version__
 from pySED.parser import read_input
@@ -71,10 +72,8 @@ def _print_run_summary(input_file, params) -> None:
     """Print the selected input, action, device, and output prefix."""
     if params.device == "gpu":
         device = "GPU (single CUDA device)"
-    elif params.max_cores == 1:
-        device = "CPU (1 process)"
     else:
-        device = f"CPU (up to {params.max_cores} processes)"
+        device = f"CPU (max_cores = {params.max_cores})"
 
     border = f"{_BANNER_INDENT}{'=' * _BANNER_WIDTH}"
     divider = f"{_BANNER_INDENT}{'-' * _BANNER_WIDTH}"
@@ -221,10 +220,11 @@ def main() -> int:
         _print_run_summary(input_file, params)
         run_pipeline(params)
     except (EOFError, ImportError, KeyError, OSError, RuntimeError, ValueError) as error:
-        print(f"\n  ✖  ERROR: {error}\n", file=sys.stderr)
+        details = indent(str(error).strip(), _BANNER_INDENT * 2)
+        print(f"\n{_BANNER_INDENT}✖  ERROR:\n{details}\n", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("\n  ⚠  Interrupted.\n", file=sys.stderr)
+        print(f"\n{_BANNER_INDENT}⚠  Interrupted.\n", file=sys.stderr)
         return 130
     return 0
 

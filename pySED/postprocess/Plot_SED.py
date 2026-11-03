@@ -27,6 +27,7 @@ import numpy as np
 import seaborn as sns
 
 from pySED.postprocess import output_files
+from pySED.console import print_detail as _print_plot_detail
 
 # Use one Seaborn theme for every pySED figure in this plotting module.
 sns.set_theme(
@@ -82,12 +83,6 @@ def _prepare_sed_for_log_scale(sed, vmin, vmax):
     positive = np.ma.masked_less_equal(values, 0.0)
     finite = np.ma.masked_invalid(positive)
     return np.ma.clip(np.ma.log(finite), vmin, vmax)
-
-
-def _print_plot_detail(label, value):
-    """Print one plot detail using the pipeline's column alignment."""
-
-    print(f"      {label:<16}: {value}")
 
 
 def _input_filename(params):

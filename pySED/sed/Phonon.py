@@ -31,6 +31,7 @@ import numpy as np
 from scipy.fftpack import fftfreq
 
 from pySED.backends import create_backend
+from pySED.console import print_detail, print_section
 from pySED.io.schema import POSITIONS, VELOCITIES
 from pySED.sed.sed_kernel import (
     SEDKernelConfig, block_normalization, finalize_spectrum,
@@ -89,15 +90,6 @@ class spectral_energy_density:
                 f"but num_atoms = {params.num_atoms}."
             )
 
-        print(
-            "\nThe number of frames used to calculate SED is "
-            f"{self.num_frame}."
-        )
-        print(
-            f"\nThe {self.num_frame} frame trajectories were divided into "
-            f"{params.num_blocks} blocks for averaging."
-        )
-
         # Convert the saved-frame interval from fs to seconds.
         self.dt = params.time_step * params.output_data_stride / 1e15
 
@@ -109,13 +101,6 @@ class spectral_energy_density:
             / 1e15
         )
         self.amu_2_kg = 1.66054e-27
-
-        print(
-            "\n****** Velocity unit normalized to m/s; "
-            f"SED output scale: {self.sed_unit} ******"
-        )
-        if self.legacy_unit:
-            print(f"  Note: {LEGACY_UNIT_NOTICE}")
 
         # scipy.fftpack.fftfreq returns Hz; expose the frequency axis in THz.
         self.freq_fft = (
@@ -136,6 +121,15 @@ class spectral_energy_density:
         """
         start_time = time.time()
         self.trajectory_prefetch = bool(params.trajectory_prefetch)
+        print_section("SED calculation setup")
+        print_detail("Total q-points", lattice_info.num_qpoints)
+        print_detail("Frames", self.num_frame)
+        print_detail("Averaging blocks", f"{params.num_blocks} × {self.num_frames_per_block} frames")
+        print_detail("Velocity unit", "m/s")
+        print_detail("SED unit", self.sed_unit)
+        print_detail("Partial SED", "element × direction" if getattr(params, "output_partial", 0) else "disabled")
+        if self.legacy_unit:
+            print(f"            {LEGACY_UNIT_NOTICE}")
         kernel_config = self._prepare_kernel(params, lattice_info)
 
         # The trajectory source owns disk I/O. This generator only reduces
@@ -152,10 +146,6 @@ class spectral_energy_density:
         self._average_blocks_and_frequencies()
         elapsed = time.time() - start_time
         backend.report(elapsed, self._trajectory_wait)
-        print(
-            "\n************ Total SED calculation time: "
-            f"{elapsed:.2f} seconds. ************"
-        )
 
     def _prepare_kernel(self, params, lattice_info):
         """Build the static SEDKernelConfig and allocate the block accumulator.
@@ -228,18 +218,11 @@ class spectral_energy_density:
         """
 
         if self.output_partial:
-            print(
-                "\n******* Output partial SED for each atom type and "
-                "different directions *******"
-            )
-            print(
-                "  🚀🚀 Element -> mass mapping "
-                "(mass in amu; used for partial SED filenames):"
-            )
+            print("\n        Atomic masses (amu):")
             for type_index, mass in enumerate(unique_masses):
                 symbol = self.type_symbols[type_index]
                 print(
-                    f"            {symbol} = {mass} amu"
+                    f"            {symbol:<8}: {mass}"
                 )
 
             self._sed_sum = np.zeros(
@@ -290,10 +273,7 @@ class spectral_energy_density:
                     vels, cell_vecs, qdot, self._sed_sum,
                     prefetch=self.trajectory_prefetch and self.num_blocks > 1,
                 )
-            print(
-                "\n**************** Now calculate on averaging blocks "
-                f"{block_index + 1}/{self.num_blocks} ... ****************\n"
-            )
+            print_section(f"Computing block {block_index + 1}/{self.num_blocks}", "▶")
             backend.compute(vels, cell_vecs, qdot)
             qdot *= scaling_const
             self._sed_sum += qdot

@@ -18,6 +18,7 @@
 
 from functools import partial
 
+from pySED.console import print_detail, print_section
 from pySED.sed.sed_kernel import calculate_q_batch
 from pySED.backends.common import (
     estimate_kernel_working_bytes, print_cpu_memory_estimate, print_qpoints,
@@ -123,10 +124,8 @@ class GPUBackend:
         except BaseException:
             self.close()
             raise
-        print(
-            "\n****************** Using CuPy GPU backend for "
-            "computing SED *****************"
-        )
+        print()
+        print_detail("GPU backend", "CuPy (single CUDA device)")
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -293,12 +292,9 @@ class GPUBackend:
 
         self._gpu_q_batch_size = selected_batch
         used_bytes = total_bytes - free_bytes
-        print(
-            "\n  🚀🚀 GPU memory before SED: "
-            f"{used_bytes / 1e9:.2f} GB used; "
-            f"{free_bytes / 1e9:.2f} GB available "
-            f"of {total_bytes / 1e9:.2f} GB."
-        )
+        print_detail("GPU memory before SED", f"{used_bytes / 1e9:.2f} GB used / {total_bytes / 1e9:.2f} GB total")
+        print_detail("GPU memory available", f"{free_bytes / 1e9:.2f} GB")
+        print_detail("GPU q batch size", selected_batch)
 
     def report(self, total_elapsed, trajectory_wait):
         """Print accumulated GPU-stage times alongside CPU trajectory-wait time.
@@ -316,44 +312,31 @@ class GPUBackend:
 
         stages = (
             (
-                "CPU: trajectory block wait",
+                "Trajectory block wait",
                 trajectory_wait,
             ),
-            ("CPU -> GPU upload", event_times.get("upload", 0.0)),
-            ("GPU: tensordot projection", projection),
-            ("GPU: FFT", fft_time),
-            ("GPU: other operations", other_gpu),
-            ("GPU -> CPU result", event_times.get("download", 0.0)),
+            ("CPU → GPU upload", event_times.get("upload", 0.0)),
+            ("GPU projection", projection),
+            ("GPU FFT", fft_time),
+            ("Other GPU operations", other_gpu),
+            ("GPU → CPU result", event_times.get("download", 0.0)),
         )
         profiled_total = sum(seconds for _, seconds in stages)
         other_sed_work = max(0.0, total_elapsed - profiled_total)
 
-        print(
-            "\n****************** CuPy SED timing profile "
-            "******************"
-        )
+        print_section("GPU timing profile")
         for label, seconds in stages:
             percentage = (
                 100.0 * seconds / profiled_total
                 if profiled_total
                 else 0.0
             )
-            print(
-                f"  {label:<30}: {seconds:8.2f} s "
+            print_detail(
+                label, f"{seconds:8.2f} s "
                 f"({percentage:5.1f}%)"
             )
-        print(
-            f"  {'Sum of the six rows above':<30}: "
-            f"{profiled_total:8.2f} s"
-        )
-        print(
-            f"  {'Other SED work':<30}: "
-            f"{other_sed_work:8.2f} s"
-        )
+        print_detail("Profiled stages total", f"{profiled_total:8.2f} s")
+        print_detail("Other SED work", f"{other_sed_work:8.2f} s")
         if self._gpu_total_bytes:
-            print(
-                "\n  🚀🚀 Observed GPU memory after SED blocks: "
-                f"{self._gpu_observed_used_bytes / 1e9:.2f} GB used "
-                f"of {self._gpu_total_bytes / 1e9:.2f} GB."
-            )
-        print("\n  🚀🚀 CuPy cached GPU memory has been released.")
+            print_detail("GPU memory observed", f"{self._gpu_observed_used_bytes / 1e9:.2f} GB used / {self._gpu_total_bytes / 1e9:.2f} GB total")
+        print_detail("GPU memory pool", "released")

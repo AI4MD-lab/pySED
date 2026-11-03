@@ -685,9 +685,9 @@ class ParserTests(unittest.TestCase):
             write_output.assert_called_once_with(sed, params, bz_info)
             message = output.getvalue()
             self.assertIn("SED compute done (13.0 s)", message)
-            self.assertIn("Initial read/setup : 2.0 s", message)
-            self.assertIn("SED calculation    : 8.0 s", message)
-            self.assertIn("Output/finalization: 3.0 s", message)
+            self.assertRegex(message, r"Initial read/setup\s+: 2\.0 s")
+            self.assertRegex(message, r"SED calculation\s+: 8\.0 s")
+            self.assertRegex(message, r"Output/finalization\s+: 3\.0 s")
 
     def test_dump_group_supercell_overrides_the_trajectory_cell_for_bz(self) -> None:
         params = SimpleNamespace(
