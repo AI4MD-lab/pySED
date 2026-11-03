@@ -8,17 +8,32 @@ re_output_total_freq_lifetime
    re_output_total_freq_lifetime = 1
 
 **Meaning**
-   Rewrites ``Lifetime/Fitting-All-Qpoints.Fre_lifetime`` and regenerates
-   ``Fitting-Frequency-Lifetime.png`` after you re-fit a selected
-   q-point. Use it when one q-point fit was poor and you want to adjust
-   ``peak_min_significance`` without re-fitting all q-points.
+   After fitting all q-points, use this option when a particular q-point's
+   fit needs improvement. Adjust ``peak_min_significance`` to detect peaks
+   again and re-fit that q-point's phonon lifetimes.
+
+   Updates the combined phonon lifetime data in
+   ``Lifetime/Fitting-All-Qpoints.Fre_lifetime`` after re-fitting a selected
+   q-point. The other q-points retain their saved lifetime results and are
+   not re-fitted. If the combined data contain fitted lifetimes, pySED also
+   redraws ``Fitting-Frequency-Lifetime.png``.
 
 **Default**
    ``0``.
 
 **Notes**
-   Use this with ``lorentz_fit_all_qpoint = 0`` after improving a single
-   q-point fit. It is active only in single-Q fitting mode.
+   Use ``action = fit``, ``lorentz_fit_all_qpoint = 0``, and the desired
+   ``qpoint_slice_index``, together with this option set to ``1``. The selected
+   q-point's lifetime file is overwritten with its new fit results before
+   updating the combined phonon lifetime data. This option is active only
+   in single-Q fitting mode. See :doc:`the refitting workflow <../peak_fitting>`.
+
+   All q-point lifetime files must be present. If any are missing, pySED
+   reports how many files were found and skips the combined phonon lifetime
+   update. The selected q-point's lifetime data are still saved; any existing
+   combined lifetime data and frequency-lifetime figure remain unchanged.
+   This checks file availability, not whether a fit was satisfactory. A file
+   with no detected peaks is still a completed fit output and is allowed.
 
    When ``lorentz_fit_all_qpoint = 1``, pySED always rebuilds
    ``Lifetime/Fitting-All-Qpoints.Fre_lifetime`` and redraws

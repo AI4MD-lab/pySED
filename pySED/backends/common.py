@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from pySED.console import print_detail
+from pySED.console import SED_PROGRESS_WIDTH, print_detail
 
 def qpoint_batches(num_qpoints, num_workers, max_batch_size=None):
     """Return non-overlapping (start, stop) ranges covering all q points.
@@ -113,26 +113,30 @@ def estimate_kernel_working_bytes(vels, config, max_q_batch, *, cpu=False):
 
 
 def print_qpoints(reduced_qpoints, q_start, q_stop):
-    """Print the index and reduced coordinates of each q point in a batch."""
+    """Center each q-point progress line below the averaging-block banner."""
     num_qpoints = len(reduced_qpoints)
+    index_width = len(str(num_qpoints))
     for q_index in range(q_start, q_stop):
         qpoint = reduced_qpoints[q_index]
-        print_detail(
-            f"q-point {q_index + 1}/{num_qpoints}",
-            f"({qpoint[0]:.4f}, {qpoint[1]:.4f}, "
+        message = (
+            f"Now calculating q-point {q_index + 1:>{index_width}}/{num_qpoints}:   "
+            f"q = ({qpoint[0]:.4f}, {qpoint[1]:.4f}, "
             f"{qpoint[2]:.4f})"
         )
+        print("    " + message.center(SED_PROGRESS_WIDTH).rstrip())
 
 
 def print_cpu_memory_estimate(
     vels, cell_vecs, config, accumulator, result, *,
-    backend, num_workers=1, parallel=False, prefetch=False,
+    backend, trajectory_bytes, num_workers=1, parallel=False, prefetch=False,
     max_q_batch=None,
 ):
     """Print estimated peak host-array storage in decimal GB.
 
     Include the current trajectory block, output and accumulated spectra,
     shared-memory copies, queued results, and a possible prefetched block.
+    trajectory_bytes is measured from the block's arrays, including positions;
+    the estimate assumes subsequent blocks have the same shapes and dtypes.
     CPU execution also includes active workers' temporary arrays; GPU working
     memory is reported separately by the GPU backend.
     """
@@ -143,9 +147,9 @@ def print_cpu_memory_estimate(
         vels, config, max_q_batch, cpu=backend != "cupy",
     )
     persistent_arrays = (
-        accumulator.nbytes + result.nbytes + vels.nbytes + cell_vecs.nbytes
+        accumulator.nbytes + result.nbytes + trajectory_bytes + cell_vecs.nbytes
     )
-    prefetched_block = 2 * vels.nbytes + cell_vecs.nbytes if prefetch else 0
+    prefetched_block = trajectory_bytes if prefetch else 0
     shared_velocities = vels.nbytes if parallel else 0
     queued_results = result.nbytes if parallel else 0
     active_workers = 0 if backend == "cupy" else (num_workers if parallel else 1)

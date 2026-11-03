@@ -44,12 +44,13 @@ def write_output(phonons, params, BZ_lattice_info):
     sed_path, qpoints_path, frequency_path, labels_path = (
         output_files.sed_data_files(params.out_files_name)
     )
+    sed_path.parent.mkdir(parents=True, exist_ok=True)
     legacy_unit = getattr(phonons, 'legacy_unit', getattr(params, 'legacy_unit', False))
     header = SED_HEADER
     if legacy_unit:
         header = (
             f"pySED spectral energy density; unit: {LEGACY_SED_UNIT}; "
-            "legacy_unit: true; historically labelled J*s; "
+            "legacy_unit: true; "
             "each column corresponds to one q-point (same order as the .Qpts file)\n"
             + LEGACY_UNIT_NOTICE
         )
@@ -178,8 +179,6 @@ class load_data(object):
             raise ValueError("partial SED files use inconsistent output scales")
         self.sed_avg = sum(values for values, _ in components)
         self.sed_unit = LEGACY_SED_UNIT if self.legacy_unit else SED_UNIT
-        if self.legacy_unit:
-            print(f"    Note: {LEGACY_UNIT_NOTICE}")
 
         self.qpoints = np.loadtxt(qpoints_path, ndmin=2)
         self.freq_fft = np.loadtxt(frequency_path, ndmin=1)

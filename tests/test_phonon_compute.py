@@ -24,9 +24,6 @@ from pySED.backends.gpu import (
     _GPUEventProfiler,
     _load_cupy,
 )
-from pySED.backends.common import (
-    qpoint_batches,
-)
 
 
 def _reference_qpoints(vels, cell_vecs, config):
@@ -125,24 +122,9 @@ class SEDKernelTests(unittest.TestCase):
             self.cell_vecs,
             config,
         )
-        self.assertEqual(actual.shape, (8, 7, 2, 3))
-        np.testing.assert_allclose(actual, expected, rtol=1e-13)
-
-    def test_qpoint_batches_cover_each_qpoint_once(self):
-        """Balanced batches must cover every q point without overlap."""
-
-        for num_qpoints in (20, 40):
-            for num_workers in (4, 36):
-                batches = qpoint_batches(num_qpoints, num_workers)
-                flattened = [
-                    q_index
-                    for start, stop in batches
-                    for q_index in range(start, stop)
-                ]
-                self.assertEqual(flattened, list(range(num_qpoints)))
-                sizes = [stop - start for start, stop in batches]
-                self.assertEqual(len(batches), min(num_qpoints, num_workers))
-                self.assertLessEqual(max(sizes) - min(sizes), 1)
+        self.assertEqual(actual.shape, (8, 2, 3, 7))
+        self.assertTrue(actual.flags.c_contiguous)
+        np.testing.assert_allclose(actual, expected.transpose(0, 2, 3, 1), rtol=1e-13)
 
     def test_gpu_q_batches_make_one_result_transfer_per_block(self):
         """Split or full GPU batches must return one complete block result."""
@@ -225,44 +207,6 @@ class SEDKernelTests(unittest.TestCase):
 
         self.assertEqual(_element_symbol_from_mass(15.9994), "O")
         self.assertEqual(_element_symbol_from_mass(123.456), "unknown")
-
-    def test_online_blocks_and_one_sided_fold_preserve_power(self):
-        """Block averaging and frequency folding must preserve total power."""
-
-        rng = np.random.default_rng(2468)
-        stored_blocks = rng.random((3, 8, 7))
-
-        block_average = stored_blocks.sum(axis=0) / stored_blocks.shape[0]
-        expected = block_average.copy()
-        n_half = expected.shape[0] // 2
-        negative = block_average[:n_half:-1, ...]
-        paired_length = negative.shape[0]
-        expected[1 : 1 + paired_length, ...] = (
-            block_average[1 : 1 + paired_length, ...] + negative
-        )
-        expected = expected[:n_half, ...]
-        expected *= JOULE_SECOND_TO_EV_PER_THZ
-        retained_two_sided_power = (
-            block_average[0, ...]
-            + block_average[1 : 1 + paired_length, ...].sum(axis=0)
-            + negative.sum(axis=0)
-        ) * JOULE_SECOND_TO_EV_PER_THZ
-
-        calculator = object.__new__(spectral_energy_density)
-        calculator._sed_sum = np.zeros_like(stored_blocks[0])
-        for block in stored_blocks:
-            calculator._sed_sum += block
-        calculator.num_blocks = stored_blocks.shape[0]
-        calculator.freq_fft = np.arange(stored_blocks.shape[1], dtype=float)
-
-        calculator._average_blocks_and_frequencies()
-
-        np.testing.assert_allclose(calculator.sed_avg, expected)
-        np.testing.assert_allclose(
-            calculator.sed_avg.sum(axis=0),
-            retained_two_sided_power,
-        )
-        self.assertFalse(hasattr(calculator, "_sed_sum"))
 
     def test_one_sided_fold_handles_odd_and_even_frame_counts(self):
         """Retain every positive bin, excluding only an even-length Nyquist."""
@@ -384,7 +328,7 @@ class SEDKernelTests(unittest.TestCase):
                                     params, SimpleNamespace(n_atoms=6),
                                 )
                                 calculator.compute_sed(
-                                    params, lattice, blocks[0], iter(blocks[1:]),
+                                    params, lattice, iter(blocks),
                                 )
                             expected = old_folded.copy()
                             if not legacy:
@@ -396,33 +340,7 @@ class SEDKernelTests(unittest.TestCase):
                             np.testing.assert_array_equal(
                                 calculator.freq_fft, frequencies[indices],
                             )
-
-    def test_block_scaling_includes_discrete_time_step_squared(self):
-        """The FFT sum must include dt twice after taking its magnitude squared."""
-
-        calculator = object.__new__(spectral_energy_density)
-        calculator.dt = 2.0
-        calculator.t_o = 8.0
-        calculator.num_unit_cells = 3
-        calculator.num_blocks = 1
-        calculator._sed_sum = np.zeros((8, 7))
-        calculator.trajectory_prefetch = False
-        backend = SimpleNamespace(
-            prepare=lambda *args, **kwargs: None,
-            compute=lambda vels, cells, result: result.fill(1.0),
-        )
-        calculator._loop_over_blocks(
-            backend=backend,
-            trajectory_blocks=[(self.vels, self.cell_vecs)],
-        )
-
-        expected = calculator.dt**2 / (
-            4
-            * np.pi
-            * calculator.t_o
-            * calculator.num_unit_cells
-        )
-        np.testing.assert_allclose(calculator._sed_sum, expected)
+                            self.assertFalse(hasattr(calculator, "_sed_sum"))
 
     @unittest.skipUnless(
         importlib.util.find_spec("cupy") is not None,

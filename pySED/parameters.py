@@ -298,7 +298,8 @@ def validate_sed(params):
 
     This function also unpacks params.plot_partial_SED from its parsed tuple
     into a boolean plus plot_partial_element and plot_partial_dir attributes.
-    A selected element is checked against masses in basis.in.
+    Compute/thinking also check the selected element against masses in basis.in;
+    plot/fit validate the selected component files when loading saved spectra.
     """
 
     needs_compute = params.action in {"thinking", "compute"}
@@ -317,6 +318,8 @@ def validate_sed(params):
     validate_qpoint_slice_index(params)
     if np.any(params.supercell_dim <= 0):
         raise ValueError("supercell_dim values must be positive")
+    if not np.isfinite(params.plot_interval) or params.plot_interval <= 0:
+        raise ValueError("plot_interval must be positive and finite")
     for name in ("colorbar_min", "colorbar_max"):
         value = getattr(params, name)
         if value is not None and not np.isfinite(value):
@@ -456,7 +459,7 @@ def validate_sed(params):
         params.plot_partial_dir,
     ) = params.plot_partial_SED
 
-    if params.plot_partial_SED:
+    if params.plot_partial_SED and needs_compute:
         try:
             masses = np.loadtxt(
                 params.basis_lattice_file,

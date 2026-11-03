@@ -79,6 +79,12 @@ peak_min_significance
    refined to a nearby maximum of the original SED, and line-shape fitting
    uses the original, unsmoothed, linear SED.
 
+   To improve one Q point after fitting all Q points, adjust this threshold
+   and use ``action = fit`` with ``lorentz_fit_all_qpoint = 0`` and the desired
+   ``qpoint_slice_index``. Set :doc:`re_output_total_freq_lifetime
+   <re_output_total_freq_lifetime>` to ``1`` to include the revised phonon
+   lifetimes in the combined file while keeping the other Q-point results.
+
 :doc:`Back to Parameter Index <../input_parameters>`
 
 Related parameters

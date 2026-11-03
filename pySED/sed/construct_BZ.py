@@ -60,28 +60,46 @@ class BZ_methods(object):
         self._construct_BZ_path(params)
 
     def _get_basis_lattice(self, params):
-        """Read the four mapping columns of basis.in after its two header lines.
+        """Read and validate the generated basis layout once before calculation.
 
-        Atom IDs, unit-cell indices, and basis indices are one-based in the file;
-        masses are in amu. These rows must follow the trajectory atom order.
-        The largest atom ID is checked against params.num_atoms before calculation.
+        Require consecutive atom IDs and complete unit cells in order, each
+        containing basis indices 1..N with matching positive masses in amu.
+        Rows must also follow the trajectory atom order; no reordering is done.
         """
         if not os.path.exists(params.basis_lattice_file):
             raise FileNotFoundError(
                 f"Basis file '{params.basis_lattice_file}' not found"
             )
 
-        # read the lattice info from a file
-        self.atom_ids, self.unitcell_index, self.basis_index, self.masses = np.loadtxt(params.basis_lattice_file,
-                                                                                       skiprows=2, unpack=True)
-        self.atom_ids = self.atom_ids.astype(int)
-        self.unitcell_index = self.unitcell_index.astype(int)
-        self.basis_index = self.basis_index.astype(int)
-        self.masses = self.masses.astype(float)
-        if params.num_atoms != self.atom_ids.max():
-            raise ValueError("\nInconsistent input: \"num_atoms = %d\" does not match \"Max atom_id = %d\" "
-                             "in basis.in file. Please carefully verify the input." %
-                             (params.num_atoms, self.atom_ids.max()))
+        mapping = np.loadtxt(params.basis_lattice_file, skiprows=2, ndmin=2)
+        if mapping.shape != (params.num_atoms, 4):
+            raise ValueError(
+                f"basis.in must contain {params.num_atoms} rows and four columns: "
+                "atom_id, unitcell_index, basis_index, mass."
+            )
+        if not np.isfinite(mapping).all() or np.any(mapping <= 0):
+            raise ValueError("basis.in indices and masses must be positive and finite.")
+        indices = mapping[:, :3]
+        if np.any(indices != np.floor(indices)) or np.any(indices > params.num_atoms):
+            raise ValueError("basis.in indices must be integers between 1 and num_atoms.")
+        self.atom_ids, self.unitcell_index, self.basis_index = indices.astype(int).T
+        self.masses = mapping[:, 3].copy()
+
+        rows = np.arange(params.num_atoms)
+        if not np.array_equal(self.atom_ids, rows + 1):
+            raise ValueError("basis.in atom IDs must be consecutive and ordered from 1 to num_atoms.")
+        num_basis = int(self.basis_index.max())
+        if (
+            params.num_atoms % num_basis
+            or not np.array_equal(self.unitcell_index, rows // num_basis + 1)
+            or not np.array_equal(self.basis_index, rows % num_basis + 1)
+        ):
+            raise ValueError(
+                "basis.in must list complete unit cells in order, with basis indices "
+                "1..N in each cell. Regenerate the structure and basis.in together with pySED."
+            )
+        if not np.all(self.masses.reshape(-1, num_basis) == self.masses[:num_basis]):
+            raise ValueError("basis.in masses for each basis index must match across all unit cells.")
 
     def _reconstruct_primitive_cell(self, supercell, supercell_dim):
         """
@@ -169,13 +187,20 @@ class BZ_methods(object):
             if self.box_info:
                 print_section("Cell mismatch", "⚠")
                 print("        Trajectory cell differs from primitive cell × supercell dimensions.")
+                print(
+                    "        This may indicate that structural optimization was performed "
+                    "using the NPT ensemble."
+                )
 
             if params.rescale_prim:
                 # Attempt to reconstruct the primitive cell
                 params.prim_unitcell = self._reconstruct_primitive_cell(box_in_traj, params.supercell_dim)
                 if self.box_info:
-                    print_detail("Cell handling", "reconstructed primitive cell from trajectory")
-                    print_matrix("Reconstructed primitive cell (Angstrom)", params.prim_unitcell)
+                    print_matrix(
+                        "Now, pySED has reconstructed the primitive unit cell matrix "
+                        "from the MD simulation cell (Angstrom)",
+                        params.prim_unitcell,
+                    )
             elif self.box_info:
                 print_detail("Cell handling", "keeping input primitive cell (rescale_prim = 0)")
 
@@ -234,6 +259,7 @@ class BZ_methods(object):
 
         if self.qpoints_info:
             print_section("Q-point information")
+            print("        " + "-" * 72)
 
         cumulative_distance = 0.0
         last_delta = 0.0
@@ -304,15 +330,14 @@ class BZ_methods(object):
             q_distances.extend(distances_segment)
 
             if self.qpoints_info:
-                if i:
-                    print()
                 print_detail(f"Path segment {i}", f"{terminal_label(start_label)} → {terminal_label(end_label)}")
                 print_detail("Start", fmt_vec(q_start))
                 print_detail("End", fmt_vec(q_end))
                 print_detail("Number of q-points", len(reduced_qpoints))
                 print('        Reduced q-points:')
                 for q in reduced_qpoints:
-                    print(f'            {fmt_vec(q)}')
+                    print(f'            (reduced) q = {fmt_vec(q)}')
+                print("\n        " + "-" * 72)
 
         self.qpoints = np.vstack(qpoints_list)
         self.reduced_qpoints = np.vstack(reduced_qpoints_list)

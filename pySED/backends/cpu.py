@@ -24,7 +24,7 @@ from multiprocessing import get_context, shared_memory
 import numpy as np
 from threadpoolctl import threadpool_limits
 
-from pySED.console import print_detail
+from pySED.console import print_detail, print_section
 from pySED.sed.sed_kernel import calculate_q_batch
 from pySED.backends.common import (
     available_cpu_memory, estimate_kernel_working_bytes,
@@ -124,7 +124,6 @@ class CPUBackend:
 
     max_cores bounds processes * native threads, capped by CPU affinity.
     Each process uses up to four threads; q count and memory cap workers.
-    The SED kernel and production trajectory frames are unchanged.
     """
 
     def __init__(self, config, reduced_qpoints, max_cores):
@@ -182,14 +181,14 @@ class CPUBackend:
         ):
             workers -= 1
         self._configure(workers, threads)
-        print()
+        print_section("CPU resources", "🚀")
         print_detail(
             "CPU allocation",
             f"{workers} process{'es' if workers > 1 else ''} "
             f"× {threads} thread{'s' if threads > 1 else ''}"
         )
 
-    def prepare(self, vels, cell_vecs, result, accumulator, *, prefetch):
+    def prepare(self, vels, cell_vecs, result, accumulator, *, prefetch, trajectory_bytes):
         self._prefetch = prefetch
         self._allocate(vels)
         max_q_batch = max(stop - start for start, stop in self._q_batches(vels))
@@ -198,6 +197,7 @@ class CPUBackend:
             backend="numpy", num_workers=self.num_workers,
             parallel=self._executor is not None, prefetch=prefetch,
             max_q_batch=max_q_batch,
+            trajectory_bytes=trajectory_bytes,
         )
 
     def _q_batches(self, vels):
@@ -213,13 +213,14 @@ class CPUBackend:
         return qpoint_batches(len(self.config.qpoints), workers, limit)
 
     def compute(self, vels, cell_vecs, result):
+        """Fill total or partial power, with q on the last axis."""
         self._allocate(vels)
         batches = self._q_batches(vels)
         if self._executor is None:
             with threadpool_limits(limits=self.num_threads):
                 for start, stop in batches:
                     print_qpoints(self.reduced_qpoints, start, stop)
-                    result[:, start:stop, ...] = calculate_q_batch(
+                    result[..., start:stop] = calculate_q_batch(
                         vels, cell_vecs, self.config.qpoints[start:stop],
                         self.config.basis_ids, self.config,
                     )
@@ -237,7 +238,7 @@ class CPUBackend:
                     ))
                 for future in as_completed(futures):
                     start, stop, values = future.result()
-                    result[:, start:stop, ...] = values
+                    result[..., start:stop] = values
             finally:
                 for future in futures:
                     future.cancel()

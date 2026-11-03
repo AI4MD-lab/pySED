@@ -180,7 +180,7 @@ class structure_maker(object):
 
         # Get lammps unit for generate lammps data
         if lammps_data_types is None and self.lammps_data_flag:
-            self.unit = read_structure.get_units(self.input_file)
+            self.unit = read_structure.get_units(self.lammpsInfile)
             print('Lammps data units is ' + self.unit)
 
         elif lammps_data_types is not None:

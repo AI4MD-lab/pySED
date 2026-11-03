@@ -5,6 +5,7 @@ import threading
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
+from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -121,12 +122,13 @@ class CachedTrajectoryParityTests(unittest.TestCase):
         with prefetch_one(raw_blocks, enabled=prefetch) as blocks:
             first_block = next(blocks)
             calculator = spectral_energy_density(params, source.info)
+            all_blocks = chain(iter((first_block,)), blocks)
+            del first_block
             with redirect_stdout(StringIO()):
                 calculator.compute_sed(
                     params,
                     lattice,
-                    first_block,
-                    blocks,
+                    all_blocks,
                 )
         return calculator.freq_fft, calculator.sed_avg
 

@@ -27,10 +27,10 @@ JOULE_PER_EV = 1.602176634e-19
 # frequency; 1e12 converts per Hz to per THz, and JOULE_PER_EV converts energy.
 JOULE_SECOND_TO_EV_PER_THZ = 2 * np.pi * 1.0e12 / JOULE_PER_EV
 SED_UNIT = "eV/THz"
-LEGACY_SED_UNIT = "legacy 2.x scale"
+LEGACY_SED_UNIT = "J*s"
 LEGACY_UNIT_NOTICE = (
-    "legacy_unit is for comparison with pySED 2.x results and will be "
-    "removed in a future major release. Use legacy_unit = False for new calculations."
+    "For pySED 2.x comparison only; support ends in a future major release. "
+    "Use legacy_unit = False for eV/THz."
 )
 
 
@@ -71,43 +71,62 @@ def calculate_q_batch(
     Cartesian q points include 2*pi, making ``cell_vecs @ qpoints.T`` a phase
     in radians. ``basis_ids_by_basis`` selects matching atoms in each cell.
     Each basis selects one atom per cell. The projection sums only cells,
-    producing (T, 3, Q); FFT acts only on T. The result is (T, Q), or
-    (T, Q, types, 3) for partial SED. Here T becomes the full FFT grid.
+    producing (T, 3, Q). FFT acts along time (axis 0), producing (F, 3, Q),
+    where F = T is the number of full FFT frequency bins.
+    This function returns (F, Q) for total SED, or (F, types, 3, Q) for
+    partial SED. The final output stage later moves q to axis 1 for saving
+    and plotting; no axis reordering is needed inside this kernel.
 
     The same operations support NumPy and CuPy arrays through ``xp`` and
     ``fft_function``. This returns a new array of power; sampling-time
     normalization, block averaging, and one-sided folding are separate steps.
     """
-    project = xp.tensordot if project_function is None else project_function
+    # CPU uses NumPy; GPU may supply CuPy's tensordot wrapped for timing.
+    if project_function is None:
+        project = xp.tensordot
+    else:
+        project = project_function
 
-    # 1. Spatial phase for every cell and Q point: (cells, Q).
-    phases = xp.exp(1.0j * (cell_vecs @ qpoints.T))
+    # 1. exp(i q.R) for each cell and q point: (cells, q).
+    phase_factors = xp.exp(1.0j * (cell_vecs @ qpoints.T))
     num_frames = int(vels.shape[0])
     num_qpoints = int(qpoints.shape[0])
-    shape = (num_frames, num_qpoints)
     if config.output_partial:
-        shape += (config.num_types, 3)
+        # Keep (frequency, xyz, q) together within each element type.
+        shape = (num_frames, config.num_types, 3, num_qpoints)
+    else:
+        shape = (num_frames, num_qpoints)
     result = xp.zeros(shape, dtype=xp.float64)
 
-    for b_idx, basis_ids in enumerate(basis_ids_by_basis):
-        # 2. Sum velocities over cells BEFORE FFT (FFT is linear).
-        projected_vels = project(
-            vels[:, basis_ids, :], phases, axes=([1], [0]),
+    # Each group selects the same basis atom in every repeated cell.
+    for basis_index, atom_indices in enumerate(basis_ids_by_basis):
+        # 2. Sum v(t) * exp(i q.R) over cells, keeping x/y/z separate.
+        # (time, cells, xyz) and (cells, q) -> (time, xyz, q).
+        # Match the cell axis of velocities (axis 1) to that of phase_factors (axis 0).
+        # Multiply each velocity by its same-cell phase factor, then sum over cells.
+        # Time, x/y/z directions, and q points remain independent.
+        velocity_sum = project(
+            vels[:, atom_indices, :], phase_factors, axes=([1], [0]),
         )
-        # 3. Time FFT, then mass-weighted power: (frequency, xyz, Q).
-        transformed_vels = fft_function(projected_vels, axis=0)
+        # 3. FFT along time (axis 0), independently for each direction and q.
+        transformed_vels = fft_function(velocity_sum, axis=0)
+
+        # Mass-weighted |FFT|^2 for this basis atom: (frequency, xyz, q).
         spectra = (
             xp.abs(transformed_vels) ** 2
-            * config.masses[b_idx]
+            * config.masses[basis_index]
             * config.amu_2_kg
         )
-        del projected_vels, transformed_vels
+        # Release the complex temporary arrays; spectra holds the power.
+        del velocity_sum, transformed_vels
 
-        # 4. Retain element/xyz components or sum them into the total SED.
+        # 4. Add this basis atom's power to the partial or total spectrum.
         if config.output_partial:
-            type_index = config.basis_to_type[b_idx]
-            result[:, :, type_index, :] += spectra.transpose(0, 2, 1)
+            type_index = config.basis_to_type[basis_index]
+            # Both sides have shape (frequency, xyz, q).
+            result[:, type_index, :, :] += spectra
         else:
+            # Sum x/y/z power (axis 1); result has shape (frequency, q).
             result += spectra.sum(axis=1)
     return result
 
@@ -133,11 +152,11 @@ def finalize_spectrum(sed_sum, frequencies, num_blocks, *, legacy_unit=False):
     converts to eV/THz. Legacy scaling averages each pair and skips that unit
     conversion. Frequencies remain in THz in both modes.
 
-    ``sed_sum`` already contains block-normalized spectra, with frequency
-    on axis 0 and optional q/type/direction axes afterward. ``frequencies``
-    is the corresponding full FFT grid in THz. The input array is modified
-    in place; the returned (spectrum, frequency_grid) uses slices of the
-    original arrays. Use the same ``legacy_unit`` value as block_normalization.
+    ``sed_sum`` contains block-normalized spectra, with frequency on axis 0.
+    All other axes keep their input order; this function does not reorder them.
+    ``frequencies`` is the corresponding full FFT grid in THz. The input array
+    is modified in place; the returned (spectrum, frequency_grid) uses slices
+    of the original arrays. Use the same ``legacy_unit`` value as block_normalization.
     """
     sed_sum /= num_blocks
     n_half = len(frequencies) // 2

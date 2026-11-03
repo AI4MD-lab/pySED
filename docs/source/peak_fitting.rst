@@ -34,10 +34,40 @@ Fitting one Q point
    peak_min_significance           = 4.0
    fitting_function                = auto
    initial_guess_hwhm              = 0.001
-   re_output_total_freq_lifetime   = 1
+   re_output_total_freq_lifetime   = 0
 
 Inspect ``Fitting-Qpoint/Fitting-1-qpoint.png``. Once several representative
 Q points are satisfactory, set ``lorentz_fit_all_qpoint = 1``.
+
+Refining a Q point after all-Q fitting
+--------------------------------------
+
+After fitting all Q points, inspect the figures in ``Fitting-Qpoint/``.
+If peak detection or fitting is unsatisfactory at a particular Q point,
+select it with ``qpoint_slice_index`` and adjust ``peak_min_significance``.
+For example:
+
+.. code-block:: text
+
+   action                         = fit
+   lorentz_fit_all_qpoint         = 0
+   qpoint_slice_index             = 1
+   peak_min_significance          = 4.0  # Adjust for this Q point
+   re_output_total_freq_lifetime  = 1
+
+Run pySED again to detect peaks and refit the selected spectrum. Its new
+phonon lifetime results overwrite its per-Q-point lifetime file. pySED then
+updates ``Lifetime/Fitting-All-Qpoints.Fre_lifetime`` using this new result
+and the saved results for the other Q points; those Q points are not refitted.
+If the combined data contain fitted lifetimes, the frequency-lifetime figure
+is also redrawn. Use ``action = fit`` while adjusting parameters because
+``thinking`` skips a fit whose output already exists.
+
+Keep all per-Q-point lifetime files in ``Lifetime/`` for this update. If any
+are unavailable, the selected Q-point's new lifetime data are still saved,
+but the combined lifetime data and summary figure are not updated. This is
+a file-completeness check, not a check of fit quality or detected peak count.
+A Q-point file with no detected peaks is still a completed fit output.
 
 Line-shape choices
 ------------------

@@ -124,7 +124,7 @@ class GPUBackend:
         except BaseException:
             self.close()
             raise
-        print()
+        print_section("GPU resources", "🚀")
         print_detail("GPU backend", "CuPy (single CUDA device)")
         return self
 
@@ -140,11 +140,12 @@ class GPUBackend:
             self._cupy.get_default_memory_pool().free_all_blocks()
             self._cupy.get_default_pinned_memory_pool().free_all_blocks()
 
-    def prepare(self, vels, cell_vecs, result, accumulator, *, prefetch):
+    def prepare(self, vels, cell_vecs, result, accumulator, *, prefetch, trajectory_bytes):
         """Report host-memory use and check available device memory."""
         print_cpu_memory_estimate(
             vels, cell_vecs, self.config, accumulator, result,
             backend="cupy", prefetch=prefetch,
+            trajectory_bytes=trajectory_bytes,
         )
         self._check_gpu_memory(vels, cell_vecs, result)
 
@@ -203,7 +204,8 @@ class GPUBackend:
                     fft_function=transform,
                     project_function=project,
                 )
-                gpu_result[:, q_start:q_stop, ...] = batch_result
+                # q is the last axis for both total and partial SED.
+                gpu_result[..., q_start:q_stop] = batch_result
                 profiler.stop("compute", compute_start)
                 del batch_result
 
@@ -292,8 +294,10 @@ class GPUBackend:
 
         self._gpu_q_batch_size = selected_batch
         used_bytes = total_bytes - free_bytes
+        print()
         print_detail("GPU memory before SED", f"{used_bytes / 1e9:.2f} GB used / {total_bytes / 1e9:.2f} GB total")
         print_detail("GPU memory available", f"{free_bytes / 1e9:.2f} GB")
+        print_detail("Estimated SED GPU memory", f"{candidate_bytes / 1e9:.2f} GB")
         print_detail("GPU q batch size", selected_batch)
 
     def report(self, total_elapsed, trajectory_wait):
@@ -338,5 +342,9 @@ class GPUBackend:
         print_detail("Profiled stages total", f"{profiled_total:8.2f} s")
         print_detail("Other SED work", f"{other_sed_work:8.2f} s")
         if self._gpu_total_bytes:
-            print_detail("GPU memory observed", f"{self._gpu_observed_used_bytes / 1e9:.2f} GB used / {self._gpu_total_bytes / 1e9:.2f} GB total")
+            print_detail(
+                "GPU memory used",
+                f"{self._gpu_observed_used_bytes / 1e9:.2f} GB used / "
+                f"{self._gpu_total_bytes / 1e9:.2f} GB total",
+            )
         print_detail("GPU memory pool", "released")

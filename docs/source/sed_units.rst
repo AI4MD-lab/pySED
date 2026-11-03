@@ -26,7 +26,7 @@ Historical output scale
 Set :doc:`legacy_unit <input_parameters/legacy_unit>` to ``True`` to compare
 with pySED 2.x intensities. This mode omits ``dt**2``, averages each
 positive/negative frequency pair, and skips the eV/THz conversion. Its output
-is labelled ``legacy 2.x scale``; the historical ``J*s`` label does not denote
+retains the historical ``J*s`` label; this label does not denote
 the same normalized density as the default output. Frequency is still in THz.
 
 This compatibility option will be removed in a future major release.
@@ -52,8 +52,9 @@ With the default physical scale, the dispersion heatmap displays
 
 so ``colorbar_min`` and ``colorbar_max`` are dimensionless natural-log
 values. Single-Q plots and fitted amplitudes use eV/THz by default, usually
-shown on a logarithmic vertical axis. Legacy results use the same plot style
-with the explicit ``legacy 2.x scale`` label and their stored intensities.
+shown on a logarithmic vertical axis. Legacy results retain the historical
+``log(Phi(q, omega)) (J*s)`` label and their stored intensities. Here ``log``
+denotes the natural logarithm, as in the default plots.
 
 ``peak_min_significance`` is dimensionless. Fitted center frequencies and
 HWHM are in THz, and linewidth-derived lifetimes are in ps.

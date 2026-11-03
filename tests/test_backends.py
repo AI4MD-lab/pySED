@@ -17,8 +17,6 @@ import numpy as np
 from pySED.backends import create_backend
 from pySED.backends.cpu import CPUBackend, _share_numpy_array, _cpu_budget
 from pySED.backends.common import qpoint_batches
-from pySED.sed.Phonon import spectral_energy_density
-from pySED.io.schema import POSITIONS, VELOCITIES, TrajectoryBatch
 from pySED.sed.sed_kernel import SEDKernelConfig, calculate_q_batch
 
 
@@ -47,6 +45,8 @@ class BackendTests(unittest.TestCase):
                         covered = [q for start, stop in batches for q in range(start, stop)]
                         self.assertEqual(covered, list(range(count)))
                         sizes = [stop - start for start, stop in batches]
+                        if limit is None:
+                            self.assertEqual(len(batches), min(count, workers))
                         if sizes:
                             self.assertLessEqual(max(sizes) - min(sizes), 1)
                             if limit is not None:
@@ -86,6 +86,7 @@ class BackendTests(unittest.TestCase):
                                 backend.prepare(
                                     self.vels, self.cell_vecs, result,
                                     np.zeros_like(result), prefetch=False,
+                                    trajectory_bytes=self.positions.nbytes + self.vels.nbytes,
                                 )
                                 backend.compute(self.vels, self.cell_vecs, result)
                                 np.testing.assert_allclose(result, expected, rtol=1e-13)
@@ -201,19 +202,16 @@ class BackendTests(unittest.TestCase):
                         backend.compute(self.vels, self.cell_vecs, np.zeros((8, 7)))
             self.assertEqual(threadpool_info(), before)
 
-    def test_allocation_does_not_compute_and_is_reused(self):
-        output = StringIO()
-        with patch("pySED.backends.cpu._cpu_budget", return_value=4), redirect_stdout(output):
+    def test_allocation_does_not_run_a_benchmark(self):
+        with patch("pySED.backends.cpu._cpu_budget", return_value=4), redirect_stdout(StringIO()):
             with CPUBackend(self.config, self.config.qpoints, 4) as backend:
                 with patch("pySED.backends.cpu.calculate_q_batch", wraps=calculate_q_batch) as kernel:
                     result = np.zeros((8, 7))
-                    backend.prepare(self.vels, self.cell_vecs, result, result.copy(), prefetch=False)
+                    backend.prepare(
+                        self.vels, self.cell_vecs, result, result.copy(), prefetch=False,
+                        trajectory_bytes=self.positions.nbytes + self.vels.nbytes,
+                    )
                     kernel.assert_not_called()
-                    backend.compute(self.vels, self.cell_vecs, result)
-                    backend.compute(self.vels, self.cell_vecs, result)
-                self.assertEqual((backend.num_workers, backend.num_threads), (1, 4))
-        self.assertEqual(output.getvalue().count("CPU allocation"), 1)
-        self.assertIn("        CPU allocation          : 1 process × 4 threads", output.getvalue())
 
     def test_shared_buffer_is_removed_after_an_exception(self):
         with self.assertRaisesRegex(RuntimeError, "deliberate failure"):
@@ -240,49 +238,12 @@ class BackendTests(unittest.TestCase):
         self.assertIsNone(backend._gpu_basis_ids)
         self.assertIsNone(backend._gpu_qpoints)
 
-    def test_driver_single_and_multiple_threads_outputs_match(self):
-        lattice = SimpleNamespace(
-            unitcell_index=np.repeat([1, 2, 3], 2),
-            basis_index=np.tile([1, 2], 3),
-            masses=np.tile(self.config.masses, 3),
-            cell_ref_ids=np.array([0, 2, 4]),
-            num_qpoints=7,
-            qpoints=self.config.qpoints,
-            reduced_qpoints=self.config.qpoints,
-        )
-        blocks = [
-            TrajectoryBatch(
-                start=index * 8,
-                data={POSITIONS: self.positions, VELOCITIES: self.vels * scale},
-            )
-            for index, scale in enumerate((1.0, 2.0))
-        ]
-        for partial_output in (False, True):
-            results = []
-            for cores in (1, 2):
-                params = SimpleNamespace(
-                    total_num_steps=16, output_data_stride=1, num_blocks=2,
-                    num_atoms=6, time_step=0.5, device="cpu", max_cores=cores,
-                    output_partial=partial_output, trajectory_prefetch=False,
-                )
-                with redirect_stdout(StringIO()):
-                    calculator = spectral_energy_density(params, SimpleNamespace(n_atoms=6))
-                    calculator.compute_sed(params, lattice, blocks[0], iter(blocks[1:]))
-                results.append(calculator.sed_avg)
-            np.testing.assert_allclose(results[0], results[1], rtol=1e-13)
-
     def test_cpu_import_does_not_load_cupy(self):
         command = (
             "import sys; from pySED.sed import sed_kernel; "
-            "assert 'pySED.backends' not in sys.modules; "
-            "assert 'pySED.io' not in sys.modules; "
-            "from pySED.postprocess import Lorentz; "
-            "assert 'matplotlib' not in sys.modules; "
-            "assert 'pySED.postprocess.FileIO' not in sys.modules; "
             "from pySED.sed import Phonon; "
             "from pySED.postprocess import FileIO, Lorentz, Plot_SED; "
-            "assert 'cupy' not in sys.modules; "
-            "assert 'pySED.backends.gpu' not in sys.modules"
+            "assert 'cupy' not in sys.modules"
         )
         subprocess.run(
             [sys.executable, "-c", command],

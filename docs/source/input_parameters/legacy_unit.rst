@@ -10,8 +10,9 @@ legacy_unit
 **Meaning**
    Selects the SED intensity scale for a new calculation. ``False`` uses
    the pySED 3.0 normalization in ``eV/THz``. ``True`` uses the historical
-   pySED 2.x scale, formerly labelled ``J*s``. Figures and file headers
-   identify this as ``legacy 2.x scale`` rather than a physical energy density.
+   pySED 2.x scale. Terminal output, figures, and file headers retain its
+   historical ``J*s`` label for compatibility. This label does not imply
+   a physically normalized energy density.
 
 **Default**
    ``False``. Values are case-insensitive; ``0`` and ``1`` are also accepted.

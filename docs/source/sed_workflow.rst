@@ -42,7 +42,9 @@ Trajectory formats
   ``id type x y z vx vy vz``;
 - compatible GPUMD, LAMMPS, or pySED NetCDF.
 
-For LAMMPS text output, use one sorted dump:
+LAMMPS positions and velocities must be in the same custom text dump.
+Separate files such as ``pos.dat`` and ``vels.dat`` are not supported and
+are not merged automatically. Write both sets of fields in one sorted dump:
 
 .. code-block:: text
 
@@ -66,16 +68,32 @@ assuming a fixed field order.
 Cache, direct reading, and NetCDF
 ---------------------------------
 
-For text trajectories, the default
+**Existing NetCDF input:** set ``trajectory_file`` to the compatible NetCDF
+trajectory. It must contain positions, velocities, and cell information.
+pySED reads it directly without conversion or creating another cache;
+``trajectory_read_mode`` has no effect. This also applies when an existing
+pySED cache is explicitly supplied as the input trajectory.
+
+**NetCDF cache for text input:** leave ``trajectory_file`` pointing to the
+GPUMD XYZ or combined LAMMPS dump. The default
 
 .. code-block:: text
 
    trajectory_read_mode = cache
 
-streams the source once into a reusable ``.pysed.nc`` cache next to it.
+streams the source once into ``<basename>.pysed.nc`` in the directory
+containing the pySED input file, then reuses the cache on later runs.
+``basename`` is the final path component of ``out_files_name``. For example,
+``out_files_name = results/SrTiO3`` creates ``SrTiO3.pysed.nc`` beside the
+input file; the ``results/`` directory still applies to the SED outputs.
 The cache fingerprint includes source identity and conversion-affecting
 settings. ``trajectory_read_mode = direct`` consumes text sequentially
-without an intermediate file. Native NetCDF input is always read directly.
+without an intermediate file.
+
+The cache is an additional file; the original text trajectory is retained.
+Compression can reduce its disk size. Both text and NetCDF paths read time
+blocks, so peak RAM use depends on block size, prefetch, and computation
+buffers. Compression does not shrink the decoded arrays used for SED.
 
 ``trajectory_prefetch = 1`` prepares at most one following block in a
 background thread. Disable it when the extra raw block would exceed memory.

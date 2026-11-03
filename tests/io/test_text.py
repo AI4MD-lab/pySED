@@ -15,6 +15,7 @@ from pySED.io.text import (
     LAMMPS_DUMP,
     detect_text_format,
     iter_gpumd_xyz,
+    iter_lammps_dump,
 )
 
 NETCDF4_AVAILABLE = importlib.util.find_spec("netCDF4") is not None
@@ -161,8 +162,100 @@ class GPUMDPropertiesTests(unittest.TestCase):
                 self.assertEqual(sum(batch.data[POSITIONS].shape[0] for batch in batches), 2)
 
 
+class LAMMPSAtomIDTests(unittest.TestCase):
+    @staticmethod
+    def frame(ids, columns="id type x y z vx vy vz"):
+        rows = []
+        for row, atom_id in enumerate(ids):
+            values = dict(id=str(atom_id), type="1", x=str(row + 0.125), y="0", z="0",
+                          vx=str(row + 0.25), vy="0", vz="0")
+            rows.append(" ".join(values[name] for name in columns.split()))
+        return (
+            f"ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n{len(ids)}\n"
+            "ITEM: BOX BOUNDS pp pp pp\n0 10\n0 10\n0 10\n"
+            f"ITEM: ATOMS {columns}\n" + "\n".join(rows) + "\n"
+        )
+
+    def read(self, text, **kwargs):
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / "dump.data"
+            source.write_text(text, encoding="utf-8")
+            return list(iter_lammps_dump(source, **kwargs))
+
+    def test_large_ids_are_exact_and_sort_the_matching_data(self):
+        for low in (2**24, 2**53, 2**63 - 2):
+            for dtype in (np.float32, np.float64):
+                for columns in ("id type x y z vx vy vz", "x id type y z vx vy vz", "type x y z vx vy vz id"):
+                    with self.subTest(low=low, dtype=dtype, columns=columns):
+                        data = self.read(self.frame([low + 1, low], columns), dtype=dtype)[0].data
+                        self.assertEqual(data[ATOM_IDS].dtype, np.dtype("int64"))
+                        np.testing.assert_array_equal(data[ATOM_IDS], [low, low + 1])
+                        self.assertEqual(data[POSITIONS].dtype, np.dtype(dtype))
+                        self.assertEqual(data[VELOCITIES].dtype, np.dtype(dtype))
+                        np.testing.assert_array_equal(data[POSITIONS][0, :, 0], [1.125, 0.125])
+                        np.testing.assert_array_equal(data[VELOCITIES][0, :, 0], [125., 25.])
+
+    def test_single_atom_and_reordered_frames_preserve_ids(self):
+        atom_id = 2**63 - 1
+        batches = self.read(self.frame([atom_id]) * 2, batch_size=1)
+        self.assertEqual([batch.start for batch in batches], [0, 1])
+        for batch in batches:
+            np.testing.assert_array_equal(batch.data[ATOM_IDS], [atom_id])
+        low = 2**53
+        batches = self.read(self.frame([low + 1, low]) + self.frame([low, low + 1]), batch_size=1)
+        for batch in batches:
+            np.testing.assert_array_equal(batch.data[ATOM_IDS], [low, low + 1])
+
+    def test_invalid_duplicate_or_changed_ids_are_rejected(self):
+        for value in (0, -1, "1.5", "1e3", "nan", "inf", "bad", 2**63, 2**64):
+            with self.subTest(atom_id=value), self.assertRaises(ValueError):
+                self.read(self.frame([value]))
+        with self.assertRaisesRegex(ValueError, "positive and unique"):
+            self.read(self.frame([2**24, 2**24]))
+        with self.assertRaisesRegex(ValueError, "IDs changed"):
+            self.read(self.frame([2**24, 2**24 + 1]) + self.frame([2**24, 2**24 + 2]))
+
+    def test_truncated_and_misaligned_atom_rows_are_rejected(self):
+        text = self.frame([1, 2])
+        with self.assertRaisesRegex(ValueError, "truncated LAMMPS atom block"):
+            self.read(text.rsplit("\n", 2)[0] + "\n")
+        # Keep the total token count unchanged while moving one token between rows.
+        lines = text.splitlines()
+        first = lines[-2].split()
+        lines[-2] = " ".join(first[:-1])
+        lines[-1] += " " + first[-1]
+        with self.assertRaisesRegex(ValueError, "invalid LAMMPS atom block"):
+            self.read("\n".join(lines) + "\n")
+
+
 @unittest.skipUnless(NETCDF4_AVAILABLE, "netCDF4 is not installed")
 class TextConversionTests(unittest.TestCase):
+    def test_old_lammps_id_cache_is_rebuilt_then_reused(self):
+        from netCDF4 import Dataset
+        from pySED.io.netcdf import converted_file_is_current
+
+        low = 2**24
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / "dump.data"
+            source.write_text(LAMMPSAtomIDTests.frame([low + 1, low]), encoding="utf-8")
+            cached, _ = prepare_trajectory(source, compression_level=0)
+            with Dataset(str(cached), "a") as dataset:
+                dataset.delncattr("pysed_lammps_integer_ids")
+                dataset.variables["atom_id"][:] = [low, low]
+                dataset.variables["coordinates"][0, :, 0] = [111, 222]
+            self.assertFalse(converted_file_is_current(cached, source, compression_level=0))
+
+            refreshed, _ = prepare_trajectory(source, compression_level=0)
+            self.assertEqual(refreshed, cached)
+            with NetCDFReader(refreshed) as trajectory:
+                np.testing.assert_array_equal(trajectory.read(ATOM_IDS), [low, low + 1])
+                np.testing.assert_array_equal(trajectory.read(POSITIONS)[0, :, 0], [1.125, 0.125])
+            with Dataset(str(refreshed), "r") as dataset:
+                self.assertEqual(dataset.pysed_lammps_integer_ids, 1)
+            first_mtime = refreshed.stat().st_mtime_ns
+            prepare_trajectory(source, compression_level=0)
+            self.assertEqual(refreshed.stat().st_mtime_ns, first_mtime)
+
     def test_float64_conversion_preserves_position_and_velocity_precision(self) -> None:
         position = 1.123456789012345
         velocity = 0.001234567890123456

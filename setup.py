@@ -29,7 +29,7 @@ setup(
     name="pySED",
     version=VERSION["__version__"],
     description=(
-        "To implement the SED method in 2010, phonon lifetime can be calculated"
+        "pySED is a tool for calculating Phonon Spectral Energy Density and phonon lifetimes from MD simulation trajectories"
     ),
     long_description=(ROOT / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
