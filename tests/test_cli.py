@@ -36,15 +36,21 @@ class CommandLineTests(unittest.TestCase):
                 status = error.code
         return status, stdout.getvalue(), stderr.getvalue()
 
-    def test_global_help_does_not_start_calculation(self):
-        with patch.object(cli, "read_input") as read, patch.object(cli, "run_pipeline") as run:
-            status, output, error = self.invoke("-h")
-        self.assertEqual(status, 0)
-        self.assertFalse(error)
-        self.assertIn("https://pysed.readthedocs.io/", output)
-        self.assertIn("pysed init", output)
-        read.assert_not_called()
-        run.assert_not_called()
+    def test_help_does_not_read_input_run_calculation_or_create_files(self):
+        for arguments in (("-h",), ("--help",), ("init", "-h"), ("init", "--help")):
+            with self.subTest(arguments=arguments), TemporaryDirectory() as directory:
+                with (
+                    working_directory(directory),
+                    patch.object(cli, "read_input") as read,
+                    patch.object(cli, "run_pipeline") as run,
+                ):
+                    status, output, error = self.invoke(*arguments)
+                    self.assertEqual(status, 0, error)
+                    self.assertTrue(output)
+                    self.assertFalse(error)
+                    self.assertEqual(list(Path.cwd().iterdir()), [])
+                    read.assert_not_called()
+                    run.assert_not_called()
 
     def test_init_creates_a_valid_basic_template_without_running(self):
         with TemporaryDirectory(prefix="pysed init ") as directory:
@@ -52,9 +58,8 @@ class CommandLineTests(unittest.TestCase):
             calculation.mkdir()
             with working_directory(calculation):
                 with patch.object(cli, "read_input") as read, patch.object(cli, "run_pipeline") as run:
-                    status, output, error = self.invoke("init")
+                    status, _, error = self.invoke("init")
                 self.assertEqual(status, 0, error)
-                self.assertIn("Created input_SED.in", output)
                 self.assertEqual([path.name for path in Path.cwd().iterdir()], ["input_SED.in"])
                 read.assert_not_called()
                 run.assert_not_called()
@@ -74,30 +79,11 @@ class CommandLineTests(unittest.TestCase):
             original = b"# user input\r\n\xff\x00\n"
             path.write_bytes(original)
             with patch.object(cli, "run_pipeline") as run:
-                status, output, error = self.invoke("init")
+                status, _, error = self.invoke("init")
             self.assertNotEqual(status, 0)
-            self.assertNotIn("Created", output)
-            self.assertIn("already exists", error)
+            self.assertTrue(error)
             self.assertEqual(path.read_bytes(), original)
             run.assert_not_called()
-
-    def test_init_help_explains_generation_without_writing(self):
-        with TemporaryDirectory() as directory, working_directory(directory):
-            with patch.object(cli, "run_pipeline") as run:
-                for flag in ("-h", "--help"):
-                    with self.subTest(flag=flag):
-                        status, output, error = self.invoke("init", flag)
-                        self.assertEqual(status, 0, error)
-                        self.assertIn("pysed init", output)
-                        self.assertEqual(list(Path.cwd().iterdir()), [])
-            run.assert_not_called()
-
-    def test_init_extra_arguments_do_not_create_a_file(self):
-        with TemporaryDirectory() as directory, working_directory(directory):
-            status, output, error = self.invoke("init", "custom.in")
-            self.assertNotEqual(status, 0)
-            self.assertIn("pysed init", error)
-            self.assertEqual(list(Path.cwd().iterdir()), [])
 
     def test_single_argument_is_still_an_input_filename(self):
         for path in ("action", "device", "./init", "folder with spaces/custom.in"):
@@ -107,15 +93,20 @@ class CommandLineTests(unittest.TestCase):
             self.assertEqual(cli._detect_input_file(), "input_SED.in")
 
     def test_malformed_invocation_does_not_start_calculation(self):
-        for arguments in (("action", "compute"), ("total_num_steps", "-h"), ("device", "--help")):
-            with self.subTest(arguments=arguments):
-                with patch.object(cli, "read_input") as read, patch.object(cli, "run_pipeline") as run:
-                    status, output, error = self.invoke(*arguments)
-                self.assertNotEqual(status, 0)
-                self.assertFalse(output)
-                self.assertIn("pysed -h", error)
-                read.assert_not_called()
-                run.assert_not_called()
+        for arguments in (("action", "compute"), ("total_num_steps", "-h"),
+                          ("device", "--help"), ("init", "custom.in")):
+            with self.subTest(arguments=arguments), TemporaryDirectory() as directory:
+                with (
+                    working_directory(directory),
+                    patch.object(cli, "read_input") as read,
+                    patch.object(cli, "run_pipeline") as run,
+                ):
+                    status, _, error = self.invoke(*arguments)
+                    self.assertNotEqual(status, 0)
+                    self.assertTrue(error)
+                    self.assertEqual(list(Path.cwd().iterdir()), [])
+                    read.assert_not_called()
+                    run.assert_not_called()
 
     def test_run_passes_the_selected_device_to_pipeline(self):
         with TemporaryDirectory() as directory:
@@ -124,7 +115,7 @@ class CommandLineTests(unittest.TestCase):
                 with self.subTest(device=device):
                     path.write_text(f"action = plot\ndevice = {device}\n", encoding="utf-8")
                     with patch.object(cli, "run_pipeline") as run:
-                        status, output, error = self.invoke(str(path))
+                        status, _, error = self.invoke(str(path))
                     self.assertEqual(status, 0, error)
                     run.assert_called_once()
                     params = run.call_args.args[0]

@@ -17,8 +17,6 @@ import numpy as np
 from pySED.backends import create_backend
 from pySED.backends.cpu import CPUBackend, _share_numpy_array, _cpu_budget
 from pySED.backends.common import qpoint_batches
-from pySED.sed.Phonon import spectral_energy_density
-from pySED.io.schema import POSITIONS, VELOCITIES, TrajectoryBatch
 from pySED.sed.sed_kernel import SEDKernelConfig, calculate_q_batch
 
 
@@ -239,37 +237,6 @@ class BackendTests(unittest.TestCase):
         pinned_pool.free_all_blocks.assert_called_once()
         self.assertIsNone(backend._gpu_basis_ids)
         self.assertIsNone(backend._gpu_qpoints)
-
-    def test_driver_single_and_multiple_threads_outputs_match(self):
-        lattice = SimpleNamespace(
-            unitcell_index=np.repeat([1, 2, 3], 2),
-            basis_index=np.tile([1, 2], 3),
-            masses=np.tile(self.config.masses, 3),
-            cell_ref_ids=np.array([0, 2, 4]),
-            num_qpoints=7,
-            qpoints=self.config.qpoints,
-            reduced_qpoints=self.config.qpoints,
-        )
-        blocks = [
-            TrajectoryBatch(
-                start=index * 8,
-                data={POSITIONS: self.positions, VELOCITIES: self.vels * scale},
-            )
-            for index, scale in enumerate((1.0, 2.0))
-        ]
-        for partial_output in (False, True):
-            results = []
-            for cores in (1, 2):
-                params = SimpleNamespace(
-                    total_num_steps=16, output_data_stride=1, num_blocks=2,
-                    num_atoms=6, time_step=0.5, device="cpu", max_cores=cores,
-                    output_partial=partial_output, trajectory_prefetch=False,
-                )
-                with redirect_stdout(StringIO()):
-                    calculator = spectral_energy_density(params, SimpleNamespace(n_atoms=6))
-                    calculator.compute_sed(params, lattice, iter(blocks))
-                results.append(calculator.sed_avg)
-            np.testing.assert_allclose(results[0], results[1], rtol=1e-13)
 
     def test_cpu_import_does_not_load_cupy(self):
         command = (

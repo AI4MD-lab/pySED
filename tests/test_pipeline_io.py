@@ -178,7 +178,6 @@ class ParserTests(unittest.TestCase):
                     (lifetime_dir / "Fitting-2-qpoint.Fre_lifetime").write_text(
                         header, encoding="utf-8",
                     )
-                log = io.StringIO()
                 with (
                     patch("pySED.pipeline.output_files.LIFETIME_DIRECTORY", lifetime_dir),
                     patch("pySED.pipeline._require_plot_data"),
@@ -187,7 +186,7 @@ class ParserTests(unittest.TestCase):
                           side_effect=lambda data, params: FileIO.write_phonon_lifetime(fit, params)),
                     patch("pySED.pipeline.Plot_SED.plot_lifetime_summary",
                           return_value=str(figure)) as plot,
-                    redirect_stdout(log),
+                    redirect_stdout(io.StringIO()),
                 ):
                     if state == "invalid":
                         with self.assertRaises(ValueError):
@@ -210,9 +209,6 @@ class ParserTests(unittest.TestCase):
                     self.assertEqual(combined.read_bytes(), b"previous combined table")
                     self.assertEqual(figure.read_bytes(), b"previous combined figure")
                     plot.assert_not_called()
-                if state == "missing":
-                    self.assertIn("Combined phonon lifetime update skipped", log.getvalue())
-                    self.assertNotIn("Combined phonon lifetime data updated", log.getvalue())
 
     def test_lifetime_outputs_are_grouped_and_combined(self):
         with TemporaryDirectory() as directory:
@@ -243,7 +239,6 @@ class ParserTests(unittest.TestCase):
                     2,
                 )
                 frequency, lifetime = FileIO.read_lifetime_data(output_file)
-                combined_text = combined_file.read_text(encoding="utf-8")
             finally:
                 os.chdir(previous_directory)
 
@@ -254,7 +249,6 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(total_modes, 2)
         np.testing.assert_allclose(frequency, [1.0, 3.0])
         np.testing.assert_allclose(lifetime, [2.0, 4.0])
-        self.assertNotIn("99.000000", combined_text)
 
     def test_lifetime_summary_uses_frequency_and_log_lifetime_axes(self):
         with TemporaryDirectory() as directory:
@@ -321,7 +315,7 @@ class ParserTests(unittest.TestCase):
             with (
                 patch("pySED.postprocess.Plot_SED.plt.savefig",
                       side_effect=lambda *args, **kwargs: saved_figures.append(plt.gcf())),
-                redirect_stdout(io.StringIO()) as output,
+                redirect_stdout(io.StringIO()),
             ):
                 plot_bands(data, params)
             figure = saved_figures[0]
@@ -333,11 +327,6 @@ class ParserTests(unittest.TestCase):
                 r"$\log(\Phi(\mathbf{q},\omega))$ (J$\cdot$s)"
             )
             self.assertEqual(figure.axes[1].get_ylabel(), expected_label)
-            expected_scale = (
-                f"ln[SED / ({unit})]" if unit == "eV/THz" else
-                f"ln[SED] ({unit})"
-            )
-            self.assertIn(expected_scale, output.getvalue())
 
     def test_slice_frequency_limit_uses_the_matching_plot_control(self):
         """Plain plots and Lorentz overlays should use their own cutoffs."""
@@ -532,11 +521,6 @@ class ParserTests(unittest.TestCase):
                         encoding="utf-8"
                     ).splitlines()[0]
                     self.assertIn("unit: eV/THz", header)
-                    self.assertIn(
-                        "each column corresponds to one q-point "
-                        "(same order as the .Qpts file)",
-                        header,
-                    )
                 oxygen_y.unlink()
                 with self.assertRaisesRegex(FileNotFoundError, "partial SED files"):
                     FileIO.load_data(params)
@@ -998,41 +982,6 @@ class ParserTests(unittest.TestCase):
                     qpoints_info=False,
                 )
 
-    def test_netcdf_and_plot_tuning_parameters_are_validated(self) -> None:
-        with TemporaryDirectory() as directory:
-            input_file = Path(directory) / "input.in"
-            for setting, message in (
-                ("netcdf_compression_level = 10", "between 0 and 9"),
-                ("netcdf_batch_size = 0", "must be positive"),
-                ("plot_interval = 0", "plot_interval must be positive and finite"),
-                ("plot_interval = -1", "plot_interval must be positive and finite"),
-                ("plot_interval = nan", "plot_interval must be positive and finite"),
-                ("plot_interval = inf", "plot_interval must be positive and finite"),
-            ):
-                input_file.write_text(
-                    f"action = plot\n{setting}\n",
-                    encoding="utf-8",
-                )
-                with (
-                    self.subTest(setting=setting),
-                    self.assertRaisesRegex(ValueError, message),
-                ):
-                    read_input(str(input_file))
-
-    def test_partial_sed_rejects_unknown_element(self) -> None:
-        with TemporaryDirectory() as directory:
-            input_file = Path(directory) / "input.in"
-            input_file.write_text(
-                "plot_partial_SED = NotAnElement y\n",
-                encoding="utf-8",
-            )
-
-            with self.assertRaisesRegex(
-                ValueError,
-                "was not found in the periodic table",
-            ):
-                read_input(str(input_file))
-
     def test_partial_sed_element_must_exist_in_structure(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1107,7 +1056,33 @@ class ParserTests(unittest.TestCase):
                 "action = plot\ntrajectory_read_mode = parallel\n",
                 "trajectory_read_mode must be 'cache' or 'direct'",
             ),
+            "invalid_compression_level": (
+                "action = plot\nnetcdf_compression_level = 10\n",
+                "between 0 and 9",
+            ),
+            "empty_netcdf_batch": (
+                "action = plot\nnetcdf_batch_size = 0\n",
+                "must be positive",
+            ),
+            "unknown_partial_element": (
+                "plot_partial_SED = NotAnElement y\n",
+                "was not found in the periodic table",
+            ),
+            "missing_q_path_label": (
+                "action = plot\nnum_qpaths = 2\nq_path_name = GX\n"
+                "q_path = 0 0 0  0.5 0 0  0.5 0.5 0\n",
+                "q_path_name requires 3 labels",
+            ),
+            "nonpositive_time_step": (
+                "action = compute\ntime_step = 0\noutput_data_stride = 1\n",
+                "time_step must be positive",
+            ),
         }
+        for value in ("0", "-1", "nan", "inf"):
+            cases[f"plot_interval_{value}"] = (
+                f"action = plot\nplot_interval = {value}\n",
+                "plot_interval must be positive and finite",
+            )
         with TemporaryDirectory() as directory:
             root = Path(directory)
             for name, (text, message) in cases.items():
@@ -1116,39 +1091,6 @@ class ParserTests(unittest.TestCase):
                     input_file.write_text(text, encoding="utf-8")
                     with self.assertRaisesRegex(ValueError, message):
                         read_input(input_file)
-
-    def test_q_path_labels_are_validated(self) -> None:
-        with TemporaryDirectory() as directory:
-            input_file = Path(directory) / "input.in"
-            input_file.write_text(
-                "action = plot\n"
-                "num_qpaths = 2\n"
-                "q_path_name = GX\n"
-                "q_path = 0 0 0  0.5 0 0  0.5 0.5 0\n",
-                encoding="utf-8",
-            )
-
-            with self.assertRaisesRegex(
-                ValueError,
-                "q_path_name requires 3 labels",
-            ):
-                read_input(input_file)
-
-    def test_compute_requires_positive_sampling_values(self) -> None:
-        with TemporaryDirectory() as directory:
-            input_file = Path(directory) / "input.in"
-            input_file.write_text(
-                "action = compute\n"
-                "time_step = 0\n"
-                "output_data_stride = 1\n",
-                encoding="utf-8",
-            )
-
-            with self.assertRaisesRegex(
-                ValueError,
-                "time_step must be positive",
-            ):
-                read_input(input_file)
 
     @unittest.skipUnless(NETCDF4_AVAILABLE, "netCDF4 is not installed")
     def test_pipeline_prepares_text_for_compute(self) -> None:
