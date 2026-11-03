@@ -10,12 +10,14 @@ Recommended Workflow
 --------------------
 
 1. **Prepare the primitive structure.**
-   Start from a POSCAR or compatible structure file for the primitive cell.
+   Start from a POSCAR or extended-XYZ file for the primitive cell.
 
 2. **Generate the MD supercell and ``basis.in``.**
    Use ``pySED.structure.generate_data.structure_maker``. The generated
    ``basis.in`` maps every atom in the MD supercell to its unit-cell index,
    basis index, and mass. pySED needs this mapping for reciprocal-space SED.
+   See :doc:`structure_generation` for supported input formats, a complete
+   script, and the generated files.
 
    For LAMMPS output, use ``atom_order`` to choose the element-to-type
    numbering when writing the generated structure:

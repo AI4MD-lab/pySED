@@ -19,6 +19,7 @@ maps, and fit Lorentzian peaks to estimate phonon lifetimes.
    requirements
    installation
    starting
+   structure_generation
    input_parameters
    tutorials
    example
