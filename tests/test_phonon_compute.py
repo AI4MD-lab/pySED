@@ -129,7 +129,7 @@ class SEDKernelTests(unittest.TestCase):
         np.testing.assert_allclose(actual, expected, rtol=1e-13)
 
     def test_qpoint_batches_cover_each_qpoint_once(self):
-        """Small worker batches must cover 20-40 Q points without overlap."""
+        """Balanced batches must cover every q point without overlap."""
 
         for num_qpoints in (20, 40):
             for num_workers in (4, 36):
@@ -140,12 +140,9 @@ class SEDKernelTests(unittest.TestCase):
                     for q_index in range(start, stop)
                 ]
                 self.assertEqual(flattened, list(range(num_qpoints)))
-                self.assertTrue(
-                    all(
-                        2 <= stop - start <= 5
-                        for start, stop in batches
-                    )
-                )
+                sizes = [stop - start for start, stop in batches]
+                self.assertEqual(len(batches), min(num_qpoints, num_workers))
+                self.assertLessEqual(max(sizes) - min(sizes), 1)
 
     def test_gpu_q_batches_make_one_result_transfer_per_block(self):
         """Split or full GPU batches must return one complete block result."""
