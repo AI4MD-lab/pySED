@@ -152,7 +152,8 @@ def plot_bands(data, params):
     """Write a dispersion heatmap from SED values shaped (frequency, q).
 
     freq_fft supplies THz frequencies; q_distances and q_labels describe the
-    path. Multiple segments or use_contourf select physical-coordinate contours;
+    path. Saved q_path_ranges keep disconnected segments separate. Multiple
+    segments or use_contourf select physical-coordinate contours;
     otherwise imshow displays the matrix by pixel index. Color limits apply to
     the natural logarithm of the stored intensities. The colorbar names the
     scale recorded in data, and output_files selects the output filename.
@@ -162,6 +163,11 @@ def plot_bands(data, params):
     thz = data.freq_fft
     q_distances = data.q_distances
     q_labels = data.q_labels
+    path_ranges = getattr(data, 'q_path_ranges', [])
+    physical_coordinates = (
+        params.num_qpaths > 1 or params.use_contourf or len(path_ranges) > 1
+        or len(q_labels) != 2 or any('|' in label for label in q_labels.values())
+    )
 
     color = params.plot_color               # 'inferno', 'RdBu_r', 'jet', 'Spectral', 'RdYlGn' (https://matplotlib.org/stable/tutorials/colors/colormaps.html)
     interp = 'hanning'                      # 'hanning'
@@ -183,18 +189,25 @@ def plot_bands(data, params):
 
     # Contour coordinates follow physical Q distances and frequencies;
     # imshow uses pixel indices. Keep their coordinate handling distinct.
-    if params.num_qpaths > 1 or params.use_contourf:
+    if physical_coordinates:
         levels = np.linspace(vmin, vmax, 350)
 
-        im = ax.contourf(
-            q_distances,
-            thz,
-            sed_for_plot,
-            cmap=color,
-            levels=levels,
-            vmin=vmin,
-            vmax=vmax,
-        )
+        for start, stop in path_ranges or [(0, len(qpoints))]:
+            distances = np.asarray(q_distances[start:stop])
+            values = sed_for_plot[:, start:stop]
+            if len(distances) > 1 and len(thz) > 1 and np.ptp(distances) > 0:
+                ax.contourf(
+                    distances, thz, values, cmap=color, levels=levels,
+                    vmin=vmin, vmax=vmax,
+                )
+            else:
+                # A lone allowed q point has no interval to interpolate over.
+                x, y = np.meshgrid(distances, thz)
+                ax.scatter(x.ravel(), y.ravel(), c=values.ravel(), cmap=color,
+                           vmin=vmin, vmax=vmax, marker='s', s=6, linewidths=0)
+        im = plt.cm.ScalarMappable(norm=plt.Normalize(vmin, vmax), cmap=color)
+        if len(q_labels) > 1:
+            ax.set_xlim(min(q_labels), max(q_labels))
 
         # Draw vertical grey lines for q_labels (excluding endpoints)
         keys = list(q_labels.keys())
@@ -234,7 +247,7 @@ def plot_bands(data, params):
     bar.set_label(colorbar_label, fontsize=13.5)
 
     # Set xticks and xticklabels
-    if params.num_qpaths > 1 or params.use_contourf:
+    if physical_coordinates:
         xticks = list(q_labels.keys())
 
     else:
@@ -246,7 +259,7 @@ def plot_bands(data, params):
     ax.set_xticklabels(xticklabels, fontsize=16)
 
     # Map physical frequency labels to the selected renderer's coordinates.
-    if params.num_qpaths > 1 or params.use_contourf:
+    if physical_coordinates:
         max_freq = params.plot_cutoff_freq if params.plot_cutoff_freq else thz.max()
         num_ticks = int(np.ceil(max_freq / df)) + 1
         freqs = np.linspace(0, max_freq, num_ticks)

@@ -19,7 +19,8 @@ Numerical and plotting outputs
    * - ``<prefix>.THz``
      - Positive ordinary-frequency grid in THz.
    * - ``<prefix>.Q_distances_and_labels``
-     - Cumulative path distances and high-symmetry labels.
+     - Cumulative path distances, high-symmetry labels, and sampled segment
+       column ranges (``# q_path_ranges``, zero-based, stop exclusive).
    * - ``<prefix>-SED.png``
      - Total SED dispersion heatmap.
    * - ``SED-<q-index>-qpoint.png``
@@ -32,6 +33,12 @@ With ``output_partial = 1``, directional matrices are written beneath
 Total and partial outputs use the same :doc:`legacy_unit
 <input_parameters/legacy_unit>` setting. Saved scale metadata determines
 labels when reloading for plotting or fitting; see :doc:`sed_units`.
+
+Saved segment ranges prevent interpolation across disconnected q paths when
+replotting total or partial SED. Older files without these ranges remain
+readable, but contain no explicit connectivity metadata. Recompute after
+changing ``q_path_name`` or adding ``|``; changing the plot input alone does
+not change a saved spectrum's path.
 
 Fitting outputs
 ---------------

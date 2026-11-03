@@ -97,6 +97,10 @@ def write_output(phonons, params, BZ_lattice_info):
         f.write("High-symmetry points and their distances:\n")
         for distance, label in BZ_lattice_info.q_labels:
             f.write(f"{float(distance):.10f}   {label}\n")
+        # Half-open column ranges retain the computed path topology when replotting.
+        ranges = getattr(BZ_lattice_info, 'q_path_ranges', [])
+        if ranges:
+            f.write("# q_path_ranges: " + " ".join(f"{start}:{stop}" for start, stop in ranges) + "\n")
 
 def _read_sed(path, legacy_unit=False):
     """Return (spectrum, legacy_flag) without changing stored intensities.
@@ -185,6 +189,7 @@ class load_data(object):
 
         self.q_distances = []
         self.q_labels = {}
+        self.q_path_ranges = []
         with open(labels_path, 'r') as f:
             lines = f.readlines()
             # q_distances
@@ -193,8 +198,24 @@ class load_data(object):
             # q_labels
             if lines[3].strip() == "High-symmetry points and their distances:":
                 for line in lines[4:]:
+                    if line.startswith("# q_path_ranges:"):
+                        self.q_path_ranges = [
+                            tuple(map(int, item.split(":")))
+                            for item in line.split(":", 1)[1].split()
+                        ]
+                        continue
+                    if not line.strip() or line.lstrip().startswith("#"):
+                        continue
                     distance, label = line.split(maxsplit=1)
                     self.q_labels[float(distance)] = label.strip()
+        if self.q_path_ranges:
+            expected_start = 0
+            for bounds in self.q_path_ranges:
+                if len(bounds) != 2 or bounds[0] != expected_start or bounds[1] <= bounds[0]:
+                    raise ValueError("Invalid q_path_ranges in Q-point metadata")
+                expected_start = bounds[1]
+            if expected_start != len(self.qpoints):
+                raise ValueError("q_path_ranges do not match the saved Q-point count")
 
 
 def write_phonon_lifetime(lorentz, params):

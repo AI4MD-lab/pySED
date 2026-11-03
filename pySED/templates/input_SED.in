@@ -27,9 +27,9 @@ prim_unitcell = 3.89598 0 0  0 3.89598 0  0 0 3.89598  # Lattice vectors in angs
 rescale_prim  = 1         # Reconstruct the primitive cell from the MD cell
 
 # ==================== Q-points ====================
-num_qpaths  = 5       # Number of consecutive path segments
-q_path_name = GXMGRM  # Endpoint labels; G denotes Gamma
-# One fractional reciprocal-coordinate triple per endpoint (num_qpaths + 1).
+num_qpaths  = 5       # Number of connected segments; jumps do not count
+q_path_name = GXMGRM  # G denotes Gamma; | separates path groups, e.g. GXU|KGL
+# One fractional reciprocal-coordinate triple per label, excluding |.
 q_path      = 0.0 0.0 0.0  0.0 0.5 0.0  0.5 0.5 0.0  0.0 0.0 0.0  0.5 0.5 0.5  0.5 0.5 0.0
 
 # ==================== Computation ====================

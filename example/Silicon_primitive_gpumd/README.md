@@ -123,8 +123,8 @@ action = plot
 The silicon q-path is:
 
 ```text
-num_qpaths = 5
-q_path_name = 'GXUKGL'
+num_qpaths = 4
+q_path_name = GXU|KGL
 q_path = 0.0 0.0 0.0  0.5 0.0 0.5  0.625 0.25 0.625  0.375 0.375 0.75  0.0 0.0 0.0  0.5 0.5 0.5
 ```
 
@@ -132,6 +132,11 @@ For the q-path syntax, see
 [`num_qpaths`](https://pysed.readthedocs.io/en/latest/input_parameters.html#num-qpaths),
 [`q_path_name`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path-name),
 and [`q_path`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path).
+
+The `|` separates Gamma-X-U from K-Gamma-L: no U-K segment is computed or
+interpolated in the plot. It does not assert frequency degeneracy. Recompute
+the SED to save the new path metadata. The 20 x 20 x 20 example samples allowed
+points near U and K; it does not contain those exact endpoints.
 
 The raw pySED SED map is:
 
@@ -186,5 +191,5 @@ Tune these key parameters in `SED/input.in`:
 - [x] [`supercell_dim = 20 20 20`](https://pysed.readthedocs.io/en/latest/input_parameters.html#supercell-dim) matches the generated silicon supercell.
 - [x] [`output_data_stride = 10`](https://pysed.readthedocs.io/en/latest/input_parameters.html#output-data-stride) matches `dump_exyz 10 1`.
 - [x] [`prim_unitcell`](https://pysed.readthedocs.io/en/latest/input_parameters.html#prim-unitcell) is consistent with the primitive silicon cell.
-- [x] [`q_path_name = 'GXUKGL'`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path-name) has
-  [`num_qpaths + 1`](https://pysed.readthedocs.io/en/latest/input_parameters.html#num-qpaths) labels.
+- [x] [`q_path_name = GXU|KGL`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path-name)
+  has four connected segments, two path groups, and six coordinate triples.

@@ -23,7 +23,7 @@ from fractions import Fraction
 import numpy as np
 
 from pySED.structure import generate_data
-from pySED.console import print_detail, print_matrix, print_section, terminal_label
+from pySED.console import print_detail, print_matrix, print_section
 
 
 class BZ_methods(object):
@@ -213,20 +213,18 @@ class BZ_methods(object):
                 print_matrix("Transformed primitive cell (Angstrom)", params.prim_unitcell)
 
     def _construct_BZ_path(self, params):
+        """Sample connected path groups separated by | in q_path_name.
 
-        # Get q_path and number of q-paths
-        """Build and join the requested commensurate q-path segments.
-
-        Input endpoints are reduced primitive reciprocal coordinates. Store
-        Cartesian qpoints, reduced_qpoints, cumulative Cartesian path distances,
-        and symmetry labels in matching order. Segments without allowed points
-        are skipped and their labels merged into the preceding endpoint.
+        Distances follow the requested Cartesian segments, including unsampled
+        endpoint intervals. A jump between groups adds no distance. Keep each
+        sampled segment's column range so plotting cannot interpolate across a
+        jump or an empty segment. Labels do not assert frequency degeneracy.
         """
         q_path = np.array(params.q_path, dtype=object).reshape(-1, 3)
-        num_qpaths = params.num_qpaths
+        groups = params.q_path_name.split("|")
 
         try:
-            BZ_Path = BZPathHelper(params.prim_unitcell, self.supercell)
+            bz_path = BZPathHelper(params.prim_unitcell, self.supercell)
         except ValueError as error:
             if getattr(params, "dump_group_supercell", None) is not None:
                 raise ValueError(
@@ -235,115 +233,85 @@ class BZ_methods(object):
                     "same dumped group."
                 ) from error
             raise
-        self._validate_dump_group_supercell(params, BZ_Path)
+        self._validate_dump_group_supercell(params, bz_path)
 
         qpoints_list = []
-        reduced_qpoints_list = []
         q_distances = []
         q_labels = []
-
+        q_path_ranges = []
         label_map = {"G": r"$\Gamma$"}
+        cumulative_distance = 0.0
+        coordinate_offset = 0
+        point_offset = 0
+        segment_index = 0
 
-        def fmt_vec(x):
-            """Format a vector with four decimal places per component."""
-            return "(" + ", ".join(f"{v:.4f}" for v in x) + ")"
-
-        def shortest_distance(q1_cart, q2_cart):
-            """Shortest reciprocal distance between two q-points"""
-            q1_red = BZ_Path.cartesian_to_reduced(q1_cart.reshape(1, -1))[0]
-            q2_red = BZ_Path.cartesian_to_reduced(q2_cart.reshape(1, -1))[0]
-            dq_red = q2_red - q1_red
-            dq_red -= np.round(dq_red)                # wrap to [-0.5, 0.5)
-            dq_cart = BZ_Path.reduced_to_cartesian(dq_red.reshape(1, -1))[0]
-            return np.linalg.norm(dq_cart)  # The Euclidean norm (length) of the difference vector
+        def add_label(distance, label):
+            # An explicit jump shares an x coordinate, but not q coordinates.
+            if q_labels and abs(q_labels[-1][0] - distance) < 1e-12:
+                old_label = q_labels[-1][1]
+                if old_label != label:
+                    q_labels[-1] = (distance, f"{old_label}|{label}")
+            else:
+                q_labels.append((distance, label))
 
         if self.qpoints_info:
             print_section("Q-point information")
-            print("        " + "-" * 72)
 
-        cumulative_distance = 0.0
-        last_delta = 0.0
-        prev_end_label = None
-        prev_end_distance = None
+        for group in groups:
+            add_label(cumulative_distance, label_map.get(group[0], group[0]))
+            for index in range(len(group) - 1):
+                q_start = q_path[coordinate_offset + index]
+                q_end = q_path[coordinate_offset + index + 1]
+                start_label, end_label = group[index:index + 2]
+                qpoints_cart, fractions = bz_path.build_commensurate_path(q_start, q_end)
+                # Match the normalization used by build_commensurate_path.
+                endpoints = np.array([
+                    bz_path._normalize_endpoint(q_start),
+                    bz_path._normalize_endpoint(q_end),
+                ], dtype=float)
+                cart_endpoints = bz_path.reduced_to_cartesian(endpoints)
+                length = np.linalg.norm(cart_endpoints[1] - cart_endpoints[0])
+                distances = cumulative_distance + fractions * length
 
-        for i in range(num_qpaths):
+                if len(qpoints_cart):
+                    qpoints_list.append(qpoints_cart)
+                    q_distances.extend(distances)
+                    q_path_ranges.append((point_offset, point_offset + len(qpoints_cart)))
+                    point_offset += len(qpoints_cart)
+                    missing = []
+                    if not np.allclose(qpoints_cart[0], cart_endpoints[0], rtol=0, atol=1e-10):
+                        missing.append(start_label)
+                    if not np.allclose(qpoints_cart[-1], cart_endpoints[1], rtol=0, atol=1e-10):
+                        missing.append(end_label)
+                    if missing:
+                        print_section("Unsampled path endpoint", "⚠")
+                        print_detail("Path", f"{start_label} → {end_label}")
+                        print_detail("Not commensurate", ", ".join(missing))
+                        print("        Labels mark requested endpoints; only allowed q-points are sampled.")
+                else:
+                    print_section(f"No commensurate q-points in path segment {segment_index}", "⚠")
+                    print_detail("Path", f"{start_label} → {end_label}")
+                    print("        This segment has no data; use | to request an explicit path break.")
 
-            q_start = q_path[i]
-            q_end = q_path[i + 1]
+                cumulative_distance += length
+                add_label(cumulative_distance, label_map.get(end_label, end_label))
+                if self.qpoints_info:
+                    print_detail(f"Path segment {segment_index}", f"{start_label} → {end_label}")
+                    print_detail("Number of q-points", len(qpoints_cart))
+                    for q in bz_path.cartesian_to_reduced(qpoints_cart):
+                        print("            (reduced) q = (" + ", ".join(f"{v:.4f}" for v in q) + ")")
+                segment_index += 1
+            coordinate_offset += len(group)
 
-            start_label = label_map.get(params.q_path_name[i], params.q_path_name[i])
-            end_label = label_map.get(params.q_path_name[i + 1], params.q_path_name[i + 1])
-
-            qpoints_cart, _ = BZ_Path.build_commensurate_path(q_start, q_end)
-
-            if not len(qpoints_cart):
-                print_section(f"No commensurate q-points in path segment {i}", "⚠")
-                print_detail("Path", f"{terminal_label(start_label)} → {terminal_label(end_label)}")
-                print_detail("Start", fmt_vec(q_start))
-                print_detail("End", fmt_vec(q_end))
-
-                if q_labels and prev_end_label is not None and prev_end_distance is not None:
-
-                    merged_label = f"{prev_end_label}/{end_label}"
-                    q_labels[-1] = (prev_end_distance, merged_label)
-
-                prev_end_label = end_label
-                continue
-
-            # For distance
-            distances_segment = []
-
-            if end_label == r"$\Gamma$":
-                if prev_end_label is not None and start_label != r"$\Gamma$":
-                    cumulative_distance += last_delta
-                if q_labels:
-                    new_dist = cumulative_distance
-                    old_label = q_labels[-1][1]
-                    q_labels[-1] = (new_dist, old_label)
-
-            distances_segment.append(cumulative_distance)
-
-            for j in range(1, len(qpoints_cart)):
-                step = shortest_distance(qpoints_cart[j - 1], qpoints_cart[j])
-                cumulative_distance += step
-                distances_segment.append(cumulative_distance)
-
-            if len(distances_segment) >= 2:
-                last_delta = distances_segment[-1] - distances_segment[-2]
-
-            else:
-                last_delta = 0.0
-
-            # label for gamma begin
-            if i == 0:
-                q_labels.append((distances_segment[0], start_label))
-            q_labels.append((distances_segment[-1], end_label))
-
-            prev_end_label = end_label
-            prev_end_distance = distances_segment[-1]
-
-            # reduced coords
-            reduced_qpoints = BZ_Path.cartesian_to_reduced(qpoints_cart)
-            reduced_qpoints = np.where(np.isclose(reduced_qpoints, 0, atol=1e-16), 0.0, reduced_qpoints)
-            qpoints_list.append(qpoints_cart)
-            reduced_qpoints_list.append(reduced_qpoints)
-            q_distances.extend(distances_segment)
-
-            if self.qpoints_info:
-                print_detail(f"Path segment {i}", f"{terminal_label(start_label)} → {terminal_label(end_label)}")
-                print_detail("Start", fmt_vec(q_start))
-                print_detail("End", fmt_vec(q_end))
-                print_detail("Number of q-points", len(reduced_qpoints))
-                print('        Reduced q-points:')
-                for q in reduced_qpoints:
-                    print(f'            (reduced) q = {fmt_vec(q)}')
-                print("\n        " + "-" * 72)
-
+        if not qpoints_list:
+            raise ValueError("No commensurate q-points in the requested path groups.")
         self.qpoints = np.vstack(qpoints_list)
-        self.reduced_qpoints = np.vstack(reduced_qpoints_list)
+        self.reduced_qpoints = bz_path.cartesian_to_reduced(self.qpoints)
+        self.reduced_qpoints[np.isclose(self.reduced_qpoints, 0, atol=1e-16)] = 0.0
         self.num_qpoints = len(self.qpoints)
         self.q_distances = np.array(q_distances)
         self.q_labels = q_labels
+        self.q_path_ranges = q_path_ranges
 
     def _validate_dump_group_supercell(self, params, bz_path):
         """Compare the local cell repetition count with the count encoded in basis.in.
