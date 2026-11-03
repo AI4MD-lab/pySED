@@ -14,9 +14,18 @@ Trajectory cannot be read
 -------------------------
 
 For LAMMPS text, verify that every frame has box bounds and
-``id type x y z vx vy vz``, and that IDs are stable. For GPUMD extxyz,
-verify that ``Properties=`` declares position and velocity fields. Confirm
-that ``num_atoms`` agrees with both the trajectory and ``basis.in``.
+``id type x y z vx vy vz``, and that IDs are stable. The GPUMD XYZ reader
+accepts fixed-cell NVT/NVE output only. Its first frame must contain
+``Lattice="..."`` and an unquoted ``Properties=species:S:1:pos:R:3``
+declaration, followed only by numeric ``R``/``I`` properties. Include
+``vel:R:3`` for SED. Additional GPUMD numeric fields such as mass, forces,
+and groups are allowed; generic XYZ layouts and extra string fields are
+rejected without a fallback.
+
+The first frame's column map, cell, and element mapping are reused. Later
+comment lines are skipped, so the column layout and cell must stay fixed;
+atom count and species order are checked. Confirm that ``num_atoms`` agrees
+with both the trajectory and ``basis.in``.
 
 Frame/block mismatch
 --------------------

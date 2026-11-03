@@ -83,86 +83,82 @@ class GPUMDPropertiesTests(unittest.TestCase):
                 np.testing.assert_array_equal(data[ATOM_IDS], [1, 2])
                 np.testing.assert_array_equal(data[CELLS], [np.diag([10., 11., 12.])])
 
-    def test_position_only_and_type_order_across_batch_boundaries(self):
+    def test_first_frame_schema_cell_and_types_are_reused_across_batches(self):
         text = (
-            '2\nProperties="SPECIES:s:1:POS:r:3"\nTi 1 2 3\nSr 4 5 6\n'
-            '2\nProperties=species:S:1:pos:R:3\nO 7 8 9\nTi 10 11 12'
+            '2\nLattice="10 0 0 0 11 0 0 0 12" '
+            'Properties=species:S:1:pos:R:3:mass:R:1:vel:R:3:group:I:1\n'
+            'Ti 1 2 3 47.867 .001 .002 .003 0\n'
+            'Sr 4 5 6 87.62 .004 .005 .006 1\n'
+            '2\nTime=1.0\n'
+            'Ti 7 8 9 47.867 .007 .008 .009 0\n'
+            'Sr 10 11 12 87.62 .010 .011 .012 1'
         )
-        batches = self._read(text, batch_size=1)
+        batches = self._read(text, batch_size=1, dtype=np.float64)
         self.assertEqual([batch.start for batch in batches], [0, 1])
-        np.testing.assert_array_equal(batches[0].data[TYPES], [[0, 1]])
-        np.testing.assert_array_equal(batches[1].data[TYPES], [[2, 0]])
-        self.assertNotIn(VELOCITIES, batches[0].data)
-        self.assertNotIn(CELLS, batches[0].data)
         np.testing.assert_array_equal(batches[1].data[POSITIONS], [[[7, 8, 9], [10, 11, 12]]])
+        expected_velocities = np.array([[[.007, .008, .009], [.010, .011, .012]]]) * 100000.0
+        np.testing.assert_array_equal(batches[1].data[VELOCITIES], expected_velocities)
+        for batch in batches:
+            np.testing.assert_array_equal(batch.data[TYPES], [[0, 1]])
+            np.testing.assert_array_equal(batch.data[ATOM_IDS], [1, 2])
+            np.testing.assert_array_equal(batch.data[CELLS], [np.diag([10., 11., 12.])])
 
-    def test_general_layouts_keep_extra_fields_aliases_and_legacy_input(self):
-        cases = (
-            ("Properties=species:S:1:pos:R:3:label:S:1:vel:R:3", "Sr 1 2 3 mobile .001 .002 .003", 1, 0),
-            ("Properties=id:I:1:type:I:1:positions:R:3:velocities:R:3", "42 7 1 2 3 .001 .002 .003", 42, 7),
-            ("Properties=velocity:R:3:element:S:1:position:R:3", ".001 .002 .003 Sr 1 2 3", 1, 0),
-            ("legacy comment", "Sr 1 2 3 .001 .002 .003 ignored", 1, 0),
-            ("Properties=species:S:1:pos:R:3:vel:R:3:force:R:3", "Sr 1 2 3 .001 .002 .003 4 5 6", 1, 0),
+    def test_position_only_gpumd_output(self):
+        text = '1\nLattice="10 0 0 0 10 0 0 0 10" Properties=species:S:1:pos:R:3\nSi 1 2 3\n'
+        data = self._read(text)[0].data
+        np.testing.assert_array_equal(data[POSITIONS], [[[1, 2, 3]]])
+        self.assertNotIn(VELOCITIES, data)
+
+    def test_nonstandard_properties_are_rejected_without_fallback(self):
+        declarations = (
+            '', 'Properties=vel:R:3:species:S:1:pos:R:3',
+            'Properties=species:S:1:position:R:3',
+            'Properties=species:S:1:pos:R:3:label:S:1',
+            'Properties=id:I:1:type:I:1:pos:R:3',
+            'Properties=species:S:1:pos:R:2',
+            'Properties=species:S:1:pos:R:3:vel:R:2',
+            'Properties=species:S:1:pos:R:3:vel:I:3',
+            'Properties=species:S:1:pos:R:3:pos:R:3',
+            'Properties=species:S:1:pos:R:3:group:I:0',
+            'Properties="species:S:1:pos:R:3"',
         )
-        for comment, row, atom_id, atom_type in cases:
-            with self.subTest(comment=comment):
-                data = self._read(f"1\n{comment}\n{row}\n", dtype=np.float64)[0].data
-                np.testing.assert_array_equal(data[POSITIONS], [[[1, 2, 3]]])
-                np.testing.assert_array_equal(data[VELOCITIES], [[[100, 200, 300]]])
-                np.testing.assert_array_equal(data[ATOM_IDS], [atom_id])
-                np.testing.assert_array_equal(data[TYPES], [[atom_type]])
+        for declaration in declarations:
+            with self.subTest(declaration=declaration), self.assertRaises(ValueError):
+                self._read(f'1\nLattice="10 0 0 0 10 0 0 0 10" {declaration}\nSr 1 2 3\n')
+        with self.assertRaisesRegex(ValueError, "Lattice"):
+            self._read('1\nProperties=species:S:1:pos:R:3\nSr 1 2 3\n')
 
-    def test_python_numeric_spellings_and_whitespace_remain_accepted(self):
-        for row in ("Sr 1_000 ２ 3", "Sr\t1\u20032\u20033"):
-            with self.subTest(row=row):
-                data = self._read(f"1\nProperties=species:S:1:pos:R:3\n{row}\n")[0].data
-                expected = np.asarray([float(x) for x in row.split()[1:]], dtype=np.float32)
-                np.testing.assert_array_equal(data[POSITIONS][0, 0], expected)
-
-    def test_nonfinite_values_match_python_float(self):
-        row = "-nan +inf -Infinity"
-        for dtype in (np.float32, np.float64):
-            data = self._read(f"1\nProperties=species:S:1:pos:R:3\nSr {row}\n", dtype=dtype)[0].data
-            expected = np.asarray([float(x) for x in row.split()], dtype=dtype)
-            np.testing.assert_array_equal(data[POSITIONS][0, 0], expected)
-            np.testing.assert_array_equal(np.signbit(data[POSITIONS][0, 0]), np.signbit(expected))
-
-    def test_invalid_numeric_tokens_and_compensating_ragged_rows_are_rejected(self):
-        comment = "Properties=species:S:1:pos:R:3"
-        for token in ("3junk", "nan(payload)", "1e", "1_", "bad"):
+    def test_nonfinite_or_invalid_numbers_and_ragged_rows_are_rejected(self):
+        comment = 'Lattice="10 0 0 0 10 0 0 0 10" Properties=species:S:1:pos:R:3'
+        for token in ("nan", "inf", "-inf", "nan(payload)", "3junk", "1e", "bad"):
             with self.subTest(token=token), self.assertRaises(ValueError):
                 self._read(f"1\n{comment}\nSr 1 2 {token}\n")
-        with self.assertRaisesRegex(ValueError, "columns do not match"):
+        # The total numeric count is correct, but both rows are malformed.
+        with self.assertRaises(ValueError):
             self._read(f"2\n{comment}\nSr 1 2\nTi 3 4 5 6\n")
         with self.assertRaises(EOFError):
             self._read(f"2\n{comment}\nSr 1 2 3\n")
 
-    def test_layout_changes_still_validate_columns_and_fields(self):
-        first = "1\nProperties=species:S:1:pos:R:3\nSr 1 2 3\n"
-        with self.assertRaisesRegex(ValueError, "columns changed"):
-            self._read(first + "1\nProperties=species:S:1:pos:R:3:vel:R:3\nSr 1 2 3 4 5 6\n")
+    def test_atom_count_and_species_order_must_remain_fixed(self):
+        first = '2\nLattice="10 0 0 0 10 0 0 0 10" Properties=species:S:1:pos:R:3\nSr 1 2 3\nTi 4 5 6\n'
+        with self.assertRaisesRegex(ValueError, "species/order changed"):
+            self._read(first + '2\nTime=1\nTi 4 5 6\nSr 1 2 3\n')
+        with self.assertRaisesRegex(ValueError, "atom count changed"):
+            self._read(first + '1\nTime=1\nSr 1 2 3\n')
+        with self.assertRaisesRegex(ValueError, "positive"):
+            self._read('0\ncomment\n')
 
-    def test_extxyz_uses_the_declared_properties_order(self) -> None:
-        text = """\
-2
-Lattice="10 0 0 0 10 0 0 0 10" Properties=vel:R:3:species:S:1:pos:R:3
-0.001 0.002 0.003 Sr 1 2 3
-0.004 0.005 0.006 Ti 4 5 6
-"""
-        with TemporaryDirectory() as directory:
-            source = Path(directory) / "reordered.xyz"
-            source.write_text(text, encoding="utf-8")
-
-            batches = list(iter_gpumd_xyz(source, batch_size=1))
-
-        self.assertEqual(len(batches), 1)
-        batch = batches[0].data
-        np.testing.assert_allclose(batch[POSITIONS], [[[1, 2, 3], [4, 5, 6]]])
-        np.testing.assert_allclose(
-            batch[VELOCITIES],
-            [[[100, 200, 300], [400, 500, 600]]],
-        )
-        np.testing.assert_array_equal(batch[TYPES], [[0, 1]])
+    def test_progress_offsets_and_partial_final_batch(self):
+        for size, frame_counts in ((1, [1, 2]), (3, [2])):
+            with self.subTest(batch_size=size):
+                progress = []
+                batches = self._read(
+                    GPUMD_TEXT, batch_size=size,
+                    progress=lambda frames, offset: progress.append((frames, offset)),
+                )
+                self.assertEqual([frames for frames, _ in progress], frame_counts)
+                self.assertEqual(progress[-1][1], len(GPUMD_TEXT.encode("utf-8")))
+                self.assertEqual(sum(batch.data[POSITIONS].shape[0] for batch in batches), 2)
 
 
 @unittest.skipUnless(NETCDF4_AVAILABLE, "netCDF4 is not installed")
