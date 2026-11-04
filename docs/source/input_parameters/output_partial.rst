@@ -23,7 +23,9 @@ output_partial
 
 **Notes**
    Enable this in compute mode. Plot selected partial components later with
-   ``plot_partial_SED``.
+   ``plot_partial_SED``. Every element's x/y/z components are retained so that
+   later combinations, such as ``Sr+Ti x+z`` or ``all x``, need no new SED
+   calculation. ``save_partial_SED`` controls saving these postprocessing sums.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 
@@ -31,6 +33,7 @@ Related parameters
 ------------------
 
 - :doc:`plot_partial_SED <plot_partial_SED>`
+- :doc:`save_partial_SED <save_partial_SED>`
 - :doc:`out_files_name <out_files_name>`
 - :doc:`legacy_unit <legacy_unit>`
 - :doc:`basis_lattice_file <basis_lattice_file>`

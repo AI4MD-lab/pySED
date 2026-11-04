@@ -35,10 +35,11 @@ def sed_data_files(prefix):
 
 
 def partial_sed_data(prefix, element, direction):
-    """Return the data path for one element and Cartesian direction.
+    """Return the data path for an element/direction or their selected sums.
 
-    Use direction x, y, or z. For prefix /work/sample, the file is placed in
-    /work/sample_partial_SED/ and named sample.SED_<element>_<direction>.
+    Basic components use x, y, or z. Postprocessing sums use + combinations
+    or all. Files are named <basename>.SED_<element>_<direction> beneath
+    <prefix>_partial_SED/.
     """
     return (
         Path(str(prefix) + "_partial_SED")
@@ -46,10 +47,27 @@ def partial_sed_data(prefix, element, direction):
     )
 
 
+def selected_partial_sed_data(params):
+    """Return the selected spectrum path; omitted directions mean x+y+z."""
+    return partial_sed_data(
+        params.out_files_name, params.plot_partial_element,
+        params.plot_partial_dir or "x+y+z",
+    )
+
+
+def _partial_figure_direction(params):
+    """Keep the original xyz figure suffix for a single element without axes."""
+    if params.plot_partial_dir:
+        return params.plot_partial_dir
+    if params.plot_partial_element == "all" or "+" in params.plot_partial_element:
+        return "x+y+z"
+    return "xyz"
+
+
 def dispersion_figure(params):
     """Return the path for the selected total or element-resolved dispersion plot."""
     if getattr(params, "plot_partial_SED", False):
-        direction = params.plot_partial_dir or "xyz"
+        direction = _partial_figure_direction(params)
         return (
             Path(params.out_files_name + "_partial_SED")
             / f"SED_{params.plot_partial_element}_{direction}.png"
@@ -68,7 +86,7 @@ def slice_figure(params, *, fitting=False):
     if fitting:
         return fitting_qpoint_figure(q_index)
     if getattr(params, "plot_partial_SED", False):
-        direction = params.plot_partial_dir or "xyz"
+        direction = _partial_figure_direction(params)
         return (
             Path(params.out_files_name + "_partial_SED")
             / f"SED_{params.plot_partial_element}_{direction}-{q_index}-qpoint.png"

@@ -236,9 +236,15 @@ In plot mode:
 
    action = plot
    plot_partial_SED = Sr
-   plot_partial_SED = Sr x
+   # Alternatively, replace the selection above with one of these:
+   # plot_partial_SED = Sr x
+   # plot_partial_SED = Sr+Ti x+z
+   # plot_partial_SED = all x
 
 ``plot_partial_SED = Sr`` plots the summed ``x+y+z`` contribution for strontium. ``plot_partial_SED = Sr x`` plots only the x-direction contribution for strontium.
+Element and direction combinations use saved component files. By default,
+``save_partial_SED = 1`` also saves the selected sum in the partial SED folder.
+See :doc:`input_parameters/plot_partial_SED` for the complete syntax.
 
 The following SrTiO\ :sub:`3` cubic examples from
 `issue #39 <https://github.com/AI4MD-lab/pySED/issues/39>`_ show atom-type

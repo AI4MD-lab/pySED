@@ -160,6 +160,9 @@ In the input file, use ``output_partial = 1`` during computation. pySED
 writes one partial SED file for each element and direction. In plotting mode,
 use ``plot_partial_SED = Si`` to plot the sum of ``x+y+z`` for silicon,
 or ``plot_partial_SED = Si x`` for its x-direction contribution.
+Element and direction sums, such as ``Sr+Ti x+z`` or ``all x``, are assembled
+from these saved intensities during postprocessing. The ``+`` operation sums
+powers; it does not combine complex amplitudes or project onto a new direction.
 
 Partial SED is not the same as local or spatial-bin SED. The standard SED method
 requires a mapping between the supercell and the primitive cell to define

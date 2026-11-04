@@ -65,6 +65,9 @@ def _plot_ready(params):
 
     if not output_files.dispersion_figure(params).is_file():
         return False
+    if getattr(params, "plot_partial_SED", False) and getattr(params, "save_partial_SED", True):
+        if not output_files.selected_partial_sed_data(params).is_file():
+            return False
     return (
         not getattr(params, "plot_slice", False)
         or output_files.slice_figure(params).is_file()
@@ -90,6 +93,15 @@ def _sed_component_description(params):
         return "total SED"
     direction = params.plot_partial_dir or "x+y+z (summed)"
     return f"{params.plot_partial_element}, direction {direction}"
+
+
+def _load_sed_data(params):
+    """Load the selected spectrum and optionally export its component sum."""
+    data = FileIO.load_data(params)
+    saved = FileIO.save_partial_sed(data, params)
+    if saved is not None:
+        _print_detail("Combined SED data", saved)
+    return data
 
 
 # ── step runners ────────────────────────────────────────────────
@@ -204,7 +216,7 @@ def step_plot_sed(params):
     """
     _require_plot_data(params)
 
-    data = FileIO.load_data(params)
+    data = _load_sed_data(params)
     if params.plot_slice:
         validate_qpoint_slice_index(params, data.qpoints)
 
@@ -270,7 +282,7 @@ def step_fit_sed(params):
 
     if params.lorentz_fit_all_qpoint:
         print_section("Fitting spectral peaks at all Q-points", "▶")
-        data = FileIO.load_data(params)
+        data = _load_sed_data(params)
         total_qpoints = len(data.q_distances)
         incomplete_qpoints = []
         _print_detail("Total Q-points", total_qpoints)
@@ -347,7 +359,7 @@ def step_fit_sed(params):
         print("         re_output_total_freq_lifetime = 1.")
     else:
         # single Q-point fit
-        data = FileIO.load_data(params)
+        data = _load_sed_data(params)
         validate_qpoint_slice_index(params, data.qpoints)
         q = ", ".join(f"{value:.4f}" for value in data.qpoints[params.qpoint_slice_index])
         print("\n    " + "-" * 72)

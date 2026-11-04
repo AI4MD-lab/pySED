@@ -55,6 +55,7 @@ meaning, defaults, examples, practical notes, and related parameters.
    input_parameters/qpoint_slice_index
    input_parameters/plot_slice
    input_parameters/plot_partial_SED
+   input_parameters/save_partial_SED
    input_parameters/if_show_figures
    input_parameters/initial_guess_hwhm
    input_parameters/peak_max_hwhm
@@ -101,6 +102,7 @@ meaning, defaults, examples, practical notes, and related parameters.
        "qpoint-slice-index": "input_parameters/qpoint_slice_index.html",
        "plot-slice": "input_parameters/plot_slice.html",
        "plot-partial-sed": "input_parameters/plot_partial_SED.html",
+       "save-partial-sed": "input_parameters/save_partial_SED.html",
        "if-show-figures": "input_parameters/if_show_figures.html",
        "initial-guess-hwhm": "input_parameters/initial_guess_hwhm.html",
        "peak-max-hwhm": "input_parameters/peak_max_hwhm.html",
@@ -250,7 +252,10 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Plot one q-point spectrum.
    * - `plot_partial_SED <input_parameters/plot_partial_SED.html>`_
      - Plotting
-     - Plot one element or direction-resolved partial SED.
+     - Select elements and directions with + for partial SED plotting or fitting.
+   * - `save_partial_SED <input_parameters/save_partial_SED.html>`_
+     - Postprocessing
+     - Save the selected partial SED sum (default: 1).
    * - `if_show_figures <input_parameters/if_show_figures.html>`_
      - Plotting
      - Show figures interactively.
