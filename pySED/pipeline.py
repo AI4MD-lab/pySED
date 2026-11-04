@@ -100,7 +100,7 @@ def _load_sed_data(params):
     data = FileIO.load_data(params)
     saved = FileIO.save_partial_sed(data, params)
     if saved is not None:
-        _print_detail("Combined SED data", saved)
+        _print_detail("✓ Combined SED data", saved)
     return data
 
 
