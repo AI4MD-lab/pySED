@@ -149,3 +149,8 @@ plotting and fitting remain CPU operations.
 Set ``output_partial = 1`` during computation to preserve element- and
 Cartesian-resolved components. Use ``plot_partial_SED = Si`` for an element
 sum or ``plot_partial_SED = Si x`` for one direction.
+Join elements and directions with ``+``, for example ``Sr+Ti x+z``, or select
+the whole system's x contribution with ``all x``. These sums use saved
+components and require no new trajectory processing or FFT. The default
+``save_partial_SED = 1`` exports the selected sum beside its figures; set it
+to ``0`` to skip that export. See :doc:`input_parameters/plot_partial_SED`.

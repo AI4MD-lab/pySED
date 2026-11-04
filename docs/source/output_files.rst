@@ -30,6 +30,14 @@ With ``output_partial = 1``, directional matrices are written beneath
 ``<prefix>_partial_SED/`` as
 ``<basename>.SED_<Element>_<x|y|z>``.
 
+Postprocessing can add selected element/direction components without a new
+SED calculation. For example, ``plot_partial_SED = Sr+Ti x+z`` produces
+``SED_Sr+Ti_x+z.png`` in the same directory and, with the default
+``save_partial_SED = 1``, exports ``<basename>.SED_Sr+Ti_x+z``. These derived
+files contain the full linear-intensity matrix and share the original axis
+metadata. They do not replace the basic components or the total ``.SED``.
+See :doc:`input_parameters/plot_partial_SED` for selection syntax.
+
 Total and partial outputs use the same :doc:`legacy_unit
 <input_parameters/legacy_unit>` setting. Saved scale metadata determines
 labels when reloading for plotting or fitting; see :doc:`sed_units`.

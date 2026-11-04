@@ -119,20 +119,33 @@ def read_q_path(values):
 
 
 def read_partial_sed(values):
-    """Read ``plot_partial_SED = element [x|y|z]``."""
+    """Read ``plot_partial_SED = elements [directions]``, joined with +."""
 
     if len(values) not in {1, 2}:
-        raise ValueError("requires an element and optional x, y, or z")
-
-    element = values[0].strip("'\"").capitalize()
-    if element not in atomic_masses:
         raise ValueError(
-            f"element '{values[0]}' was not found in the periodic table"
+            "use elements [directions], for example Sr+Ti x+z (no spaces around +)"
         )
 
+    selection = values[0].strip("'\"")
+    if selection.lower() == "all":
+        element = "all"
+    else:
+        elements = [symbol.capitalize() for symbol in selection.split("+")]
+        for symbol in elements:
+            if symbol not in atomic_masses:
+                raise ValueError(f"element '{symbol}' was not found in the periodic table")
+        if len(elements) != len(set(elements)):
+            raise ValueError("each element may appear only once in a partial SED selection")
+        element = "+".join(elements)
+
     direction = values[1].strip("'\"").lower() if len(values) > 1 else None
-    if direction not in {None, "x", "y", "z"}:
-        raise ValueError("direction must be x, y, or z")
+    if direction is not None:
+        directions = direction.split("+")
+        if any(axis not in {"x", "y", "z"} for axis in directions):
+            raise ValueError("use x, y, z, or directions joined with +, for example x+z")
+        if len(directions) != len(set(directions)):
+            raise ValueError("each direction may appear only once in a partial SED selection")
+        direction = "+".join(axis for axis in "xyz" if axis in directions)
     return True, element, direction
 
 
@@ -195,6 +208,7 @@ PARAMETERS = {
         (False, None, None),
         read_partial_sed,
     ),
+    "save_partial_SED": Parameter(True, read_bool),
 
     # Spectral peak fit
     "lorentz_fit_all_qpoint": Parameter(False, read_bool),
@@ -298,7 +312,7 @@ def validate_sed(params):
 
     This function also unpacks params.plot_partial_SED from its parsed tuple
     into a boolean plus plot_partial_element and plot_partial_dir attributes.
-    Compute/thinking also check the selected element against masses in basis.in;
+    Compute/thinking also check selected elements against masses in basis.in;
     plot/fit validate the selected component files when loading saved spectra.
     """
 
@@ -466,7 +480,10 @@ def validate_sed(params):
         params.plot_partial_dir,
     ) = params.plot_partial_SED
 
-    if params.plot_partial_SED and needs_compute:
+    if (
+        params.plot_partial_SED and needs_compute
+        and params.plot_partial_element != "all"
+    ):
         try:
             masses = np.loadtxt(
                 params.basis_lattice_file,
@@ -480,19 +497,20 @@ def validate_sed(params):
             ) from error
 
         unique_masses = np.unique(np.atleast_1d(masses))
-        matches = np.flatnonzero(
-            np.isclose(
-                unique_masses,
-                atomic_masses[params.plot_partial_element],
-                rtol=0.0,
-                atol=5.0e-2,
+        for element in params.plot_partial_element.split("+"):
+            matches = np.flatnonzero(
+                np.isclose(
+                    unique_masses,
+                    atomic_masses[element],
+                    rtol=0.0,
+                    atol=5.0e-2,
+                )
             )
-        )
-        if not len(matches):
-            raise ValueError(
-                f"element '{params.plot_partial_element}' was not found "
-                f"in the input structure '{params.basis_lattice_file}'"
-            )
+            if not len(matches):
+                raise ValueError(
+                    f"element '{element}' was not found "
+                    f"in the input structure '{params.basis_lattice_file}'"
+                )
 
 __all__ = [
     "PARAMETERS",

@@ -19,12 +19,13 @@ Spectrum rows are frequency bins and columns are q points. SED headers record
 the intensity scale so later plotting and fitting can label existing numbers
 correctly. Intensity conversion belongs to the calculation, not this module.
 """
-import os
+from pathlib import Path
 import numpy as np
 
 from pySED.postprocess import output_files
 from pySED.postprocess.Lorentz import hwhm_to_lifetime_ps
 from pySED.sed.sed_kernel import SED_UNIT, LEGACY_SED_UNIT, LEGACY_UNIT_NOTICE
+from pySED.structure.atoms import atomic_masses
 
 
 SED_HEADER = (
@@ -125,6 +126,44 @@ def _read_sed(path, legacy_unit=False):
     return np.loadtxt(path, ndmin=2), legacy_unit
 
 
+def _partial_sed_files(params):
+    """Select original element/axis files, never previously saved sums."""
+    prefix = params.out_files_name
+    if params.plot_partial_element == "all":
+        directory = Path(str(prefix) + "_partial_SED")
+        stem = Path(prefix).name + ".SED_"
+        elements = set()
+        if directory.is_dir():
+            for path in directory.iterdir():
+                if not path.is_file() or not path.name.startswith(stem):
+                    continue
+                element, _, axis = path.name[len(stem):].rpartition("_")
+                if element in atomic_masses and axis in {"x", "y", "z"}:
+                    elements.add(element)
+        elements = sorted(elements)
+        if not elements:
+            raise FileNotFoundError(
+                f"No element-resolved partial SED files found in '{directory}'. "
+                "Generate them with output_partial = 1 first."
+            )
+    else:
+        elements = params.plot_partial_element.split("+")
+
+    directions = (params.plot_partial_dir or "x+y+z").split("+")
+    files = []
+    for element in elements:
+        for direction in directions:
+            path = output_files.partial_sed_data(prefix, element, direction)
+            if not path.is_file():
+                raise FileNotFoundError(
+                    f"partial SED files for element '{element}' and direction "
+                    f"'{direction}' are missing: {path}. "
+                    "Check the element selection and generate components with output_partial = 1."
+                )
+            files.append(path)
+    return files
+
+
 class load_data(object):
     """Load the spectrum selected for plotting or fitting, together with its axes.
 
@@ -135,57 +174,38 @@ class load_data(object):
     """
 
     def __init__(self, params):
-        """Read total SED or the selected element/direction component.
+        """Read total SED or sum selected element/direction components.
 
-        For an element without a specified direction, sum its x/y/z files after
-        checking that their intensity scales agree. Also read reduced q coordinates,
-        frequencies, distances, and labels from the shared metadata files. No
-        frequency or intensity conversion is performed during loading.
+        Read one component at a time and add its linear intensity, checking
+        shapes and output scales. Omitted directions mean x+y+z. Shared axis
+        files supply q coordinates, frequencies, path distances, and labels.
+        Loading does not convert units or change source files.
         """
         sed_path, qpoints_path, frequency_path, labels_path = (
             output_files.sed_data_files(params.out_files_name)
         )
 
-        if getattr(params, 'plot_partial_SED', 0):
-
-            element = params.plot_partial_element
-
-            if params.plot_partial_dir is None:
-                # Sum x/y/z for the requested element.
-                file_x = output_files.partial_sed_data(params.out_files_name, element, 'x')
-                file_y = output_files.partial_sed_data(params.out_files_name, element, 'y')
-                file_z = output_files.partial_sed_data(params.out_files_name, element, 'z')
-                if not all(
-                    os.path.exists(path)
-                    for path in (file_x, file_y, file_z)
-                ):
-                    raise FileNotFoundError(
-                        f"partial SED files for element '{element}' are missing")
-                sed_files = (file_x, file_y, file_z)
+        self.partial_files = (
+            _partial_sed_files(params) if getattr(params, 'plot_partial_SED', False) else []
+        )
+        for index, path in enumerate(self.partial_files or [sed_path]):
+            values, legacy = _read_sed(path, getattr(params, 'legacy_unit', False))
+            if index == 0:
+                self.sed_avg = values
+                self.legacy_unit = legacy
             else:
-                d = params.plot_partial_dir
-                file_d = output_files.partial_sed_data(params.out_files_name, element, d)
-                if not os.path.exists(file_d):
-                    raise FileNotFoundError(
-                        f"partial SED file for element '{element}' "
-                        f"and direction '{d}' is missing")
-                sed_files = (file_d,)
-
-        else:
-            sed_files = (sed_path,)
-
-        components = [
-            _read_sed(path, getattr(params, 'legacy_unit', False))
-            for path in sed_files
-        ]
-        self.legacy_unit = components[0][1]
-        if any(legacy != self.legacy_unit for _, legacy in components):
-            raise ValueError("partial SED files use inconsistent output scales")
-        self.sed_avg = sum(values for values, _ in components)
+                if legacy != self.legacy_unit:
+                    raise ValueError("partial SED files use inconsistent output scales")
+                if values.shape != self.sed_avg.shape:
+                    raise ValueError(f"partial SED files have inconsistent shapes: {path}")
+                self.sed_avg += values
+            del values
         self.sed_unit = LEGACY_SED_UNIT if self.legacy_unit else SED_UNIT
 
         self.qpoints = np.loadtxt(qpoints_path, ndmin=2)
         self.freq_fft = np.loadtxt(frequency_path, ndmin=1)
+        if self.sed_avg.shape != (self.freq_fft.size, len(self.qpoints)):
+            raise ValueError("SED shape does not match the saved .THz and .Qpts axes")
 
         self.q_distances = []
         self.q_labels = {}
@@ -216,6 +236,29 @@ class load_data(object):
                 expected_start = bounds[1]
             if expected_start != len(self.qpoints):
                 raise ValueError("q_path_ranges do not match the saved Q-point count")
+
+
+def save_partial_sed(data, params):
+    """Save the selected linear-intensity sum without replacing basic components."""
+    if (
+        not getattr(params, 'plot_partial_SED', False)
+        or not getattr(params, 'save_partial_SED', True)
+    ):
+        return None
+    path = output_files.selected_partial_sed_data(params)
+    if data.partial_files == [path]:
+        return None
+    header = (
+        f"pySED spectral energy density; unit: {data.sed_unit}; "
+        f"legacy_unit: {str(data.legacy_unit).lower()}; "
+        "each column corresponds to one q-point (same order as the .Qpts file)\n"
+        f"Sum of components: {', '.join(source.name for source in data.partial_files)}\n"
+        f"Axes: {params.out_files_name}.THz and {params.out_files_name}.Qpts"
+    )
+    if data.legacy_unit:
+        header += "\n" + LEGACY_UNIT_NOTICE
+    np.savetxt(path, data.sed_avg, header=header)
+    return path
 
 
 def write_phonon_lifetime(lorentz, params):
