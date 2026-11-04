@@ -21,8 +21,8 @@ prim_unitcell = 3.86697 0 0  1.93349 3.3489 0  1.93349 1.1163 3.15737
 supercell_dim = 20 20 20
 rescale_prim = 1
 
-num_qpaths = 5
-q_path_name = GXUKGL
+num_qpaths = 4
+q_path_name = GXU|KGL
 q_path = 0 0 0  1/2 0 1/2  5/8 1/4 5/8  3/8 3/8 3/4  0 0 0  1/2 1/2 1/2
 
 plot_cutoff_freq = 20

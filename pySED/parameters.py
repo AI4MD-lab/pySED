@@ -413,7 +413,14 @@ def validate_sed(params):
     if needs_compute and params.q_path is None:
         raise ValueError("q_path is required for SED computation")
     if params.q_path is not None:
-        expected = (params.num_qpaths + 1) * 3
+        groups = params.q_path_name.split("|")
+        if any(len(group) < 2 or any(c.isspace() for c in group) for group in groups):
+            raise ValueError(
+                "q_path_name requires at least two single-character labels per "
+                "path group; use | between groups, for example GXU|KGL"
+            )
+        num_labels = params.num_qpaths + len(groups)
+        expected = num_labels * 3
         if params.q_path.size != expected:
             raise ValueError(
                 f"q_path requires {expected} values for "
@@ -421,11 +428,11 @@ def validate_sed(params):
             )
         if not np.all(np.isfinite(np.asarray(params.q_path, dtype=float))):
             raise ValueError("q_path values must be finite")
-        if len(params.q_path_name) != params.num_qpaths + 1:
+        if sum(map(len, groups)) != num_labels:
             raise ValueError(
                 "q_path_name requires "
-                f"{params.num_qpaths + 1} labels for "
-                f"num_qpaths = {params.num_qpaths}"
+                f"{num_labels} labels (excluding |) for "
+                f"num_qpaths = {params.num_qpaths} and {len(groups)} path group(s)"
             )
 
     if needs_compute:

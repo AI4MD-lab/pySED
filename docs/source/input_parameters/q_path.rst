@@ -15,7 +15,10 @@ q_path
    No useful default. Set it explicitly.
 
 **Notes**
-   Provide ``num_qpaths + 1`` triples. Explicit fractions such as ``1/3`` or
+   Provide one triple per label in ``q_path_name``, excluding ``|``. This is
+   ``num_qpaths + 1`` triples for a continuous path, or
+   ``num_qpaths + number_of_groups`` for disconnected paths.
+   Explicit fractions such as ``1/3`` or
    ``7/15`` are preserved exactly and are preferred for rational endpoints.
    Decimal inputs within ``1e-5`` of a fraction with denominator at most 12
    are normalized to that fraction; for example, ``0.33333`` becomes ``1/3``.
@@ -29,8 +32,31 @@ q_path
    A repeated endpoint contributes one point only if it satisfies that
    condition. See :doc:`../theory` for the GCD/Bézout construction.
 
+   Unsampled endpoints are reported; their labels retain the requested path
+   positions, while the plotted data use the actual sampled coordinates.
+   A segment with no allowed q-points remains an empty interval, not an
+   implicit path break. Specify breaks explicitly with ``|``.
+
    For conventional high-symmetry paths and labels, users may refer to the
    Setyawan-Curtarolo band-structure path paper [Setyawan2010]_.
+
+Disconnected silicon path
+-------------------------
+
+.. code-block:: text
+
+   num_qpaths = 4
+   q_path_name = GXU|KGL
+   q_path = 0 0 0  1/2 0 1/2  5/8 1/4 5/8  3/8 3/8 3/4  0 0 0  1/2 1/2 1/2
+
+This defines Gamma-X-U and K-Gamma-L as separate groups. U and K each retain
+their own coordinate triple, but no U-K segment is computed or interpolated
+in the plot. The break is independent of supercell size and does not imply
+equal frequencies. For this primitive silicon cell, a 40 x 40 x 40 supercell
+contains the exact U and K points; 20 x 20 x 20 and 41 x 41 x 41 do not.
+
+Recompute the SED after changing path connectivity. Replotting existing output
+uses the path distances, labels, and segment ranges saved with that output.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

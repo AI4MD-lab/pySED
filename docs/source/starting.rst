@@ -122,8 +122,10 @@ What to Check Before Running pySED
   production run.
 - ``prim_unitcell`` and ``supercell_dim`` reconstruct the MD supercell.
 - ``basis_lattice_file`` points to the correct ``basis.in`` file.
-- ``q_path_name`` has ``num_qpaths + 1`` labels.
-- ``q_path`` contains ``num_qpaths + 1`` reduced-coordinate triples.
+- ``q_path_name`` has ``num_qpaths + number_of_groups`` labels, excluding
+  ``|`` separators (one group for a continuous path).
+- ``q_path`` contains one reduced-coordinate triple per label. For example,
+  ``GXU|KGL`` has four connected segments and six triples; U-K is not sampled.
 - The trajectory contains coordinates and velocities for every saved frame.
 
 Recommended First Examples
