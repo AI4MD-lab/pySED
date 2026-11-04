@@ -256,8 +256,16 @@ class BZ_methods(object):
 
         if self.qpoints_info:
             print_section("Q-point information")
+            print_detail("Path", params.q_path_name)
 
-        for group in groups:
+        for group_index, group in enumerate(groups):
+            if self.qpoints_info and group_index:
+                print()
+                print_detail(
+                    "Path break",
+                    f"{groups[group_index - 1][-1]}|{group[0]} (no connecting segment)",
+                )
+                print()
             add_label(cumulative_distance, label_map.get(group[0], group[0]))
             for index in range(len(group) - 1):
                 q_start = q_path[coordinate_offset + index]
