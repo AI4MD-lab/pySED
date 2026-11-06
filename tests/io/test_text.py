@@ -59,6 +59,48 @@ ITEM: ATOMS id type x y z vx vy vz
 """
 
 
+GPUMD_UNWRAPPED_TEXT = """\
+2
+Lattice="10 0 0 0 20 0 0 0 30" Properties=species:S:1:pos:R:3:vel:R:3:unwrapped_position:R:3
+Sr 9 1 2 0.001 0.002 0.003 9 1 2
+Ti 1 19 29 0.004 0.005 0.006 1 -1 -1
+2
+Time=1.0
+Sr 1 2 3 0.002 0.003 0.004 11 2 3
+Ti 2 18 28 0.005 0.006 0.007 2 -2 -2
+"""
+
+LAMMPS_UNWRAPPED_TEXT = """\
+ITEM: TIMESTEP
+0
+ITEM: NUMBER OF ATOMS
+2
+ITEM: BOX BOUNDS pp pp pp
+0 10
+0 20
+0 30
+ITEM: ATOMS id type x y z vx vy vz xu yu zu
+2 2 1 19 29 4 5 6 1 -1 -1
+1 1 9 1 2 1 2 3 9 1 2
+ITEM: TIMESTEP
+10
+ITEM: NUMBER OF ATOMS
+2
+ITEM: BOX BOUNDS pp pp pp
+0 10
+0 20
+0 30
+ITEM: ATOMS id type x y z vx vy vz xu yu zu
+1 1 1 2 3 2 3 4 11 2 3
+2 2 2 18 28 5 6 7 2 -2 -2
+"""
+
+UNWRAPPED_POSITIONS = np.array([
+    [[9, 1, 2], [1, -1, -1]],
+    [[11, 2, 3], [2, -2, -2]],
+])
+
+
 class GPUMDPropertiesTests(unittest.TestCase):
     def _read(self, text, **kwargs):
         with TemporaryDirectory() as directory:
@@ -109,6 +151,27 @@ class GPUMDPropertiesTests(unittest.TestCase):
         data = self._read(text)[0].data
         np.testing.assert_array_equal(data[POSITIONS], [[[1, 2, 3]]])
         self.assertNotIn(VELOCITIES, data)
+
+    def test_unwrapped_positions_are_preferred_across_batches(self):
+        for dtype in (np.float32, np.float64):
+            with self.subTest(dtype=dtype):
+                batches = self._read(GPUMD_UNWRAPPED_TEXT, batch_size=1, dtype=dtype)
+                positions = np.concatenate([batch.data[POSITIONS] for batch in batches])
+                np.testing.assert_array_equal(positions, UNWRAPPED_POSITIONS)
+                self.assertEqual(positions.dtype, np.dtype(dtype))
+                np.testing.assert_allclose(batches[1].data[VELOCITIES],
+                                           [[[200, 300, 400], [500, 600, 700]]])
+
+    def test_invalid_unwrapped_property_is_rejected(self):
+        for declaration, values in (("R:2", "4 5"), ("I:3", "4 5 6")):
+            with self.subTest(declaration=declaration):
+                text = (
+                    '1\nLattice="10 0 0 0 10 0 0 0 10" '
+                    f'Properties=species:S:1:pos:R:3:unwrapped_position:{declaration}\n'
+                    f'Sr 1 2 3 {values}\n'
+                )
+                with self.assertRaisesRegex(ValueError, "unwrapped_position:R:3"):
+                    self._read(text)
 
     def test_nonstandard_properties_are_rejected_without_fallback(self):
         declarations = (
@@ -168,6 +231,7 @@ class LAMMPSAtomIDTests(unittest.TestCase):
         rows = []
         for row, atom_id in enumerate(ids):
             values = dict(id=str(atom_id), type="1", x=str(row + 0.125), y="0", z="0",
+                          xu=str(row + 10.125), yu="-10", zu="20",
                           vx=str(row + 0.25), vy="0", vz="0")
             rows.append(" ".join(values[name] for name in columns.split()))
         return (
@@ -206,6 +270,24 @@ class LAMMPSAtomIDTests(unittest.TestCase):
         for batch in batches:
             np.testing.assert_array_equal(batch.data[ATOM_IDS], [low, low + 1])
 
+    def test_unwrapped_only_and_mixed_columns_preserve_id_order(self):
+        for columns in ("id type xu yu zu vx vy vz",
+                        "id type x y z vx vy vz xu yu zu"):
+            for dtype in (np.float32, np.float64):
+                with self.subTest(columns=columns, dtype=dtype):
+                    data = self.read(self.frame([2, 1], columns), dtype=dtype)[0].data
+                    np.testing.assert_array_equal(data[ATOM_IDS], [1, 2])
+                    np.testing.assert_array_equal(data[POSITIONS],
+                                                   [[[11.125, -10, 20], [10.125, -10, 20]]])
+                    self.assertEqual(data[POSITIONS].dtype, np.dtype(dtype))
+                    np.testing.assert_array_equal(data[VELOCITIES][0, :, 0], [125, 25])
+
+    def test_incomplete_unwrapped_columns_are_rejected(self):
+        for columns in ("id xu yu", "id x y z xu", "id x y z yu zu"):
+            with self.subTest(columns=columns):
+                with self.assertRaisesRegex(ValueError, "xu yu zu"):
+                    self.read(self.frame([1], columns))
+
     def test_invalid_duplicate_or_changed_ids_are_rejected(self):
         for value in (0, -1, "1.5", "1e3", "nan", "inf", "bad", 2**63, 2**64):
             with self.subTest(atom_id=value), self.assertRaises(ValueError):
@@ -230,6 +312,39 @@ class LAMMPSAtomIDTests(unittest.TestCase):
 
 @unittest.skipUnless(NETCDF4_AVAILABLE, "netCDF4 is not installed")
 class TextConversionTests(unittest.TestCase):
+    def test_unwrapped_coordinates_match_direct_read_and_refresh_old_cache(self):
+        from netCDF4 import Dataset
+        from pySED.io.netcdf import converted_file_is_current
+
+        cases = (
+            ("dump.xyz", GPUMD_UNWRAPPED_TEXT, iter_gpumd_xyz),
+            ("dump.data", LAMMPS_UNWRAPPED_TEXT, iter_lammps_dump),
+        )
+        for filename, text, reader in cases:
+            with self.subTest(filename=filename), TemporaryDirectory() as directory:
+                source = Path(directory) / filename
+                source.write_text(text, encoding="utf-8")
+                direct = list(reader(source, batch_size=1, dtype=np.float64))
+                cached, _ = prepare_trajectory(source, batch_size=1, storage_dtype="float64")
+                with NetCDFReader(cached) as trajectory:
+                    np.testing.assert_array_equal(trajectory.read(POSITIONS), UNWRAPPED_POSITIONS)
+                    for field in (POSITIONS, VELOCITIES, CELLS, TYPES):
+                        expected = np.concatenate([batch.data[field] for batch in direct])
+                        np.testing.assert_array_equal(trajectory.read(field), expected)
+                    np.testing.assert_array_equal(trajectory.read(ATOM_IDS), [1, 2])
+
+                # Version 2 ignored GPUMD unwrapped fields and preferred LAMMPS x/y/z.
+                with Dataset(str(cached), "a") as dataset:
+                    dataset.pysed_schema_version = 2
+                    dataset.variables["coordinates"][:] = UNWRAPPED_POSITIONS % [10, 20, 30]
+                self.assertFalse(converted_file_is_current(cached, source, storage_dtype="float64"))
+                prepare_trajectory(source, storage_dtype="float64")
+                with NetCDFReader(cached) as trajectory:
+                    np.testing.assert_array_equal(trajectory.read(POSITIONS), UNWRAPPED_POSITIONS)
+                mtime = cached.stat().st_mtime_ns
+                prepare_trajectory(source, storage_dtype="float64")
+                self.assertEqual(cached.stat().st_mtime_ns, mtime)
+
     def test_old_lammps_id_cache_is_rebuilt_then_reused(self):
         from netCDF4 import Dataset
         from pySED.io.netcdf import converted_file_is_current

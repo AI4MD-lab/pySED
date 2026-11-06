@@ -75,13 +75,15 @@ with positions and velocities. A minimal production block is:
 .. code-block:: text
 
    ensemble       nve
-   dump_exyz      10     1
+   dump_xyz       10 dump.xyz velocity unwrapped_position
    run            500000
 
-The first number after ``dump_exyz`` is the output stride in MD steps. Use the
-same value for ``output_data_stride`` in ``input.in``. For details, see the
-GPUMD manual page for
-`dump_exyz <https://gpumd.org/gpumd/input_parameters/dump_exyz.html>`_.
+The first number after ``dump_xyz`` is the output stride in MD steps. Use the
+same value for ``output_data_stride`` in ``input.in``. The example uses a
+GPUMD version supporting ``unwrapped_position``; pySED prefers this field
+over the ordinary ``pos`` coordinates. Without it, ``pos`` is read as before.
+For details, see the GPUMD manual page for
+`dump_xyz <https://gpumd.org/gpumd/input_parameters/dump_xyz.html>`_.
 
 In ``input.in``, use:
 
@@ -98,10 +100,13 @@ Use one dump sorted by atom id:
 
 .. code-block:: text
 
-   dump            pysed  all  custom  ${dt_dump}  trajectory.dump  id type x y z vx vy vz
+   dump            pysed  all  custom  ${dt_dump}  trajectory.dump  id type xu yu zu vx vy vz
    dump_modify     pysed  sort  id
 
    run             2097152
+
+``xu yu zu`` are unwrapped coordinates. pySED prefers them when present;
+files containing only ``x y z`` remain supported. Include all three components.
 
 In ``input.in``, use:
 
@@ -112,6 +117,13 @@ In ``input.in``, use:
 
 Use ``lammps_unit = 'metal'`` for velocities in Angstrom/ps and
 ``lammps_unit = 'real'`` for velocities in Angstrom/fs.
+
+Unwrapped coordinates avoid periodic-boundary jumps when averaging positions.
+They are recommended for trajectories with boundary crossings, including Li
+diffusion. pySED selects the supplied coordinates automatically; it does not
+unwrap trajectories itself and needs no additional parameter. This addresses
+coordinate continuity; the applicability of fixed-lattice SED to diffusive
+motion still needs separate consideration.
 
 What to Check Before Running pySED
 ----------------------------------

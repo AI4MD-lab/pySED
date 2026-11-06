@@ -127,11 +127,38 @@ def _gpumd_columns(comment):
         count = int(raw_count)
         if kind not in {"R", "I"} or count < 1 or name in columns or name == "species":
             raise ValueError("GPUMD XYZ requires unique numeric properties with positive widths")
-        if name in {"pos", "vel"} and (kind != "R" or count != 3):
+        if name in {"pos", "vel", "unwrapped_position"} and (kind != "R" or count != 3):
             raise ValueError(f"GPUMD XYZ requires {name}:R:3")
         columns[name] = slice(offset, offset + count)
         offset += count
     return columns, offset
+
+
+def _lammps_position_columns(columns):
+    """Select a complete coordinate triplet, preferring xu/yu/zu."""
+    names = ("xu", "yu", "zu")
+    if not any(name in columns for name in names):
+        names = ("x", "y", "z")
+    if not all(name in columns for name in names):
+        raise ValueError(
+            f"LAMMPS dump must include all three coordinates: {' '.join(names)}"
+        )
+    return names
+
+
+def read_text_position_field(path: Path, source_format: str) -> str:
+    """Identify the selected coordinates from the first header, without reading atoms."""
+    with Path(path).open("r", encoding="utf-8") as stream:
+        if source_format == GPUMD_XYZ:
+            stream.readline()
+            columns, _ = _gpumd_columns(stream.readline())
+            return "unwrapped_position" if "unwrapped_position" in columns else "pos"
+        if source_format == LAMMPS_DUMP:
+            # The standard dump header has nine lines, including three box bounds.
+            for line in islice(stream, 9):
+                if line.startswith("ITEM: ATOMS"):
+                    return " ".join(_lammps_position_columns(line.split()[2:]))
+    raise ValueError(f"cannot read coordinate fields from {source_format} header")
 
 
 def _stack_batch(start: int, frames: list[dict[str, np.ndarray]]):
@@ -167,6 +194,7 @@ def iter_gpumd_xyz(
     Subsequent comments are skipped; there is no generic-XYZ fallback.
     Positions/cells use Angstrom and velocities convert from Angstrom/fs
     to m/s. Numeric fields use dtype; the cached cell uses float64.
+    Prefer unwrapped_position over pos when supplied; do not unwrap coordinates.
     """
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
@@ -198,6 +226,7 @@ def iter_gpumd_xyz(
             first = expected_atoms is None
             if first:
                 columns, width = _gpumd_columns(comment)
+                position_columns = columns.get("unwrapped_position", columns["pos"])
                 cell = _lattice_from_comment(comment)
                 if cell is None:
                     raise ValueError("standard GPUMD XYZ requires Lattice in the first frame")
@@ -235,7 +264,7 @@ def iter_gpumd_xyz(
             if not np.isfinite(values).all():
                 raise ValueError("GPUMD XYZ numeric fields must be finite")
             frame = {
-                POSITIONS: values[:, columns["pos"]],
+                POSITIONS: values[:, position_columns],
                 TYPES: atom_types,
                 ATOM_IDS: atom_ids,
                 CELLS: cell,
@@ -293,7 +322,8 @@ def iter_lammps_dump(
 ) -> Iterator[TrajectoryBatch]:
     """Yield batches from a LAMMPS custom dump, sorting each frame by atom ID.
 
-    Require id plus x/y/z or xu/yu/zu columns. When vx/vy/vz are present,
+    Require id plus x/y/z or xu/yu/zu columns; prefer xu/yu/zu when supplied.
+    Use the selected coordinates as written, without unwrapping. When vx/vy/vz are present,
     convert from Angstrom/ps (metal) or Angstrom/fs (real) to m/s. Positions
     remain in Angstrom; scaled xs/ys/zs coordinates are not supported.
     Atom count and sorted IDs must remain consistent across frames.
@@ -359,19 +389,7 @@ def iter_lammps_dump(
             if "id" not in index:
                 raise ValueError("LAMMPS dump must include atom id")
 
-            position_names = next(
-                (
-                    names
-                    for names in (
-                        ("x", "y", "z"),
-                        ("xu", "yu", "zu"),
-                    )
-                    if all(name in index for name in names)
-                ),
-                None,
-            )
-            if position_names is None:
-                raise ValueError("LAMMPS dump must include x y z or xu yu zu")
+            position_names = _lammps_position_columns(index)
 
             lines = list(islice(iter(stream.readline, ""), n_atoms))
             if len(lines) != n_atoms:

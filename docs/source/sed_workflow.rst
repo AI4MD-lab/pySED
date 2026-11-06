@@ -39,7 +39,7 @@ Trajectory formats
 
 - GPUMD extended XYZ with lattice, positions, and velocities;
 - a combined LAMMPS custom dump with box bounds and
-  ``id type x y z vx vy vz``;
+  ``id type xu yu zu vx vy vz`` (``x y z`` is also supported);
 - compatible GPUMD, LAMMPS, or pySED NetCDF.
 
 LAMMPS positions and velocities must be in the same custom text dump.
@@ -49,21 +49,25 @@ are not merged automatically. Write both sets of fields in one sorted dump:
 .. code-block:: text
 
    variable dump_stride equal 20
-   dump pysed all custom ${dump_stride} trajectory.dump id type x y z vx vy vz
+   dump pysed all custom ${dump_stride} trajectory.dump id type xu yu zu vx vy vz
    dump_modify pysed sort id
 
 Set ``lammps_unit = metal`` for velocities in Angstrom/ps or ``real`` for
 Angstrom/fs. The unit style is part of cache identity, so changing it invalidates
 a previously converted cache.
 
-For GPUMD text output, request velocity fields:
+For GPUMD text output, request velocities and unwrapped positions
+(requires a GPUMD version supporting ``unwrapped_position``):
 
 .. code-block:: text
 
-   dump_xyz -1 1 10 dump.xyz velocity
+   dump_xyz 10 dump.xyz velocity unwrapped_position
 
-The reader follows the extended-XYZ ``Properties=`` schema rather than
-assuming a fixed field order.
+The reader uses the first frame's standard GPUMD ``Properties=`` schema.
+pySED prefers explicit unwrapped coordinates in both formats; without them,
+it uses ordinary coordinates unchanged. No additional pySED parameter or
+unwrapping step is needed. See :doc:`input_parameters/trajectory_file` for
+NetCDF support and coordinate-selection details.
 
 Cache, direct reading, and NetCDF
 ---------------------------------

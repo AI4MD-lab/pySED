@@ -16,7 +16,7 @@ NETCDF4_AVAILABLE = importlib.util.find_spec("netCDF4") is not None
 
 @unittest.skipUnless(NETCDF4_AVAILABLE, "netCDF4 is not installed")
 class NetCDFTests(unittest.TestCase):
-    def _create_trajectory(self, path: Path) -> None:
+    def _create_trajectory(self, path: Path, coordinate_name="coordinates") -> None:
         from netCDF4 import Dataset
 
         with Dataset(str(path), "w", format="NETCDF3_64BIT_OFFSET") as dataset:
@@ -26,7 +26,7 @@ class NetCDFTests(unittest.TestCase):
             dataset.createDimension("spatial", 3)
 
             coordinates = dataset.createVariable(
-                "coordinates",
+                coordinate_name,
                 "f4",
                 ("frame", "atom", "spatial"),
             )
@@ -94,6 +94,42 @@ class NetCDFTests(unittest.TestCase):
                 [[10, 20, 30], [10, 20, 30]],
                 atol=1.0e-12,
             )
+
+    def test_unwrapped_coordinates_are_preferred_and_use_their_own_units(self):
+        from netCDF4 import Dataset
+
+        for program in ("GPUMD", "LAMMPS"):
+            for wrapped_present in (False, True):
+                with (self.subTest(program=program, wrapped=wrapped_present),
+                      TemporaryDirectory() as directory):
+                    source = Path(directory) / "trajectory.nc"
+                    self._create_trajectory(source, coordinate_name="unwrapped_coordinates")
+                    with Dataset(str(source), "a") as dataset:
+                        dataset.program = program
+                        dataset.variables["unwrapped_coordinates"].units = "nm"
+                        if wrapped_present:
+                            wrapped = dataset.createVariable(
+                                "coordinates", "f4", ("frame", "atom", "spatial")
+                            )
+                            wrapped.units = "angstrom"
+                            wrapped[:] = 0
+                    with NetCDFReader(source) as trajectory:
+                        np.testing.assert_array_equal(
+                            trajectory.read(POSITIONS, slice(1, 2)),
+                            np.arange(6, 12).reshape(1, 2, 3) * 10,
+                        )
+                        np.testing.assert_array_equal(trajectory.read(VELOCITIES), 100)
+
+    def test_malformed_unwrapped_coordinates_do_not_fall_back_to_wrapped(self):
+        from netCDF4 import Dataset
+
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / "trajectory.nc"
+            self._create_trajectory(source)
+            with Dataset(str(source), "a") as dataset:
+                dataset.createVariable("unwrapped_coordinates", "f4", ("frame", "atom"))
+            with self.assertRaisesRegex(ValueError, "coordinates must have shape"):
+                NetCDFReader(source)
 
     def test_batch_reader_has_bounded_shapes(self) -> None:
         with TemporaryDirectory() as directory:
