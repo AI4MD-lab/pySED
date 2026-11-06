@@ -11,7 +11,7 @@ trajectory_file
    Path to one supported trajectory:
 
    - GPUMD extended XYZ text with positions, velocities, and lattice information;
-   - one LAMMPS custom text dump containing both positions (``x y z``) and
+   - one LAMMPS custom text dump containing positions (``xu yu zu`` or ``x y z``) and
      velocities (``vx vy vz``), together with atom IDs and box information;
    - compatible NetCDF trajectories, including GPUMD/LAMMPS output and pySED
      caches, with positions, velocities, and cell information.
@@ -23,10 +23,41 @@ trajectory_file
 
    .. code-block:: text
 
-      dump pysed all custom 20 trajectory.dump id type x y z vx vy vz
+      dump pysed all custom 20 trajectory.dump id type xu yu zu vx vy vz
       dump_modify pysed sort id
 
-   NetCDF arrays such as ``coordinates`` (or ``positions``) and ``velocities``
+   For GPUMD versions supporting ``unwrapped_position``, use:
+
+   .. code-block:: text
+
+      dump_xyz 20 dump.xyz velocity unwrapped_position
+
+   **Coordinate selection:** pySED prefers GPUMD XYZ ``unwrapped_position``
+   over ``pos``, LAMMPS ``xu yu zu`` over ``x y z``, and NetCDF
+   ``unwrapped_coordinates`` over ``coordinates`` (or ``positions``).
+   Without unwrapped fields, ordinary coordinates are used unchanged.
+   Unwrapped fields must contain all three components; malformed fields
+   raise an error. No extra input parameter or unwrapping calculation is used.
+
+   When an explicit unwrapped field is selected, pySED prints its name and source:
+   ``Coordinates : unwrapped (unwrapped_position from GPUMD)`` for GPUMD XYZ,
+   or ``Coordinates : unwrapped (xu yu zu from LAMMPS)`` for LAMMPS text.
+   NetCDF input reports ``unwrapped_coordinates`` and the producing program
+   recorded in the file (or ``NetCDF`` if unspecified).
+   Otherwise, no coordinate message is printed.
+
+   GPUMD can also write these coordinates directly to NetCDF:
+
+   .. code-block:: text
+
+      dump_netcdf 20 trajectory.nc velocity unwrapped_position
+
+   See the GPUMD documentation for
+   `dump_xyz <https://gpumd.org/gpumd/input_parameters/dump_xyz.html>`_ and
+   `dump_netcdf <https://gpumd.org/gpumd/input_parameters/dump_netcdf.html>`_,
+   and the LAMMPS `dump command <https://docs.lammps.org/dump.html>`_.
+
+   NetCDF arrays such as ``unwrapped_coordinates``, ``coordinates``, and ``velocities``
    must have shape ``(frame, atom, 3)``. Cell data can use ``cell_vectors``
    (also ``box_vectors`` or ``box``), or the pair ``cell_lengths`` and
    ``cell_angles``. Unit attributes must be recognized by the reader.
@@ -54,6 +85,11 @@ trajectory_file
    ``out_files_name``: ``results/SrTiO3`` gives ``SrTiO3.pysed.nc`` beside
    the input file. This avoids repeated text parsing and retains the original
    trajectory. With ``direct``, no cache is created.
+
+   Older text-conversion caches are rebuilt once to apply the coordinate
+   selection above. Keep ``trajectory_file`` pointing to the original text
+   for this refresh; reading an old cache directly cannot recover unwrapped
+   fields that were not stored in it.
 
    Cache compression affects disk storage; both text and NetCDF inputs are
    read in time blocks. See :doc:`trajectory_read_mode <trajectory_read_mode>`

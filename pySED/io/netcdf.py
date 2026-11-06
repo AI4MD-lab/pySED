@@ -35,11 +35,11 @@ from pySED.io.schema import (
 
 _CDF_MAGICS = {b"CDF\x01", b"CDF\x02", b"CDF\x05"}
 _HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
-# Version 2 preserves the requested precision while parsing text trajectories.
-_SCHEMA_VERSION = 2
+# Version 3 prefers explicit unwrapped coordinates when converting text trajectories.
+_SCHEMA_VERSION = 3
 
 _ALIASES = {
-    POSITIONS: ("coordinates", "positions", "position"),
+    POSITIONS: ("unwrapped_coordinates", "coordinates", "positions", "position"),
     VELOCITIES: ("velocities", "velocity"),
     TYPES: ("type", "types", "atom_types"),
     ATOM_IDS: ("atom_id", "atom_ids", "id"),
@@ -182,6 +182,7 @@ class NetCDFReader:
     in m/s, and times in ps. It reads only the requested frame slices; info
     contains metadata without loading full arrays. Use a with block or call
     close() explicitly to release the file. Reading does not reorder atoms.
+    Prefer unwrapped_coordinates when present; do not unwrap coordinates.
     """
 
     def __init__(self, path: Path) -> None:
@@ -238,6 +239,11 @@ class NetCDFReader:
     def info(self) -> TrajectoryInfo:
         """Return trajectory metadata without reading frame arrays."""
         return self._info
+
+    @property
+    def position_field(self) -> str:
+        """Name the coordinate variable actually selected for reading."""
+        return self._variables[POSITIONS]
 
     def require(self, *fields: str) -> None:
         """Raise KeyError if any requested trajectory field is unavailable."""

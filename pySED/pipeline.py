@@ -30,9 +30,10 @@ from pathlib import Path
 import numpy as np
 
 from pySED.console import print_detail as _print_detail, print_section
-from pySED.io.netcdf import is_netcdf
+from pySED.io.netcdf import NetCDFReader, is_netcdf
 from pySED.io.prepare import prepare_trajectory
 from pySED.io.schema import CELLS
+from pySED.io.text import read_text_position_field
 from pySED.io.trajectory import prefetch_one, trajectory_block_source
 from pySED.parameters import validate_qpoint_slice_index
 from pySED.postprocess import FileIO, Lorentz, output_files, Plot_SED
@@ -138,6 +139,16 @@ def step_prepare_trajectory(params):
         _print_detail("NetCDF cache", "disabled")
     else:
         print(f"    ✓  Trajectory ready: {prepared} ({elapsed:.1f} s)")
+
+    if is_netcdf(source):
+        with NetCDFReader(source) as trajectory:
+            position_field = trajectory.position_field
+            coordinate_source = trajectory.info.source_program or "NetCDF"
+    else:
+        position_field = read_text_position_field(source, source_format)
+        coordinate_source = "GPUMD" if source_format == "gpumd_xyz" else "LAMMPS"
+    if position_field in {"unwrapped_position", "xu yu zu", "unwrapped_coordinates"}:
+        _print_detail("Coordinates", f"unwrapped ({position_field} from {coordinate_source})")
 
 
 def step_compute_sed(params):
