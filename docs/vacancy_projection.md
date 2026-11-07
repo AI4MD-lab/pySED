@@ -80,8 +80,22 @@ is supported. The normalization uses the complete `N_parent`, never the maximum
 surviving cell index or the number of remaining atoms.
 
 Masses are read by parent basis index rather than by the first rows of the defect
-mapping. Mass changes on an occupied parent basis are rejected; substitutional
-mass disorder is outside the present scope.
+mapping. By default, occupied sites must have the corresponding parent-basis mass.
+For substitutions, explicitly set `allow_mass_disorder = 1` and retain the complete
+parent reference. The mapping must then contain each surviving atom's actual mass.
+
+The coherent amplitude for parent basis b and direction alpha becomes
+
+```text
+A_b,alpha(q,t) = sum_i sqrt(m_i / m_ref,b) * v_i,alpha(t) * exp(i q.R_cell,i)
+power_b,alpha = m_ref,b * abs(FFT_t(A_b,alpha))**2
+```
+
+The reference mass cancels from the total power, which therefore contains the
+actual `sqrt(m_i)` weights and interference between substituted and host atoms on
+the same parent basis. Separating their powers by actual species would drop those
+cross terms. Uniform site masses recover the vacancy-only expression above.
+See [mass disorder](../MASS_DISORDER.md) for partial-spectrum semantics.
 
 ## Cell and reciprocal-space conventions
 
@@ -114,6 +128,10 @@ or reconstruction that changes site identities. Disorder-broadened peaks should
 not automatically be interpreted as isolated-branch phonon lifetimes.
 
 ## Verification
+
+A small [command-line example](../example/random_vacancy/README.md) generates its
+own analytic trajectory and checks the reference generator, compression, full and
+streamed SED, console entry points, and plotting without an MD engine or potential.
 
 The tests use an independent zero-filled parent-site tensor and the original
 full-crystal FFT expression. They cover missing cells, missing sublattices, mass

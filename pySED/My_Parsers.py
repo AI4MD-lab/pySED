@@ -41,7 +41,7 @@ class get_parse_input(object):
             'num_atoms', 'total_num_steps', 'time_step', 'output_data_stride',
             'prim_axis', 'prim_unitcell', 'num_qpaths', 'supercell_dim',
             'q_path_name', 'q_path', 'compress', 'rescale_prim', 'num_splits',
-            'basis_lattice_file', 'perfect_reference_file', 'sed_projection_block_size',
+            'basis_lattice_file', 'perfect_reference_file', 'allow_mass_disorder', 'sed_projection_block_size',
             'compress_block_size', 'vels_file', 'dump_xyz_file', 'pos_file',
             'output_hdf5', 'out_files_name', 'file_format', 'lammps_unit',
             'use_parallel', 'max_cores',
@@ -71,6 +71,7 @@ class get_parse_input(object):
         self.pos_file = 'pos.dat'
         self.dump_xyz_file = 'dump.xyz'
         self.basis_lattice_file = 'basis.in'
+        self.allow_mass_disorder = 0  # opt-in sqrt(actual mass) coherent host projection
         self.perfect_reference_file = None  # NPZ: complete parent-cell origins and basis masses
         self.sed_projection_block_size = 0  # >0: bounded-memory coherent projection
         self.compress_block_size = 0       # 0: upstream automatic compression block size
@@ -240,6 +241,10 @@ class get_parse_input(object):
                     print_error('num_splits', input_file)
 
             # change the file name for input and output
+            elif txt[0] == 'allow_mass_disorder':
+                self.allow_mass_disorder = int(txt[txt.index('=') + 1])
+                if self.allow_mass_disorder not in (0, 1):
+                    raise ValueError('allow_mass_disorder must be 0 or 1.')
             elif txt[0] == 'perfect_reference_file':
                 self.perfect_reference_file = txt[txt.index('=') + 1].strip('\'"')
             elif txt[0] in ('sed_projection_block_size', 'compress_block_size'):

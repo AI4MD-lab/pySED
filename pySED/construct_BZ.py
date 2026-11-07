@@ -46,11 +46,16 @@ class BZ_methods(object):
             if len(np.unique(np.round(wrapped, 8), axis=0)) != self.num_unit_cells:
                 raise ValueError('Duplicate reference origins under periodic boundary conditions.')
             self.basis_masses = basis_masses(self.unitcell_index, self.basis_index,
-                                            self.masses, self.num_unit_cells, parent_masses)
+                                            self.masses, self.num_unit_cells, parent_masses,
+                                            allow_mass_disorder=bool(getattr(params, 'allow_mass_disorder', 0)))
         else:
             self.num_unit_cells = int(self.unitcell_index.max())
             self.basis_masses = basis_masses(self.unitcell_index, self.basis_index,
                                             self.masses, self.num_unit_cells)
+        if getattr(params, 'allow_mass_disorder', 0) and not reference_file:
+            raise ValueError('Mass disorder requires perfect_reference_file.')
+        self.velocity_mass_weights = (np.sqrt(self.masses / self.basis_masses[self.basis_index - 1])
+            if getattr(params, 'allow_mass_disorder', 0) else np.ones(len(self.masses)))
         self.num_basis = len(self.basis_masses)
         # Legacy phase references must also follow cell order, not trajectory order.
         self.cell_ref_ids = self.cell_ref_ids[np.argsort(self.unitcell_index[self.cell_ref_ids])]

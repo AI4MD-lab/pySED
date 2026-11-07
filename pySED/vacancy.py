@@ -17,9 +17,11 @@ def read_basis(path):
     return atom, cell, basis, data[:, 3]
 
 
-def basis_masses(cell, basis, masses, num_cells, reference_masses=None):
+def basis_masses(cell, basis, masses, num_cells, reference_masses=None, allow_mass_disorder=False):
     if np.any(cell > num_cells):
         raise ValueError('Unit-cell index exceeds the complete parent supercell.')
+    if allow_mass_disorder and reference_masses is None:
+        raise ValueError('Mass disorder requires an explicit perfect reference.')
     num_basis = int(basis.max()) if reference_masses is None else len(reference_masses)
     if np.any(basis > num_basis):
         raise ValueError('Basis index exceeds the perfect reference.')
@@ -30,7 +32,7 @@ def basis_masses(cell, basis, masses, num_cells, reference_masses=None):
             raise ValueError('Incomplete lattice: supply perfect_reference_file for vacancies.')
         if len(selected):
             expected = selected[0] if reference_masses is None else result[b - 1]
-            if not np.allclose(selected, expected, rtol=1e-8, atol=1e-8):
+            if not allow_mass_disorder and not np.allclose(selected, expected, rtol=1e-8, atol=1e-8):
                 raise ValueError('Mass disagrees with its parent basis; only vacancies are supported.')
             result[b - 1] = expected
     return result

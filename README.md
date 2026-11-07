@@ -3,6 +3,23 @@
 
 # pySED
 
+## Parent-lattice projections for static defects
+
+Static vacancies can be projected onto a complete parent lattice using an explicit
+site mapping and a parent reference. See [vacancy projection](docs/vacancy_projection.md),
+[streaming projection](docs/streaming_projection.md), and [substitutional mass disorder](MASS_DISORDER.md).
+These spectra retain fixed site identities and do not provide eigenvector-resolved unfolding.
+
+After installation, run the self-contained [small CLI example](example/random_vacancy/README.md):
+
+```bash
+python example/random_vacancy/check_demo.py
+```
+
+It generates analytic data, prepares the parent mapping, runs `pysed` in full and
+streaming modes, checks an independent Fourier reference, and saves a spectrum plot.
+For a real-material illustration, see the [273 K Sb-vacancy comparison](docs/application_comparison.md).
+
 **To implement the [phonon SED (spectral energy desity) method in 2010](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.81.081411), phonon lifetime can be easily calculated.** 
 
 ## Main features

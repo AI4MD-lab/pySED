@@ -20,10 +20,11 @@ coherent amplitude time series by a matrix product:
 
 ```python
 phase = exp(1j * reference_origins @ qpoints.T)
-signal[start:stop, :, b, alpha] = velocity_chunk[:, ids, alpha] @ phase[cell_ids]
+signal[start:stop, :, b, alpha] = (velocity_chunk[:, ids, alpha] * mass_weights[ids]) @ phase[cell_ids]
 ```
 
-Only after all chunks for the split have been assembled is an FFT performed along
+Here `mass_weights` is one by default, or `sqrt(actual_mass / reference_basis_mass)`
+with explicit mass-disorder opt-in. Only after all chunks for the split have been assembled is an FFT performed along
 time. Squared FFT amplitudes, basis masses, partial-spectrum grouping and upstream
 normalization are then applied normally. The powers of separate I/O chunks are
 never averaged. Consequently, I/O chunking does not shorten the FFT window or

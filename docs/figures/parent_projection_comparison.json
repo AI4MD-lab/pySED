@@ -1,0 +1,83 @@
+{
+  "composition": "NbFeSb",
+  "NEP_sha256": "29c57b7a323fcf29865ef913e715d6eb2835e73906b0dd7d9afae75451142514",
+  "harmonic_display_sigma_THz": 0.02,
+  "overlay_weight_cutoff": 0.02,
+  "harmonic_global_max": 59.84134203019387,
+  "MD_global_max": 1.0352750919973944e-05,
+  "target_T_K": 273,
+  "NVT_ps": 10,
+  "NVE_ps": 100,
+  "MD_frequency_bin_THz": 0.01,
+  "qpath_fractional": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0.5,
+      0.5
+    ],
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0.5,
+      0.5,
+      0.5
+    ]
+  ],
+  "cases": [
+    {
+      "Sb_vacancy_percent": 0,
+      "actual_mean_T_K": 272.53684365646996,
+      "harmonic_periodic_cell_repeats": [
+        1,
+        1,
+        1
+      ],
+      "MD_parent_repeats": [
+        20,
+        20,
+        20
+      ],
+      "sampled_site_mapping_supported": true
+    },
+    {
+      "Sb_vacancy_percent": 5,
+      "actual_mean_T_K": 272.03819676031,
+      "harmonic_periodic_cell_repeats": [
+        5,
+        5,
+        4
+      ],
+      "MD_parent_repeats": [
+        20,
+        20,
+        20
+      ],
+      "sampled_site_mapping_supported": true
+    },
+    {
+      "Sb_vacancy_percent": 10,
+      "actual_mean_T_K": 274.99189464038,
+      "harmonic_periodic_cell_repeats": [
+        5,
+        5,
+        4
+      ],
+      "MD_parent_repeats": [
+        20,
+        20,
+        20
+      ],
+      "sampled_site_mapping_supported": true
+    }
+  ],
+  "role": "Qualitative application illustration; not a same-configuration equivalence test",
+  "no_new_MD_or_force_calculations": true
+}

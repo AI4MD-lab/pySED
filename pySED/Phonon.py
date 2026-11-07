@@ -74,6 +74,8 @@ class spectral_energy_density:
         unique_masses = np.unique(lattice_info.basis_masses)
         self.num_types = len(unique_masses)
         self.basis_to_type = [np.where(unique_masses == m)[0][0] for m in lattice_info.basis_masses]
+        if getattr(params, 'allow_mass_disorder', 0):
+            print('Mass disorder: sqrt(actual atom mass) coherent projection; partial channels group by parent basis, not chemical species.')
         self.output_partial = getattr(params, 'output_partial', 0)
 
         # do the calculation without eigenvectors
@@ -189,6 +191,7 @@ class spectral_energy_density:
                 stop = min(start + block_size, last)
                 vels = np.asarray(velocity[start:stop, :, :], dtype=np.float64)
                 vels *= self.scaling_velocity
+                vels *= lattice_info.velocity_mass_weights[None, :, None]
                 if not np.isfinite(vels).all():
                     raise ValueError('Trajectory contains nonfinite velocities.')
                 for b_idx, ids in enumerate(basis_groups):
@@ -249,7 +252,7 @@ class spectral_energy_density:
             #print(f'basis_idx={b_idx}, type_idx={t_idx}, mass={mass}')
             
             for dim in range(3):
-                signal = (vels[:, basis_ids, dim] * phase[None, :]).sum(axis=1)
+                signal = (vels[:, basis_ids, dim] * lattice_info.velocity_mass_weights[basis_ids][None, :] * phase[None, :]).sum(axis=1)
                 v_fft_sum = fft(signal, axis=0)
                 qdot_q_term = (np.abs(v_fft_sum)**2) * mass * self.amu_2_kg
                 
