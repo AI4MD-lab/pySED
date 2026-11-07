@@ -25,12 +25,19 @@ def _read_gpumd_block(fin, nblock, num_atoms, data_dtype):
     vels_block = np.zeros((nblock, num_atoms, 3), dtype=data_dtype)
     pos_block = np.zeros((nblock, num_atoms, 3), dtype=data_dtype)
     for bi in range(nblock):
-        fin.readline()          # Skip number of atoms line
-        fin.readline()          # Skip comment line
-        for k in range(num_atoms):
-            data = fin.readline().strip().split()
-            pos_block[bi, k, :] = data[1:4]
-            vels_block[bi, k, :] = data[4:7]
+        if int(fin.readline().strip()) != num_atoms:
+            raise ValueError('Atom count changes between GPUMD frames.')
+        header = fin.readline()
+        schema = re.search(r'properties\s*=\s*([^\s]+)', header, re.I)
+        if schema and not schema.group(1).strip('"').startswith('species:S:1:pos:R:3:vel:R:3'):
+            raise ValueError('Expected species, position and velocity columns in GPUMD dump.')
+        # NumPy's numeric parser avoids assigning six floats per atom in Python.
+        rows = np.loadtxt(fin, max_rows=num_atoms, usecols=(1, 2, 3, 4, 5, 6),
+                          dtype=data_dtype, ndmin=2)
+        if rows.shape != (num_atoms, 6) or not np.isfinite(rows).all():
+            raise ValueError('Incomplete/nonfinite GPUMD trajectory frame.')
+        pos_block[bi] = rows[:, :3]
+        vels_block[bi] = rows[:, 3:]
     return pos_block, vels_block
 
 def _print_progress(label, current, total):
@@ -141,6 +148,7 @@ def compress(params):
 
         # get velocity and position information
         with h5py.File(params.output_hdf5, 'w') as fout:
+            fout.attrs['trajectory_complete'] = False
             fout.create_dataset('box', data=box_bounds)  # Store box data
             # For velocity
             with open(params.vels_file, 'r') as fin:
@@ -174,6 +182,7 @@ def compress(params):
                     _print_progress("  Compressing lammps position", i0 + nblock, num_frame)
             fin.close()
 
+            fout.attrs['trajectory_complete'] = True
         fout.close()
         print('\nDone compressing {} and {} into .hdf5 format.'
               '\nThe compressed file is \'{}\' (DON\'T CHANGE IT!)\n'
@@ -211,6 +220,7 @@ def compress(params):
         fin.close()
 
         with h5py.File(params.output_hdf5, 'w') as fout:
+            fout.attrs['trajectory_complete'] = False
             fout.create_dataset('box', data=box_bounds)  # Store box data
             vels_dataset = fout.create_dataset(
                 'velocity',
@@ -233,6 +243,7 @@ def compress(params):
                     _print_progress("  Compressing gpumd trajectory", i0 + nblock, num_frame)
 
             fin.close()
+            fout.attrs['trajectory_complete'] = True
         fout.close()
         
         print('\nDone compressing {} into .hdf5 format.'

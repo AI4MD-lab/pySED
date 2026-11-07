@@ -67,13 +67,15 @@ class spectral_energy_density:
         start_time = time.time()
 
         # note that velocites are in A/ps
-        self.num_unit_cells = lattice_info.unitcell_index.max()
-        self.num_basis = lattice_info.basis_index.max()
+        self.num_unit_cells = lattice_info.num_unit_cells
+        self.num_basis = lattice_info.num_basis
         self.num_loops = params.num_splits
 
-        unique_masses = np.unique(lattice_info.masses)
+        unique_masses = np.unique(lattice_info.basis_masses)
         self.num_types = len(unique_masses)
-        self.basis_to_type = [np.where(unique_masses == m)[0][0] for m in lattice_info.masses]
+        self.basis_to_type = [np.where(unique_masses == m)[0][0] for m in lattice_info.basis_masses]
+        if getattr(params, 'allow_mass_disorder', 0):
+            print('Mass disorder: sqrt(actual atom mass) coherent projection; partial channels group by parent basis, not chemical species.')
         self.output_partial = getattr(params, 'output_partial', 0)
 
         # do the calculation without eigenvectors
@@ -128,8 +130,12 @@ class spectral_energy_density:
             else:
                 self.qdot = np.zeros((self.num_frame_per_split, lattice_info.num_qpoints))
 
-            vels, cell_vecs = self._get_simulation_data(params, lattice_info)
-            self._loop_over_qpoints(lattice_info, vels, cell_vecs)
+            block_size = getattr(params, 'sed_projection_block_size', 0)
+            if block_size:
+                self.qdot = self._stream_projection(params, lattice_info, block_size)
+            else:
+                vels, cell_vecs = self._get_simulation_data(params, lattice_info)
+                self._loop_over_qpoints(lattice_info, vels, cell_vecs)
 
             self.scaling_const = 1 / (4 * np.pi * self.t_o * self.num_unit_cells)
             # self.qdot in kg*m^2, then /self.t_o, so convert to kg*m^2/s, and finally convert to J * s (J=m^2·kg·s-2)
@@ -146,10 +152,69 @@ class spectral_energy_density:
                 for future in as_completed(futures):
                     q_index, qdot_q = future.result()
                     self.qdot[:, q_index, ...] = qdot_q
-        else:                                             # use one core for windows system
+
+        else:
             for q in q_indices:
                 q_index, qdot_q = self.process_q_point(q, lattice_info, vels, cell_vecs)
                 self.qdot[:, q_index, ...] = qdot_q
+
+    def _stream_projection(self, params, lattice_info, block_size):
+        """Bounded atomic-trajectory memory; FFT still uses the full split length.
+
+        This batches q-points into matrix products instead of spawning processes
+        that each receive a copy of a large trajectory. It never averages powers
+        of independent I/O chunks: coherent amplitudes are assembled first.
+        """
+        first = self.loop_index * self.num_frame_per_split
+        last = first + self.num_frame_per_split
+        signals = np.zeros((self.num_frame_per_split, lattice_info.num_qpoints,
+                            self.num_basis, 3), dtype=np.complex128)
+        with h5py.File(params.output_hdf5, 'r') as database:
+            velocity = database['velocity']
+            if (velocity.ndim != 3 or velocity.shape[1:] != (len(lattice_info.atom_ids), 3)
+                    or velocity.shape[0] < last):
+                raise ValueError('HDF5 velocity shape does not match mapping/production frames.')
+            if lattice_info.reference_positions is not None:
+                origins = lattice_info.reference_positions
+            else:
+                # Match the legacy phase convention without loading all positions.
+                origins = np.zeros((self.num_unit_cells, 3))
+                for start in range(first, last, block_size):
+                    stop = min(start + block_size, last)
+                    pos = database['position'][start:stop, :, :]
+                    origins += pos[:, lattice_info.cell_ref_ids, :].sum(axis=0)
+                origins /= self.num_frame_per_split
+            phases = np.exp(1j * origins @ lattice_info.qpoints.T)
+            basis_groups = [np.flatnonzero(lattice_info.basis_index == b + 1)
+                            for b in range(self.num_basis)]
+            for start in range(first, last, block_size):
+                stop = min(start + block_size, last)
+                vels = np.asarray(velocity[start:stop, :, :], dtype=np.float64)
+                vels *= self.scaling_velocity
+                vels *= lattice_info.velocity_mass_weights[None, :, None]
+                if not np.isfinite(vels).all():
+                    raise ValueError('Trajectory contains nonfinite velocities.')
+                for b_idx, ids in enumerate(basis_groups):
+                    if not len(ids):
+                        continue
+                    phase = phases[lattice_info.unitcell_index[ids] - 1, :]
+                    for dim in range(3):
+                        signals[start-first:stop-first, :, b_idx, dim] = vels[:, ids, dim] @ phase
+                print('\tProjected frames {}/{} (all q-points coherently)'.format(
+                    stop-first, self.num_frame_per_split))
+        if self.output_partial:
+            result = np.zeros((self.num_frame_per_split, lattice_info.num_qpoints, self.num_types, 3))
+        else:
+            result = np.zeros((self.num_frame_per_split, lattice_info.num_qpoints))
+        for b_idx, mass in enumerate(lattice_info.basis_masses):
+            for dim in range(3):
+                amplitude = fft(signals[:, :, b_idx, dim], axis=0)
+                power = np.abs(amplitude)**2 * mass * self.amu_2_kg
+                if self.output_partial:
+                    result[:, :, self.basis_to_type[b_idx], dim] += power
+                else:
+                    result += power
+        return result
 
     def process_q_point(self, q_index, lattice_info, vels, cell_vecs):
 
@@ -178,12 +243,17 @@ class spectral_energy_density:
         for b_idx in range(self.num_basis):
 
             t_idx = self.basis_to_type[b_idx]
-            mass = lattice_info.masses[b_idx]
-            basis_ids = np.argwhere(lattice_info.basis_index == (b_idx + 1)).reshape(self.num_unit_cells)
+            mass = lattice_info.basis_masses[b_idx]
+            basis_ids = np.flatnonzero(lattice_info.basis_index == (b_idx + 1))
+            if not len(basis_ids):
+                continue  # An entire parent sublattice may be vacant.
+            cell_ids = lattice_info.unitcell_index[basis_ids] - 1
+            phase = exp_fac[cell_ids]
             #print(f'basis_idx={b_idx}, type_idx={t_idx}, mass={mass}')
             
             for dim in range(3):
-                v_fft_sum = fft(np.squeeze(vels[:, basis_ids, dim]) * exp_fac, axis=0).sum(axis=1)
+                signal = (vels[:, basis_ids, dim] * lattice_info.velocity_mass_weights[basis_ids][None, :] * phase[None, :]).sum(axis=1)
+                v_fft_sum = fft(signal, axis=0)
                 qdot_q_term = (np.abs(v_fft_sum)**2) * mass * self.amu_2_kg
                 
                 if self.output_partial:
@@ -205,11 +275,17 @@ class spectral_energy_density:
 
                 vels = vels * self.scaling_velocity  # From A/ps to m/s or from A/fs to m/s
 
-                pos = database['position'][self.loop_index * self.num_frame_per_split:
-                                           (self.loop_index + 1) * self.num_frame_per_split, :, :]
+                if lattice_info.reference_positions is None:
+                    pos = database['position'][self.loop_index * self.num_frame_per_split:
+                                               (self.loop_index + 1) * self.num_frame_per_split, :, :]
 
             # Time average the positions
-            cell_vecs = pos[:, lattice_info.cell_ref_ids, :].mean(axis=0)
+            if lattice_info.reference_positions is not None:
+                cell_vecs = lattice_info.reference_positions
+            else:
+                cell_vecs = pos[:, lattice_info.cell_ref_ids, :].mean(axis=0)
+            if vels.shape != (self.num_frame_per_split, len(lattice_info.atom_ids), 3):
+                raise ValueError('HDF5 velocity shape does not match the mapping/production frames.')
 
             return vels, cell_vecs
 
