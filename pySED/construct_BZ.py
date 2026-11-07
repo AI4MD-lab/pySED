@@ -111,6 +111,8 @@ class BZ_methods(object):
 
         ########## Output simulation cell informations ############
         with h5py.File(params.output_hdf5, 'r') as database:
+            if not database.attrs.get('trajectory_complete', True):
+                raise ValueError('Incomplete trajectory cache; recreate the HDF5 file after failed compression.')
             box_in_traj = database['box'][()]
 
         # Here is important, means that the supercells used for MD simulation can be different from primitive cells.

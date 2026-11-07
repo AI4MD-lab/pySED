@@ -30,7 +30,7 @@ setup(
     packages=find_packages(),
     python_requires=">=3.7",
     install_requires=[
-        "numpy>=1.15.0",
+        "numpy>=1.16.0",
         "matplotlib>=3.5.2",
         "seaborn",
         "h5py",

@@ -41,7 +41,8 @@ class get_parse_input(object):
             'num_atoms', 'total_num_steps', 'time_step', 'output_data_stride',
             'prim_axis', 'prim_unitcell', 'num_qpaths', 'supercell_dim',
             'q_path_name', 'q_path', 'compress', 'rescale_prim', 'num_splits',
-            'basis_lattice_file', 'perfect_reference_file', 'vels_file', 'dump_xyz_file', 'pos_file',
+            'basis_lattice_file', 'perfect_reference_file', 'sed_projection_block_size',
+            'compress_block_size', 'vels_file', 'dump_xyz_file', 'pos_file',
             'output_hdf5', 'out_files_name', 'file_format', 'lammps_unit',
             'use_parallel', 'max_cores',
             'plot_SED', 'plot_cutoff_freq', 'plot_interval', 'plot_slice',
@@ -71,6 +72,8 @@ class get_parse_input(object):
         self.dump_xyz_file = 'dump.xyz'
         self.basis_lattice_file = 'basis.in'
         self.perfect_reference_file = None  # NPZ: complete parent-cell origins and basis masses
+        self.sed_projection_block_size = 0  # >0: bounded-memory coherent projection
+        self.compress_block_size = 0       # 0: upstream automatic compression block size
         self.output_hdf5 = 'vel_pos_compress.hdf5'
         self.file_format = 'gpumd'            # gpumd or lammps
         self.lammps_unit = 'metal'            # lammps unit for unit conversion (support metal or real)
@@ -239,6 +242,11 @@ class get_parse_input(object):
             # change the file name for input and output
             elif txt[0] == 'perfect_reference_file':
                 self.perfect_reference_file = txt[txt.index('=') + 1].strip('\'"')
+            elif txt[0] in ('sed_projection_block_size', 'compress_block_size'):
+                value = int(txt[txt.index('=') + 1])
+                if value < 0:
+                    raise ValueError(txt[0] + ' must be a nonnegative integer.')
+                setattr(self, txt[0], value)
             elif txt[0] == 'basis_lattice_file':
                 try:
                     self.basis_lattice_file = str(txt[txt.index('=') + 1].strip('\''))

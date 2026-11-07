@@ -10,7 +10,7 @@ import h5py
 import numpy as np
 
 from pySED.My_Parsers import get_parse_input
-from pySED.Compressor import compress
+from pySED.Compressor import compress, _read_gpumd_block
 from pySED.construct_BZ import BZ_methods
 from pySED.Phonon import spectral_energy_density
 from pySED.prepare_vacancy_reference import prepare, read_perfect_xyz
@@ -146,6 +146,79 @@ class ProjectionTests(unittest.TestCase):
         _, serial = self.compute(self.fixture(keep))
         _, parallel = self.compute(self.fixture(keep, parallel=True))
         np.testing.assert_allclose(serial.sed_avg, parallel.sed_avg, rtol=2e-13)
+
+    def test_streaming_equals_full_read_across_io_boundaries(self):
+        keep = [0, 3, 4, 5, 7]
+        _, expected = self.compute(self.fixture(keep))
+        for block_size in [1, 7, 64]:
+            params = self.fixture(keep)
+            params.sed_projection_block_size = block_size
+            _, actual = self.compute(params)
+            np.testing.assert_allclose(actual.sed_avg, expected.sed_avg, rtol=3e-13)
+
+    def test_streaming_partial_and_multiple_splits(self):
+        params = self.fixture([1, 3, 5, 7], partial=True)
+        params.num_splits = 2
+        _, expected = self.compute(params)
+        params.sed_projection_block_size = 3
+        _, actual = self.compute(params)
+        np.testing.assert_allclose(actual.sed_avg, expected.sed_avg, rtol=3e-13)
+
+    def test_streaming_complete_crystal_without_reference(self):
+        params = self.fixture(np.arange(8), reference=False)
+        _, expected = self.compute(params)
+        params.sed_projection_block_size = 5
+        _, actual = self.compute(params)
+        np.testing.assert_allclose(actual.sed_avg, expected.sed_avg, rtol=3e-13)
+
+    def test_vectorized_gpumd_reader_preserves_frames_and_columns(self):
+        lines = []
+        expected = np.arange(36, dtype=float).reshape(2, 3, 6) / 7
+        for frame in expected:
+            lines.extend(['3', 'Properties=species:S:1:pos:R:3:vel:R:3'])
+            lines.extend('Sb ' + ' '.join(map(str, row)) for row in frame)
+        pos, vel = _read_gpumd_block(io.StringIO('\n'.join(lines)), 2, 3, np.float64)
+        np.testing.assert_allclose(pos, expected[:, :, :3])
+        np.testing.assert_allclose(vel, expected[:, :, 3:])
+
+    def test_vectorized_gpumd_reader_rejects_wrong_schema(self):
+        stream = io.StringIO('1\nProperties=species:S:1:pos:R:3:mass:R:1:vel:R:3\nSb 0 0 0 121 1 2 3\n')
+        with self.assertRaisesRegex(ValueError, 'Expected species'):
+            _read_gpumd_block(stream, 1, 1, np.float64)
+
+    def test_incomplete_cache_is_rejected(self):
+        params = self.fixture([0, 3, 4])
+        with h5py.File(params.output_hdf5, 'a') as f:
+            f.attrs['trajectory_complete'] = False
+        with self.assertRaisesRegex(ValueError, 'Incomplete trajectory cache'):
+            self.compute(params)
+
+    def test_failed_compression_does_not_mark_cache_complete(self):
+        params = self.fixture([0])
+        params.dump_xyz_file = str(self.root / 'short.xyz')
+        params.output_hdf5 = str(self.root / 'failed.hdf5')
+        Path(params.dump_xyz_file).write_text(
+            '1\nLattice="4 0 0 0 1 0 0 0 1" Properties=species:S:1:pos:R:3:vel:R:3\nFe 0 0 0 1 2 3\n',
+            encoding='utf-8')
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
+            compress(params)
+        with h5py.File(params.output_hdf5, 'r') as f:
+            self.assertFalse(f.attrs['trajectory_complete'])
+        with self.assertRaisesRegex(ValueError, 'Incomplete trajectory cache'):
+            self.compute(params)
+
+    def test_successful_gpumd_compression_marks_cache_complete(self):
+        params = self.fixture([0])
+        params.total_num_steps = 3
+        params.dump_xyz_file = str(self.root / 'complete.xyz')
+        params.output_hdf5 = str(self.root / 'complete.hdf5')
+        frame = '1\nLattice="4 0 0 0 1 0 0 0 1" Properties=species:S:1:pos:R:3:vel:R:3\nFe 0 0 0 1 2 3\n'
+        Path(params.dump_xyz_file).write_text(frame * 3, encoding='utf-8')
+        with contextlib.redirect_stdout(io.StringIO()):
+            compress(params)
+        with h5py.File(params.output_hdf5, 'r') as f:
+            self.assertTrue(f.attrs['trajectory_complete'])
+            self.assertEqual(f['velocity'].shape, (3, 1, 3))
 
     def test_lammps_reader_matches_gpumd_velocity_units(self):
         keep = np.array([0, 3, 4, 5, 7])
