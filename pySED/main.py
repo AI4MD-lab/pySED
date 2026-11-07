@@ -99,6 +99,7 @@ def main():
         lammps_unit             : LAMMPS unit style ('metal' or 'real'). Default = 'metal'.
         
         output_hdf5             : Compressed HDF5 file name. Default = 'vel_pos_compress.hdf5'.
+        perfect_reference_file  : Optional NPZ parent-lattice reference for random vacancies.
         output_partial          : Partial SED for different atoms and directions. Default = 0.
 
     ────────────────────────────────────────────────────────────

@@ -67,13 +67,13 @@ class spectral_energy_density:
         start_time = time.time()
 
         # note that velocites are in A/ps
-        self.num_unit_cells = lattice_info.unitcell_index.max()
-        self.num_basis = lattice_info.basis_index.max()
+        self.num_unit_cells = lattice_info.num_unit_cells
+        self.num_basis = lattice_info.num_basis
         self.num_loops = params.num_splits
 
-        unique_masses = np.unique(lattice_info.masses)
+        unique_masses = np.unique(lattice_info.basis_masses)
         self.num_types = len(unique_masses)
-        self.basis_to_type = [np.where(unique_masses == m)[0][0] for m in lattice_info.masses]
+        self.basis_to_type = [np.where(unique_masses == m)[0][0] for m in lattice_info.basis_masses]
         self.output_partial = getattr(params, 'output_partial', 0)
 
         # do the calculation without eigenvectors
@@ -178,12 +178,17 @@ class spectral_energy_density:
         for b_idx in range(self.num_basis):
 
             t_idx = self.basis_to_type[b_idx]
-            mass = lattice_info.masses[b_idx]
-            basis_ids = np.argwhere(lattice_info.basis_index == (b_idx + 1)).reshape(self.num_unit_cells)
+            mass = lattice_info.basis_masses[b_idx]
+            basis_ids = np.flatnonzero(lattice_info.basis_index == (b_idx + 1))
+            if not len(basis_ids):
+                continue  # An entire parent sublattice may be vacant.
+            cell_ids = lattice_info.unitcell_index[basis_ids] - 1
+            phase = exp_fac[cell_ids]
             #print(f'basis_idx={b_idx}, type_idx={t_idx}, mass={mass}')
             
             for dim in range(3):
-                v_fft_sum = fft(np.squeeze(vels[:, basis_ids, dim]) * exp_fac, axis=0).sum(axis=1)
+                signal = (vels[:, basis_ids, dim] * phase[None, :]).sum(axis=1)
+                v_fft_sum = fft(signal, axis=0)
                 qdot_q_term = (np.abs(v_fft_sum)**2) * mass * self.amu_2_kg
                 
                 if self.output_partial:
@@ -209,7 +214,12 @@ class spectral_energy_density:
                                            (self.loop_index + 1) * self.num_frame_per_split, :, :]
 
             # Time average the positions
-            cell_vecs = pos[:, lattice_info.cell_ref_ids, :].mean(axis=0)
+            if lattice_info.reference_positions is not None:
+                cell_vecs = lattice_info.reference_positions
+            else:
+                cell_vecs = pos[:, lattice_info.cell_ref_ids, :].mean(axis=0)
+            if vels.shape != (self.num_frame_per_split, len(lattice_info.atom_ids), 3):
+                raise ValueError('HDF5 velocity shape does not match the mapping/production frames.')
 
             return vels, cell_vecs
 
