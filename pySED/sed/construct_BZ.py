@@ -23,7 +23,7 @@ from fractions import Fraction
 import numpy as np
 
 from pySED.structure import generate_data
-from pySED.console import print_detail, print_matrix, print_section, terminal_label
+from pySED.console import format_qpoint, print_detail, print_matrix, print_section, terminal_label
 
 
 class BZ_methods(object):
@@ -396,12 +396,12 @@ class BZ_methods(object):
                     display_start = terminal_label(label_map.get(start_label, start_label))
                     display_end = terminal_label(label_map.get(end_label, end_label))
                     print_detail(f"Path segment {segment_index}", f"{display_start} → {display_end}")
-                    print_detail("Start", "(" + ", ".join(f"{v:.4f}" for v in endpoints[0]) + ")")
-                    print_detail("End", "(" + ", ".join(f"{v:.4f}" for v in endpoints[1]) + ")")
+                    print_detail("Start", format_qpoint(endpoints[0]))
+                    print_detail("End", format_qpoint(endpoints[1]))
                     print_detail("Number of q-points", len(qpoints_cart))
                     print("        Reduced q-points:")
                     for q in bz_path.cartesian_to_reduced(qpoints_cart):
-                        print("            (reduced) q = (" + ", ".join(f"{v:.4f}" for v in q) + ")")
+                        print("            (reduced) q = " + format_qpoint(q))
                     print("\n        " + "-" * 72)
                 segment_index += 1
             coordinate_offset += len(group)

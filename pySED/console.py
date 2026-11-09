@@ -39,6 +39,13 @@ def print_matrix(label, rows):
         print("            " + "    ".join(f"{value: .8e}" for value in row))
 
 
+def format_qpoint(qpoint):
+    """Format reduced coordinates to four decimals without rounded negative zero."""
+    components = (f"{value:.4f}" for value in qpoint)
+    return "(" + ", ".join("0.0000" if value == "-0.0000" else value
+                           for value in components) + ")"
+
+
 def terminal_label(label):
     """Display Gamma in terminals while retaining math-text labels for plots."""
     return label.replace(r"$\Gamma$", "Γ")
