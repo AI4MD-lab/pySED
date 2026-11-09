@@ -99,6 +99,10 @@ def main():
         lammps_unit             : LAMMPS unit style ('metal' or 'real'). Default = 'metal'.
         
         output_hdf5             : Compressed HDF5 file name. Default = 'vel_pos_compress.hdf5'.
+        perfect_reference_file  : Optional NPZ parent-lattice reference for random vacancies.
+        allow_mass_disorder     : 1 enables sqrt(actual mass) coherent substitution projection; default 0.
+        sed_projection_block_size : Frames per coherent projection I/O chunk; 0 uses full-read mode.
+        compress_block_size     : Frames per trajectory-compression chunk; 0 selects automatic sizing.
         output_partial          : Partial SED for different atoms and directions. Default = 0.
 
     ────────────────────────────────────────────────────────────

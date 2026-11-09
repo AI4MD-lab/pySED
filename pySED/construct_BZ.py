@@ -12,6 +12,7 @@ from fractions import Fraction
 import math
 import warnings
 from pySED.structure import generate_data
+from pySED.vacancy import read_basis, basis_masses, load_reference
 
 
 class BZ_methods(object):
@@ -27,6 +28,37 @@ class BZ_methods(object):
 
         # Compare lattice cell
         self._compare_cell(params)
+        reference_file = getattr(params, 'perfect_reference_file', None)
+        self.reference_positions = None
+        if reference_file:
+            self.reference_positions, parent_masses = load_reference(
+                reference_file, self.supercell, params.rescale_prim)
+            self.num_unit_cells = len(self.reference_positions)
+            repeats = BZPathHelper(params.prim_unitcell, self.supercell).P
+            if round(abs(np.linalg.det(repeats))) != self.num_unit_cells:
+                raise ValueError('Perfect reference cell count disagrees with primitive/supercell volume ratio.')
+            translations = (self.reference_positions - self.reference_positions[0]) @ np.linalg.inv(params.prim_unitcell)
+            if not np.allclose(translations, np.rint(translations), rtol=0, atol=1e-5):
+                raise ValueError('Reference origins are not translations of prim_unitcell.')
+            fractional = self.reference_positions @ np.linalg.inv(self.supercell)
+            wrapped = np.mod(fractional, 1.0)
+            wrapped[np.isclose(wrapped, 1.0, rtol=0, atol=1e-8)] = 0
+            if len(np.unique(np.round(wrapped, 8), axis=0)) != self.num_unit_cells:
+                raise ValueError('Duplicate reference origins under periodic boundary conditions.')
+            self.basis_masses = basis_masses(self.unitcell_index, self.basis_index,
+                                            self.masses, self.num_unit_cells, parent_masses,
+                                            allow_mass_disorder=bool(getattr(params, 'allow_mass_disorder', 0)))
+        else:
+            self.num_unit_cells = int(self.unitcell_index.max())
+            self.basis_masses = basis_masses(self.unitcell_index, self.basis_index,
+                                            self.masses, self.num_unit_cells)
+        if getattr(params, 'allow_mass_disorder', 0) and not reference_file:
+            raise ValueError('Mass disorder requires perfect_reference_file.')
+        self.velocity_mass_weights = (np.sqrt(self.masses / self.basis_masses[self.basis_index - 1])
+            if getattr(params, 'allow_mass_disorder', 0) else np.ones(len(self.masses)))
+        self.num_basis = len(self.basis_masses)
+        # Legacy phase references must also follow cell order, not trajectory order.
+        self.cell_ref_ids = self.cell_ref_ids[np.argsort(self.unitcell_index[self.cell_ref_ids])]
 
         ############## Construct Brillouin zone ################
         # calculate direct lattice vectors (for orthogonal or triclinic lattice vectors)
@@ -43,13 +75,12 @@ class BZ_methods(object):
             exit()
 
         # read the lattice info from a file
-        self.atom_ids, self.unitcell_index, self.basis_index, self.masses = np.loadtxt(params.basis_lattice_file,
-                                                                                       skiprows=2, unpack=True)
+        self.atom_ids, self.unitcell_index, self.basis_index, self.masses = read_basis(params.basis_lattice_file)
         self.atom_ids = self.atom_ids.astype(int)
         self.unitcell_index = self.unitcell_index.astype(int)
         self.basis_index = self.basis_index.astype(int)
         self.masses = self.masses.astype(float)
-        if params.num_atoms != self.atom_ids.max():
+        if params.num_atoms != len(self.atom_ids):
             raise ValueError("\nInconsistent input: \"num_atoms = %d\" does not match \"Max atom_id = %d\" "
                              "in basis.in file. Please carefully verify the input." %
                              (params.num_atoms, self.atom_ids.max()))
@@ -85,6 +116,8 @@ class BZ_methods(object):
 
         ########## Output simulation cell informations ############
         with h5py.File(params.output_hdf5, 'r') as database:
+            if not database.attrs.get('trajectory_complete', True):
+                raise ValueError('Incomplete trajectory cache; recreate the HDF5 file after failed compression.')
             box_in_traj = database['box'][()]
 
         # Here is important, means that the supercells used for MD simulation can be different from primitive cells.
