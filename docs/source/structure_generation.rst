@@ -94,3 +94,57 @@ Generate the MD structure and ``basis.in`` from the same ``structure`` object
 so their atom mapping stays consistent. After MD, use the matching
 ``basis.in`` and the same replication counts as ``supercell_dim`` in the SED
 input. See :doc:`starting` for trajectory output and the subsequent SED steps.
+
+Random Vacancies
+----------------
+
+Generate the complete supercell first, then remove a random fraction of one
+element. For example, remove 5% of the oxygen atoms with a reproducible seed:
+
+.. code-block:: python
+
+   from pySED.structure import generate_data
+
+   structure = generate_data.structure_maker(structure_file_name='primitive.xyz')
+   structure.replicate_supercell(supercell=(4, 4, 4))
+   removed = structure.remove_vacancies(element='O', fraction=0.05, seed=42)
+
+   structure.write_xyz(filename='model.xyz')
+   # For LAMMPS, use this writer instead of, or in addition to, write_xyz:
+   structure.write_lammps_data(
+       file_name='lammps_data', lammps_data_types='metal',
+       atom_order=['Sr', 'Ti', 'O'],
+   )
+   structure.write_lattice_basis_file(file_name='basis.in')
+   structure.write_defect_index_file(file_name='defect_index.in')
+
+``fraction`` is relative to the selected element, not all atoms. The number
+removed is rounded to the nearest integer, with halves rounded up. This
+example has 192 O atoms, so it removes 10 and leaves 310 actual atoms.
+The method returns the number removed. The same structure, fraction and seed
+give the same pattern. Unknown elements, invalid fractions and removal of
+every atom raise an error. Calls for additional elements are allowed; each
+fraction applies to the atoms of that element still present at that call.
+
+- ``model.xyz`` / ``lammps_data`` contain only the surviving atoms, in their
+  original relative order with consecutive atom numbers.
+- ``basis.in`` retains all 320 reference sites and its existing four columns.
+- ``defect_index.in`` maps each reference site to a surviving atom; zero
+  marks a vacancy. Write it after all vacancy-removal calls.
+
+Relax the defect structure and run MD before calculating its SED. For this
+example, add the following to the usual SED input (adjust paths as needed):
+
+.. code-block:: ini
+
+   num_atoms = 310
+   supercell_dim = 4 4 4
+   basis_lattice_file = ../structure/basis.in
+   defect_index_file = ../structure/defect_index.in
+
+The reference origins still come from the production box and the complete
+lattice numbering. The calculation sums only surviving atoms, without a
+zero-filled reference velocity array. Normalization uses all 64 reference
+cells. This supports static vacancies with fixed site identities; substitutions
+and changing atom-to-site assignments are outside this interface.
+See :doc:`input_parameters/defect_index_file` for user-supplied mappings.

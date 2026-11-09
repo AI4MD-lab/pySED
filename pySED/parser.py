@@ -98,8 +98,8 @@ def read_input(input_file="input_SED.in"):
 
     Convert each key using PARAMETERS, rejecting unknown keys and reporting
     migration hints for removed 2.x names. Resolve trajectory_file and
-    basis_lattice_file relative to the input file's directory, then run common
-    and SED validation. Return a SimpleNamespace used by the pipeline.
+    basis_lattice_file and defect_index_file relative to the input directory,
+    then run common and SED validation. Return the pipeline's SimpleNamespace.
     """
 
     input_path = Path(input_file).expanduser().resolve()
@@ -131,7 +131,9 @@ def read_input(input_file="input_SED.in"):
             ) from error
         setattr(params, key, value)
 
-    for key in ("trajectory_file", "basis_lattice_file"):
+    for key in ("trajectory_file", "basis_lattice_file", "defect_index_file"):
+        if getattr(params, key) is None:
+            continue
         path = Path(getattr(params, key)).expanduser()
         if not path.is_absolute():
             path = input_path.parent / path

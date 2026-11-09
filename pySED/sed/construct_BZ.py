@@ -108,7 +108,9 @@ class BZ_methods(object):
 
         Require consecutive atom IDs and complete unit cells in order, each
         containing basis indices 1..N with matching positive masses in amu.
-        Rows must also follow the trajectory atom order; no reordering is done.
+        For vacancies these rows describe the complete reference lattice;
+        defect_index_file maps them to the atoms present in the trajectory.
+        Without that file, rows must follow the trajectory atom order.
         """
         if not os.path.exists(params.basis_lattice_file):
             raise FileNotFoundError(
@@ -116,25 +118,31 @@ class BZ_methods(object):
             )
 
         mapping = np.loadtxt(params.basis_lattice_file, skiprows=2, ndmin=2)
-        if mapping.shape != (params.num_atoms, 4):
+        defect_file = getattr(params, "defect_index_file", None)
+        num_atoms = len(mapping) if defect_file else params.num_atoms
+        if num_atoms == 0 or mapping.shape != (num_atoms, 4):
             raise ValueError(
-                f"basis.in must contain {params.num_atoms} rows and four columns: "
+                f"basis.in must contain {num_atoms} rows and four columns: "
                 "atom_id, unitcell_index, basis_index, mass."
             )
         if not np.isfinite(mapping).all() or np.any(mapping <= 0):
             raise ValueError("basis.in indices and masses must be positive and finite.")
         indices = mapping[:, :3]
-        if np.any(indices != np.floor(indices)) or np.any(indices > params.num_atoms):
+        if np.any(indices != np.floor(indices)) or np.any(indices > num_atoms):
+            if defect_file:
+                raise ValueError(f"basis.in indices must be integers between 1 and {num_atoms}, the reference atom count.")
             raise ValueError("basis.in indices must be integers between 1 and num_atoms.")
         self.atom_ids, self.unitcell_index, self.basis_index = indices.astype(int).T
         self.masses = mapping[:, 3].copy()
 
-        rows = np.arange(params.num_atoms)
+        rows = np.arange(num_atoms)
         if not np.array_equal(self.atom_ids, rows + 1):
+            if defect_file:
+                raise ValueError(f"basis.in reference atom IDs must be consecutive and ordered from 1 to {num_atoms}.")
             raise ValueError("basis.in atom IDs must be consecutive and ordered from 1 to num_atoms.")
         num_basis = int(self.basis_index.max())
         if (
-            params.num_atoms % num_basis
+            num_atoms % num_basis
             or not np.array_equal(self.unitcell_index, rows // num_basis + 1)
             or not np.array_equal(self.basis_index, rows % num_basis + 1)
         ):
@@ -145,6 +153,38 @@ class BZ_methods(object):
             )
         if not np.all(self.masses.reshape(-1, num_basis) == self.masses[:num_basis]):
             raise ValueError("basis.in masses for each basis index must match across all unit cells.")
+
+        self.trajectory_index = None
+        if defect_file:
+            self.trajectory_index = self._read_defect_index(defect_file, params.num_atoms)
+
+    def _read_defect_index(self, path, num_atoms):
+        """Map complete reference rows to one-based trajectory rows; zero is vacant."""
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Defect index file '{path}' not found.")
+        mapping = np.loadtxt(path, ndmin=2)
+        if mapping.shape != (len(self.atom_ids), 2):
+            raise ValueError(
+                "defect_index.in must contain one row per basis.in reference atom "
+                "and two columns: reference_atom_id, trajectory_index."
+            )
+        if not np.isfinite(mapping).all() or np.any(mapping != np.floor(mapping)):
+            raise ValueError("defect_index.in must contain finite integer indices.")
+        if not np.array_equal(mapping[:, 0], self.atom_ids):
+            raise ValueError("defect_index.in reference atom IDs must match basis.in in the same order.")
+        trajectory_index = mapping[:, 1]
+        if np.any(trajectory_index < 0) or np.any(trajectory_index > num_atoms):
+            raise ValueError(
+                "defect_index.in trajectory indices must be between 0 and num_atoms; "
+                "use 0 for vacancies."
+            )
+        occupied = trajectory_index[trajectory_index > 0]
+        if not np.array_equal(np.sort(occupied), np.arange(1, num_atoms + 1)):
+            raise ValueError(
+                "defect_index.in must map every trajectory atom from 1 to num_atoms "
+                "exactly once. Check for missing or repeated indices."
+            )
+        return trajectory_index.astype(int)
 
     def _reconstruct_primitive_cell(self, supercell, supercell_dim):
         """

@@ -108,6 +108,7 @@ class GPUBackend:
         self.reduced_qpoints = reduced_qpoints
         self._cupy = None
         self._gpu_basis_ids = None
+        self._gpu_cell_ids = None
         self._gpu_qpoints = None
         self._gpu_observed_used_bytes = 0
         self._gpu_total_bytes = 0
@@ -119,6 +120,10 @@ class GPUBackend:
             self._gpu_event_profiler = _GPUEventProfiler(self._cupy)
             self._gpu_basis_ids = tuple(
                 self._cupy.asarray(ids) for ids in self.config.basis_ids
+            )
+            self._gpu_cell_ids = tuple(
+                None if ids is None else self._cupy.asarray(ids)
+                for ids in self.config.basis_cell_ids
             )
             self._gpu_qpoints = self._cupy.asarray(self.config.qpoints)
         except BaseException:
@@ -135,6 +140,7 @@ class GPUBackend:
     def close(self):
         """Release block-independent arrays and the cached device buffers."""
         self._gpu_basis_ids = None
+        self._gpu_cell_ids = None
         self._gpu_qpoints = None
         if self._cupy is not None:
             self._cupy.get_default_memory_pool().free_all_blocks()
@@ -182,6 +188,7 @@ class GPUBackend:
                 cell_vecs=gpu_cell_vecs,
                 qpoints=self._gpu_qpoints,
                 basis_ids_by_basis=self._gpu_basis_ids,
+                cell_ids_by_basis=self._gpu_cell_ids,
                 config=kernel_config,
                 xp=cp,
                 fft_function=transform,
@@ -199,6 +206,7 @@ class GPUBackend:
                     cell_vecs=gpu_cell_vecs,
                     qpoints=self._gpu_qpoints[q_start:q_stop],
                     basis_ids_by_basis=self._gpu_basis_ids,
+                    cell_ids_by_basis=self._gpu_cell_ids,
                     config=kernel_config,
                     xp=cp,
                     fft_function=transform,
