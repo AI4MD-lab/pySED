@@ -153,7 +153,7 @@ class VacancyTests(unittest.TestCase):
 
     def test_invalid_defect_mappings_are_rejected(self):
         params = self.params([0, 2, 3, 6])
-        self.assertEqual(params.defect_index_file, str(self.root / 'defect_index.in'))
+        self.assertTrue(Path(params.defect_index_file).samefile(self.root / 'defect_index.in'))
         good = np.loadtxt(params.defect_index_file)
         bad_values = []
         for column, row, value in [(0, 0, 2), (1, 0, -1), (1, 0, 5), (1, 0, 1.5),
