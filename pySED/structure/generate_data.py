@@ -25,6 +25,8 @@ class structure_maker(object):
     XYZ/LAMMPS coordinates and basis.in from the same object. All writers
     preserve the atom-row order established by replication so coordinates,
     masses, unit-cell indices, and basis indices refer to the same atoms.
+    After remove_vacancies(), basis.in retains the complete reference lattice;
+    defect_index.in maps those reference sites to the remaining atoms.
     """
     def __init__(self, structure_file_name='POSCAR',
                        lammps_data_flag=False,
@@ -119,12 +121,65 @@ class structure_maker(object):
         self.supercell_position = position
         self.num_atoms = position.shape[0]
 
+    def remove_vacancies(self, element, fraction, seed=None):
+        """Remove a random fraction of one element after supercell replication.
+
+        Round fraction * remaining element count to the nearest integer (halves
+        round up). Keep surviving atoms in their original order. Reusing the
+        same structure, fraction and seed reproduces the same vacancy pattern.
+        Return the number removed; write_defect_index_file saves the mapping.
+        """
+        if not hasattr(self, "supercell_position"):
+            raise ValueError("Call replicate_supercell before remove_vacancies.")
+        fraction = float(fraction)
+        if not np.isfinite(fraction) or not 0 <= fraction <= 1:
+            raise ValueError("Vacancy fraction must be between 0 and 1, for example 0.05 for 5%.")
+        symbols = np.asarray(self.basis_atoms_symbols)
+        candidates = np.flatnonzero(symbols == element)
+        if candidates.size == 0:
+            raise ValueError(f"Element '{element}' is not present in this structure.")
+        if seed is not None and (not isinstance(seed, (int, np.integer)) or seed < 0):
+            raise ValueError("Vacancy seed must be a non-negative integer.")
+        num_removed = int(np.floor(fraction * candidates.size + 0.5))
+        if num_removed == self.num_atoms:
+            raise ValueError("Vacancy fraction would remove every atom; use a smaller fraction.")
+        removed = np.random.default_rng(seed).choice(candidates, size=num_removed, replace=False)
+        keep = np.ones(self.num_atoms, dtype=bool)
+        keep[removed] = False
+
+        if not hasattr(self, "_reference_basis"):
+            self._reference_basis = np.column_stack((
+                self.unitcell_index.ravel(), self.basis_index.ravel(), self.masses,
+            ))
+            self._reference_atom_ids = np.arange(self.num_atoms)
+        self._reference_atom_ids = self._reference_atom_ids[keep]
+        self.supercell_position = self.supercell_position[keep]
+        self.basis_atoms_symbols = symbols[keep]
+        self.masses = np.asarray(self.masses)[keep]
+        self.unitcell_index = self.unitcell_index[keep]
+        self.basis_index = self.basis_index[keep]
+        self.num_atoms = int(keep.sum())
+        return num_removed
+
+    def write_defect_index_file(self, file_name='defect_index.in'):
+        """Write one-based reference/trajectory indices, with zero at vacancies."""
+        if not hasattr(self, "_reference_basis"):
+            raise ValueError("Call remove_vacancies before write_defect_index_file.")
+        count = len(self._reference_basis)
+        trajectory_index = np.zeros(count, dtype=int)
+        trajectory_index[self._reference_atom_ids] = np.arange(1, self.num_atoms + 1)
+        np.savetxt(
+            file_name, np.column_stack((np.arange(1, count + 1), trajectory_index)),
+            fmt='%d', header='reference_atom_id trajectory_index (0 = vacancy)',
+        )
+
     def write_xyz(self, filename='model.xyz', pbc="T T T"):
         """Write replicated Cartesian positions as an extended-XYZ structure.
 
         The header contains the replicated 3x3 lattice, species/position columns,
-        and the supplied pbc flags. Rows remain in basis.in order; this is an
-        initial structure file, not a trajectory with velocities.
+        and the supplied pbc flags. Surviving rows retain their original order;
+        defect_index.in relates them to basis.in when vacancies are present.
+        This is an initial structure file, not a trajectory with velocities.
         """
         lattice = self.calculate_supercell_matrix(self.cell, self.supercell)
         with open(filename, 'w') as fid:
@@ -216,14 +271,10 @@ class structure_maker(object):
                                                                      self.basis_atoms_symbols[i]))
 
             elif self.unit == 'real':
-                # Counters for atom and molecule IDs
-                atom_id = 0
-                molecule_id = 0
                 for i, row in enumerate(lammps_positions):
-                    atom_id += 1
-                    if i > 0 and i % self.unitcell_num_atoms == 0: # assign by supercell of z direction
-                        molecule_id += 1
-                    fid.write('{0} {1} {2:d} {3} {4:20.10f} {5:20.10f} {6:20.10f}  # {7}\n'.format(i + 1, molecule_id + 1, # ids and molecular's ids
+                    # Keep the original cell identity even when atoms are missing.
+                    molecule_id = int(self.unitcell_index[i][0])
+                    fid.write('{0} {1} {2:d} {3} {4:20.10f} {5:20.10f} {6:20.10f}  # {7}\n'.format(i + 1, molecule_id,
                                                                      self.unique_types.index(self.basis_atoms_symbols[i]) + 1,  # atom types
                                                                      0.0,   # charge
                                                                      row[0], row[1], row[2],
@@ -242,14 +293,19 @@ class structure_maker(object):
 
         After two header lines, each row contains atom ID, unit-cell index,
         basis index, and mass in amu. The three indices are one-based. Write this
-        from the same replicated object as the coordinates so trajectory rows and
-        basis rows stay aligned.
+        from the same replicated object as the coordinates. After removing
+        vacancies this still writes every reference site; defect_index.in
+        supplies the corresponding trajectory rows.
         """
         basis_file = self.description + '\n'
         basis_file += "atoms_ids unitcell_index basis_index mass_types\n"
-        for i in range(self.num_atoms):
-            basis_file += '{0} {1:d} {2:d} {3:10.6f}\n'.format(i+1, int(self.unitcell_index[i][0]),
-                                                               int(self.basis_index[i][0]), self.masses[i])
+        reference = getattr(self, "_reference_basis", None)
+        if reference is None:
+            reference = np.column_stack((
+                self.unitcell_index.ravel(), self.basis_index.ravel(), self.masses,
+            ))
+        for i, (cell_id, basis_id, mass) in enumerate(reference):
+            basis_file += '{0} {1:d} {2:d} {3:10.6f}\n'.format(i+1, int(cell_id), int(basis_id), mass)
         # write the file
         f = open(file_name, 'w')
         f.write(basis_file)

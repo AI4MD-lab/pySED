@@ -49,6 +49,12 @@ basis_lattice_file
    rather than just its diagonal, is used to recover the primitive vectors.
    No additional columns or mapping files are needed.
 
+   **Static vacancies:** keep this file for the complete reference lattice,
+   including missing sites, and supply :doc:`defect_index_file` to identify
+   the surviving trajectory atoms. The four columns and reference-cell
+   numbering remain unchanged. ``num_atoms`` then counts actual trajectory
+   atoms and may be smaller than the number of rows in ``basis.in``.
+
 :doc:`Back to Parameter Index <../input_parameters>`
 
 Related parameters

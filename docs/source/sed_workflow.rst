@@ -32,6 +32,12 @@ Recommended order:
 4. Tune peak detection and fitting on selected Q points.
 5. Enable all-Q fitting only after representative fits are satisfactory.
 
+For static vacancies, keep the complete reference ``basis.in`` and supply
+:doc:`input_parameters/defect_index_file`. Only surviving atoms contribute
+to each coherent sum; the fixed reference lattice and normalization retain
+the complete cell count. See :doc:`structure_generation` for random-vacancy
+generation by element, fraction and seed.
+
 Trajectory formats
 ------------------
 

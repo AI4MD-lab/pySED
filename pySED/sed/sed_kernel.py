@@ -43,6 +43,9 @@ class SEDKernelConfig:
     basis atom, and ``basis_to_type`` selects its partial-output channel.
     ``qpoints`` has shape (Q, 3) in inverse Angstrom with the 2*pi factor
     included; ``amu_2_kg`` converts masses for the kinetic-energy weighting.
+    For vacancies, ``basis_cell_ids`` pairs each surviving atom with its
+    reference cell; None entries use all cells. An empty tuple is the
+    ordinary complete-crystal case. ``num_unit_cells`` counts the full lattice.
     """
 
     basis_ids: tuple
@@ -52,6 +55,8 @@ class SEDKernelConfig:
     num_types: int
     output_partial: bool
     amu_2_kg: float
+    basis_cell_ids: tuple = ()
+    num_unit_cells: int = 0
 
 
 def calculate_q_batch(
@@ -63,6 +68,7 @@ def calculate_q_batch(
     xp=np,
     fft_function=fft,
     project_function=None,
+    cell_ids_by_basis=None,
 ):
     """Compute mass-weighted FFT power for a batch of q points.
 
@@ -70,9 +76,10 @@ def calculate_q_batch(
     Velocities are in m/s; cell vectors are reference positions in Angstrom.
     Cartesian q points include 2*pi, making ``cell_vecs @ qpoints.T`` a phase
     in radians. ``basis_ids_by_basis`` selects matching atoms in each cell.
-    Each basis selects one atom per cell. The projection sums only cells,
-    producing (T, 3, Q). FFT acts along time (axis 0), producing (F, 3, Q),
-    where F = T is the number of full FFT frequency bins.
+    Each basis selects occupied atoms and their matching reference cells.
+    Missing sites are skipped without a padded velocity array. The projection
+    sums only cells, producing (T, 3, Q). FFT acts along time (axis 0), producing
+    (F, 3, Q), where F = T is the number of full FFT frequency bins.
     This function returns (F, Q) for total SED, or (F, types, 3, Q) for
     partial SED. The final output stage later moves q to axis 1 for saving
     and plotting; no axis reordering is needed inside this kernel.
@@ -86,6 +93,8 @@ def calculate_q_batch(
         project = xp.tensordot
     else:
         project = project_function
+    if cell_ids_by_basis is None:
+        cell_ids_by_basis = config.basis_cell_ids
 
     # 1. exp(i q.R) for each cell and q point: (cells, q).
     phase_factors = xp.exp(1.0j * (cell_vecs @ qpoints.T))
@@ -98,15 +107,20 @@ def calculate_q_batch(
         shape = (num_frames, num_qpoints)
     result = xp.zeros(shape, dtype=xp.float64)
 
-    # Each group selects the same basis atom in every repeated cell.
+    # Each group selects the same basis site in the occupied cells.
     for basis_index, atom_indices in enumerate(basis_ids_by_basis):
+        if atom_indices.size == 0:
+            continue
+        phases = phase_factors
+        if cell_ids_by_basis and cell_ids_by_basis[basis_index] is not None:
+            phases = phase_factors[cell_ids_by_basis[basis_index], :]
         # 2. Sum v(t) * exp(i q.R) over cells, keeping x/y/z separate.
         # (time, cells, xyz) and (cells, q) -> (time, xyz, q).
-        # Match the cell axis of velocities (axis 1) to that of phase_factors (axis 0).
+        # Match the occupied-cell axis of velocities (axis 1) to phases (axis 0).
         # Multiply each velocity by its same-cell phase factor, then sum over cells.
         # Time, x/y/z directions, and q points remain independent.
         velocity_sum = project(
-            vels[:, atom_indices, :], phase_factors, axes=([1], [0]),
+            vels[:, atom_indices, :], phases, axes=([1], [0]),
         )
         # 3. FFT along time (axis 0), independently for each direction and q.
         transformed_vels = fft_function(velocity_sum, axis=0)

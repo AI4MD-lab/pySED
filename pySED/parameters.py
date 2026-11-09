@@ -183,6 +183,7 @@ PARAMETERS = {
 
     # Structure
     "basis_lattice_file": Parameter("basis.in", read_text),
+    "defect_index_file": Parameter(None, read_text),
     "supercell_dim": Parameter(np.array([1, 1, 1]), read_int3),
     "dump_group_supercell": Parameter(None, read_matrix3),
     "prim_axis": Parameter(None, read_matrix3),
@@ -473,6 +474,9 @@ def validate_sed(params):
                 f"input structure '{params.basis_lattice_file}' "
                 "was not found"
             )
+        defect_file = getattr(params, "defect_index_file", None)
+        if defect_file is not None and not Path(defect_file).is_file():
+            raise ValueError(f"defect index file '{defect_file}' was not found")
 
     (
         params.plot_partial_SED,

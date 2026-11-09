@@ -96,7 +96,12 @@ def estimate_kernel_working_bytes(vels, config, max_q_batch, *, cpu=False):
         basis_velocities += num_frames * max_basis_atoms * 3 * (
             vels.dtype.itemsize + np.dtype(np.complex128).itemsize
         )
-    phases = max_basis_atoms * max_q_batch * np.dtype(np.complex128).itemsize
+    phase_cells = config.num_unit_cells or max_basis_atoms
+    if config.basis_cell_ids:
+        phase_cells += max(
+            (len(ids) for ids in config.basis_cell_ids if ids is not None), default=0,
+        )
+    phases = phase_cells * max_q_batch * np.dtype(np.complex128).itemsize
     spectral_values = num_frames * 3 * max_q_batch
     transforms = spectral_values * (
         2 * np.dtype(np.complex128).itemsize

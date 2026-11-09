@@ -36,6 +36,7 @@ meaning, defaults, examples, practical notes, and related parameters.
    input_parameters/out_files_name
    input_parameters/legacy_unit
    input_parameters/basis_lattice_file
+   input_parameters/defect_index_file
    input_parameters/lammps_unit
    input_parameters/output_partial
    input_parameters/max_cores
@@ -76,6 +77,7 @@ meaning, defaults, examples, practical notes, and related parameters.
        "out-files-name": "input_parameters/out_files_name.html",
        "legacy-unit": "input_parameters/legacy_unit.html",
        "basis-lattice-file": "input_parameters/basis_lattice_file.html",
+       "defect-index-file": "input_parameters/defect_index_file.html",
        "lammps-unit": "input_parameters/lammps_unit.html",
        "output-partial": "input_parameters/output_partial.html",
        "trajectory-file": "input_parameters/trajectory_file.html",
@@ -175,6 +177,9 @@ meaning, defaults, examples, practical notes, and related parameters.
    * - `basis_lattice_file <input_parameters/basis_lattice_file.html>`_
      - Files
      - Path to ``basis.in``.
+   * - `defect_index_file <input_parameters/defect_index_file.html>`_
+     - Files
+     - Optional reference-to-trajectory mapping for static vacancies.
    * - `lammps_unit <input_parameters/lammps_unit.html>`_
      - Files
      - LAMMPS unit style for velocity conversion.

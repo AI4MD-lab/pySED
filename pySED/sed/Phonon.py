@@ -118,6 +118,33 @@ class spectral_energy_density:
         """
         start_time = time.time()
         self.trajectory_prefetch = bool(params.trajectory_prefetch)
+        if getattr(params, "defect_index_file", None):
+            num_reference_atoms = len(lattice_info.atom_ids)
+            num_vacancies = num_reference_atoms - params.num_atoms
+            print_section("Vacancy information")
+            print_detail("Defect index file", params.defect_index_file)
+            print_detail("Reference atoms", num_reference_atoms)
+            print_detail("Trajectory atoms", params.num_atoms)
+            print_detail("Vacancies", num_vacancies)
+            vacant = lattice_info.trajectory_index == 0
+            element_counts = {}
+            for type_index, mass in enumerate(np.unique(lattice_info.masses)):
+                symbol = _element_symbol_from_mass(mass)
+                if symbol == "unknown":
+                    symbol = f"type{type_index + 1}"
+                selected = lattice_info.masses == mass
+                reference_count, vacancy_count = element_counts.get(symbol, (0, 0))
+                element_counts[symbol] = (
+                    reference_count + np.count_nonzero(selected),
+                    vacancy_count + np.count_nonzero(selected & vacant),
+                )
+            for symbol, (reference_count, vacancy_count) in element_counts.items():
+                if vacancy_count:
+                    print_detail(
+                        f"Vacancy fraction ({symbol})",
+                        f"{100 * vacancy_count / reference_count:.3f}% "
+                        f"({vacancy_count} / {reference_count} {symbol} atoms)",
+                    )
         print_section("SED calculation setup")
         print_detail("Total q-points", lattice_info.num_qpoints, width=48)
         print_detail("Total trajectory frames for calculating SED", self.num_frame, width=48)
@@ -155,9 +182,9 @@ class spectral_energy_density:
         """Build the static SEDKernelConfig and allocate the block accumulator.
 
         The one-based basis labels from basis.in become zero-based atom-index
-        arrays, with one atom per repeated cell. Masses follow the first
-        primitive-cell block, so the generated basis order must agree with
-        the trajectory order. Element/type channels follow sorted unique
+        arrays. With vacancies, defect_index.in selects the surviving atoms
+        and their matching reference cells. Masses follow the first complete
+        reference cell. Element/type channels follow sorted unique
         masses, and Cartesian q points include the reciprocal 2*pi factor.
         """
         # These topology values do not change between blocks or Q points.
@@ -196,8 +223,26 @@ class spectral_energy_density:
                     f"expected {self.num_unit_cells} unit cells."
                 )
 
+        basis_cell_ids = ()
+        trajectory_index = getattr(lattice_info, "trajectory_index", None)
+        if trajectory_index is not None:
+            occupied_ids = []
+            cell_ids = []
+            for reference_ids in basis_ids:
+                occupied = reference_ids[trajectory_index[reference_ids] > 0]
+                occupied_ids.append(trajectory_index[occupied] - 1)
+                # A complete basis keeps the existing full-phase path.
+                cell_ids.append(
+                    None if occupied.size == self.num_unit_cells
+                    else lattice_info.unitcell_index[occupied] - 1
+                )
+            basis_ids = tuple(occupied_ids)
+            basis_cell_ids = tuple(cell_ids)
+
         kernel_config = SEDKernelConfig(
             basis_ids=basis_ids,
+            basis_cell_ids=basis_cell_ids,
+            num_unit_cells=int(self.num_unit_cells),
             masses=basis_masses,
             basis_to_type=tuple(basis_to_type),
             qpoints=np.asarray(lattice_info.qpoints, dtype=float),
