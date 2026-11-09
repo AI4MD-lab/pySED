@@ -128,6 +128,7 @@ mass:
 
 .. code-block:: text
 
+   Example: two repeated cells
    atoms_ids unitcell_index basis_index mass_types
    1  1  1  28.0855
    2  2  1  28.0855
@@ -140,6 +141,62 @@ When the trajectory contains a periodic local group rather than the full MD
 cell, set ``dump_group_supercell`` to that group's three lattice vectors.
 It changes the cell used for reciprocal-space construction; it does not alter
 coordinates or the ``basis.in`` mapping.
+
+Fixed spatial reference
+-----------------------
+
+SED uses one fixed periodic reference lattice for all averaging blocks.
+The four-column ``basis.in`` format is unchanged. Cell numbers must follow
+``structure_maker.replicate_supercell``: ``i`` is the outer loop, then ``j``,
+then ``k`` (the fastest-changing index). Within each cell, basis atoms retain
+the order of the input structure. Atom IDs must keep this correspondence
+throughout the trajectory; do not reorder atoms by their current positions.
+
+For repeats ``(Nx, Ny, Nz)``, a one-based ``unitcell_index`` gives:
+
+.. code-block:: python
+
+   c = unitcell_index - 1
+   i = c // (Ny * Nz)
+   j = (c // Nz) % Ny
+   k = c % Nz
+
+Let ``H`` contain the fixed production-cell vectors as rows, after NPT
+equilibration if used. Divide these rows by ``Nx``, ``Ny``, and ``Nz`` to
+obtain ``a1``, ``a2``, and ``a3``. The cell origin is
+``R = i*a1 + j*a2 + k*a3``; it defines the spatial phase, not each atom's
+instantaneous position. For example, with repeats ``2 1 1`` and
+``H = diag(8, 4, 4)`` Angstrom, cells 1 and 2 have origins ``(0, 0, 0)`` and
+``(4, 0, 0)`` Angstrom. The box and q-point geometry use the existing
+``rescale_prim`` handling; use ``rescale_prim = 1`` to reconcile an input
+primitive cell with a changed production box.
+
+Triclinic boxes are supported. For local groups, upper or lower triangular
+repetition matrices ``P`` with positive diagonal entries are also supported.
+Their diagonal defines ``(Nx, Ny, Nz)`` in the same numbering rule above.
+Recover primitive vectors with ``C = numpy.linalg.solve(P, H)`` and construct
+references as ``R = (i, j, k) @ C``; dividing the rows of ``H`` separately would
+miss the off-diagonal shifts. Here ``H`` is the supplied local cell, and ``P``
+is inferred from that cell and its matching ``prim_unitcell``. Keep
+``rescale_prim = 0`` for local groups; their production geometry must be supplied
+explicitly. See :doc:`input_parameters/dump_group_supercell` for a (111) example.
+
+Other matrix shapes are rejected for SED calculation; general q-path
+construction itself is unchanged. External structure generators must use the
+same spatial numbering convention. Four-column ``basis.in`` alone cannot
+detect an arbitrary spatial permutation, even if the cell count is correct.
+
+During SED calculation, blocks load velocities and cell information, without
+atom coordinates. Direct text reading still scans the file but skips parsing
+coordinate columns in every frame. NetCDF conversion keeps
+all coordinates, so the full trajectory remains available for other analyses
+such as DSF. Existing compatible NetCDF caches do not need to be rebuilt.
+
+Coordinates are not averaged within each block. Velocities still come from
+every trajectory frame, and the resulting block spectra are averaged as
+before. Atom IDs retain their initial cell assignment even if an ion moves.
+This fixed-site construction does not make diffusing ions suitable for a
+conventional phonon SED interpretation.
 
 Backends and partial SED
 ------------------------

@@ -185,6 +185,7 @@ def iter_gpumd_xyz(
     batch_size: int = 32,
     dtype=np.float32,
     progress: ProgressCallback | None = None,
+    read_positions: bool = True,
 ) -> Iterator[TrajectoryBatch]:
     """Read fixed-cell GPUMD XYZ with a schema determined by the first frame.
 
@@ -195,6 +196,9 @@ def iter_gpumd_xyz(
     Positions/cells use Angstrom and velocities convert from Angstrom/fs
     to m/s. Numeric fields use dtype; the cached cell uses float64.
     Prefer unwrapped_position over pos when supplied; do not unwrap coordinates.
+    Direct SED reading uses read_positions=False to parse species and velocities
+    only; coordinate columns are skipped in every frame.
+    The default retains all positions for a complete NetCDF cache.
     """
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
@@ -233,6 +237,14 @@ def iter_gpumd_xyz(
                 record_dtype = np.dtype([
                     ("species", object), ("values", np.float64, (width,)),
                 ])
+                usecols = None
+                if not read_positions:
+                    if "vel" not in columns:
+                        raise ValueError("trajectory is missing required field(s): velocities")
+                    usecols = [0, *range(columns["vel"].start + 1, columns["vel"].stop + 1)]
+                    record_dtype = np.dtype([
+                        ("species", object), ("values", np.float64, (3,)),
+                    ])
                 atom_ids = np.arange(1, n_atoms + 1, dtype=np.int64)
                 expected_atoms = n_atoms
 
@@ -242,7 +254,7 @@ def iter_gpumd_xyz(
                 raise EOFError("truncated GPUMD XYZ atom block")
             try:
                 atoms = np.loadtxt(
-                    lines, dtype=record_dtype, comments=None,
+                    lines, dtype=record_dtype, usecols=usecols, comments=None,
                     encoding="utf-8", ndmin=1,
                 )
             except ValueError as error:
@@ -264,13 +276,14 @@ def iter_gpumd_xyz(
             if not np.isfinite(values).all():
                 raise ValueError("GPUMD XYZ numeric fields must be finite")
             frame = {
-                POSITIONS: values[:, position_columns],
                 TYPES: atom_types,
                 ATOM_IDS: atom_ids,
                 CELLS: cell,
             }
+            if read_positions:
+                frame[POSITIONS] = values[:, position_columns]
             if "vel" in columns:
-                frame[VELOCITIES] = values[:, columns["vel"]] * 100000.0
+                frame[VELOCITIES] = (values[:, columns["vel"]] if read_positions else values) * 100000.0
             pending.append(frame)
             if len(pending) == batch_size:
                 yield _stack_batch(batch_start, pending)
@@ -319,6 +332,7 @@ def iter_lammps_dump(
     lammps_unit: str = "metal",
     dtype=np.float32,
     progress: ProgressCallback | None = None,
+    read_positions: bool = True,
 ) -> Iterator[TrajectoryBatch]:
     """Yield batches from a LAMMPS custom dump, sorting each frame by atom ID.
 
@@ -332,6 +346,8 @@ def iter_lammps_dump(
     of dtype, which sets the other atom columns' precision. Cell bounds use
     float64, including triclinic tilts. The final batch may be shorter than
     batch_size; progress receives (frames_read, source_bytes_read).
+    read_positions=False skips coordinate parsing in every frame for SED;
+    cache conversion keeps all coordinate frames by default.
     """
 
     if batch_size < 1:
@@ -390,6 +406,12 @@ def iter_lammps_dump(
                 raise ValueError("LAMMPS dump must include atom id")
 
             position_names = _lammps_position_columns(index)
+            velocity_names = ("vx", "vy", "vz")
+            selected_columns = columns
+            if not read_positions:
+                if not all(name in index for name in velocity_names):
+                    raise ValueError("trajectory is missing required field(s): velocities")
+                selected_columns = [name for name in columns if name in ("id", "type", *velocity_names)]
 
             lines = list(islice(iter(stream.readline, ""), n_atoms))
             if len(lines) != n_atoms:
@@ -397,7 +419,8 @@ def iter_lammps_dump(
             try:
                 atoms = np.loadtxt(
                     lines,
-                    dtype=[(name, np.int64 if name == "id" else dtype) for name in columns],
+                    dtype=[(name, np.int64 if name == "id" else dtype) for name in selected_columns],
+                    usecols=None if read_positions else [index[name] for name in selected_columns],
                     converters={index["id"]: int}, comments=None, ndmin=1,
                 )
             except (ValueError, OverflowError) as error:
@@ -419,13 +442,13 @@ def iter_lammps_dump(
                 raise ValueError("LAMMPS atom IDs changed between frames")
 
             frame = {
-                POSITIONS: np.column_stack([atoms[name] for name in position_names])[order],
                 ATOM_IDS: atom_ids,
                 CELLS: cell,
             }
+            if read_positions:
+                frame[POSITIONS] = np.column_stack([atoms[name] for name in position_names])[order]
             if "type" in index:
                 frame[TYPES] = atoms["type"][order].astype(np.int32)
-            velocity_names = ("vx", "vy", "vz")
             if all(name in index for name in velocity_names):
                 frame[VELOCITIES] = (
                     np.column_stack([atoms[name] for name in velocity_names])[order]

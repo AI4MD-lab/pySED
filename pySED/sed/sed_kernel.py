@@ -131,17 +131,19 @@ def calculate_q_batch(
     return result
 
 
-def block_normalization(dt, duration, num_unit_cells, *, legacy_unit=False):
+def block_normalization(dt, block_duration_seconds, num_unit_cells, *, legacy_unit=False):
     """Return the factor applied to each block's mass-weighted FFT power.
 
-    ``dt`` is the saved-frame interval and ``duration`` is the block duration,
-    both in seconds; ``num_unit_cells`` is the number of repeated cells.
-    The physical factor is dt**2 / (4*pi*duration*num_unit_cells): the squared
-    interval converts the squared discrete FFT sum into a squared time integral.
+    ``dt`` is the time between saved frames, in seconds.
+    ``block_duration_seconds`` is the MD time covered by one averaging block,
+    not the time spent running the calculation. ``num_unit_cells`` is the
+    number of repeated cells. The physical factor is
+    dt**2 / (4*pi*block_duration_seconds*num_unit_cells): the squared interval
+    converts the squared discrete FFT sum into a squared time integral.
     Legacy 2.x scaling omits dt**2. Output-unit conversion is done later.
     """
     time_factor = 1.0 if legacy_unit else dt**2
-    return time_factor / (4 * np.pi * duration * num_unit_cells)
+    return time_factor / (4 * np.pi * block_duration_seconds * num_unit_cells)
 
 
 def finalize_spectrum(sed_sum, frequencies, num_blocks, *, legacy_unit=False):

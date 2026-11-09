@@ -71,8 +71,10 @@ Read these functions in order:
 1. ``pipeline.step_compute_sed`` prepares the trajectory and Q-point geometry.
 2. ``sed.Phonon.spectral_energy_density.compute_sed`` prepares the basis metadata
    and opens the selected backend for the lifetime of the calculation.
-3. ``sed.Phonon._get_simulation_data`` takes velocities and averages reference
-   positions within the current block.
+3. ``sed.Phonon._get_simulation_data`` takes velocities and reuses a fixed
+   periodic lattice for the spatial phase.
+   ``sed.construct_BZ.BZ_methods.build_cell_origins`` builds it once from
+   the numbered cells and production box, without atom coordinates.
 4. ``sed.Phonon._loop_over_blocks`` requests one spectrum from the backend,
    applies block normalization, and adds it to the running sum.
 5. ``sed.sed_kernel.calculate_q_batch`` contains the spatial projection and FFT.
@@ -86,8 +88,20 @@ to understand the SED formula.
 ``compute_sed(params, lattice_info, trajectory_blocks)`` consumes one iterator
 containing all blocks, including the first block used for geometry setup. The
 pipeline releases its separate first-block reference before calculation. Host
-array estimates include the actual position, velocity and cell array sizes of
-the current block, plus another block when prefetch is enabled.
+array estimates include the velocity and cell arrays, and another block
+when prefetch is enabled.
+
+The reference lattice uses the production box and the reconciled repetition
+matrix. Cell numbers follow the structure generator's ``i, j, k`` loops, with
+``k`` changing fastest. Diagonal repeats retain the direct division of box
+vectors; upper/lower triangular repeats use ``solve(P, box)`` to recover the
+primitive vectors. Both require positive diagonal entries and combine the
+primitive vectors using the numbered cells' integer indices. All blocks share
+these origins. SED blocks contain only velocities and cells; NetCDF reading
+does not load coordinates. Direct text reading still scans every atom row
+but skips coordinate columns during parsing.
+Text-to-NetCDF conversion retains all coordinates for other analyses, without
+changing the cache format or invalidating existing caches.
 
 The numerical core
 ------------------

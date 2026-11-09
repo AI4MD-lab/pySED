@@ -6,12 +6,13 @@ from contextlib import redirect_stdout
 from functools import partial
 from io import StringIO
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import numpy as np
 from scipy.fftpack import fft
 
 from pySED.sed.Phonon import _element_symbol_from_mass, spectral_energy_density
-from pySED.io.schema import TrajectoryBatch, POSITIONS, VELOCITIES
+from pySED.io.schema import TrajectoryBatch, VELOCITIES
 from pySED.sed.sed_kernel import (
     JOULE_PER_EV,
     JOULE_SECOND_TO_EV_PER_THZ,
@@ -283,12 +284,9 @@ class SEDKernelTests(unittest.TestCase):
         """Check both scales against the 2.x FFT formula, including DC and odd N."""
         for num_frames in (5, 8):
             velocities = self.vels[:num_frames]
-            positions = np.broadcast_to(
-                np.repeat(self.cell_vecs, 2, axis=0), velocities.shape,
-            )
             blocks = [
                 TrajectoryBatch(start=i * num_frames, data={
-                    POSITIONS: positions, VELOCITIES: velocities * amplitude,
+                    VELOCITIES: velocities * amplitude,
                 })
                 for i, amplitude in enumerate((1.0, 2.0))
             ]
@@ -298,7 +296,7 @@ class SEDKernelTests(unittest.TestCase):
                     unitcell_index=np.repeat([1, 2, 3], 2),
                     basis_index=np.tile([1, 2], 3),
                     masses=np.tile(config.masses, 3),
-                    cell_ref_ids=np.array([0, 2, 4]), num_qpoints=7,
+                    build_cell_origins=Mock(return_value=self.cell_vecs), num_qpoints=7,
                     qpoints=config.qpoints, reduced_qpoints=config.qpoints,
                 )
                 for spacing_fs in (1.0, 2.0):
@@ -316,6 +314,7 @@ class SEDKernelTests(unittest.TestCase):
                     for legacy in (False, True):
                         with self.subTest(frames=num_frames, partial=partial_output,
                                           dt=dt, legacy=legacy):
+                            lattice.build_cell_origins.reset_mock()
                             params = SimpleNamespace(
                                 total_num_steps=2 * num_frames, output_data_stride=1,
                                 num_blocks=2, num_atoms=6, time_step=spacing_fs,
@@ -330,6 +329,7 @@ class SEDKernelTests(unittest.TestCase):
                                 calculator.compute_sed(
                                     params, lattice, iter(blocks),
                                 )
+                            lattice.build_cell_origins.assert_called_once_with()
                             expected = old_folded.copy()
                             if not legacy:
                                 expected[1:] *= 2.0
