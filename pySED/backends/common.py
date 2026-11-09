@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from pySED.console import SED_PROGRESS_WIDTH, print_detail
+from pySED.console import SED_PROGRESS_WIDTH, format_qpoint, print_detail
 
 def qpoint_batches(num_qpoints, num_workers, max_batch_size=None):
     """Return non-overlapping (start, stop) ranges covering all q points.
@@ -125,8 +125,7 @@ def print_qpoints(reduced_qpoints, q_start, q_stop):
         qpoint = reduced_qpoints[q_index]
         message = (
             f"Now calculating q-point {q_index + 1:>{index_width}}/{num_qpoints}:   "
-            f"q = ({qpoint[0]:.4f}, {qpoint[1]:.4f}, "
-            f"{qpoint[2]:.4f})"
+            f"q = {format_qpoint(qpoint)}"
         )
         print("    " + message.center(SED_PROGRESS_WIDTH).rstrip())
 
