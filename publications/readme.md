@@ -8,7 +8,9 @@
 
 * Penghua Ying, Ting Liang, Yun Chen, Yan Chen, Shiyun Xiong, Zheyong Fan, Jianbin Xu, Yilun Liu, [Structurally Triggered Breakdown of the Phonon Gas Model in Crystalline Metal-Organic Frameworks](https://arxiv.org/abs/2604.03783)
 
-## 2027 (1)
+## 2027 (2)
+
+* Jia-Zhen Chen, Jian Zhou, [Impact of Zn vacancies on the lattice thermal conductivity of diamond-like Cu<sub>2</sub>ZnSnSe<sub>4</sub>: A first-principles machine-learning molecular dynamics study](https://doi.org/10.1016/j.ijheatmasstransfer.2026.129814), International Journal of Heat and Mass Transfer, **274**, 129814 (2027)
 
 * Qikun Tian, Ruyi Li, Hongkai Zhang, Enbo Zhang, Xiong Zheng, Huimin Wang, Zhenzhen Qin, Guangzhao Qin, [Atomic-level engineering thermal transport anisotropy in C<sub>24</sub> monolayers for directional heat spreading](https://doi.org/10.70401/tx.2026.0032), Thermo-X, **3**, 202626 (2027)
 
