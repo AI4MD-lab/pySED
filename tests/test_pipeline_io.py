@@ -740,7 +740,8 @@ class ParserTests(unittest.TestCase):
 
         lattice = SimpleNamespace(
             unitcell_index=np.array([1, 2]), basis_index=np.array([1, 1]),
-            masses=np.array([28.085, 28.085]), cell_ref_ids=np.array([0, 1]),
+            masses=np.array([28.085, 28.085]),
+            build_cell_origins=lambda: np.array([[0., 0., 0.], [1., 0., 0.]]),
             num_qpoints=1, qpoints=np.zeros((1, 3)), reduced_qpoints=np.zeros((1, 3)),
         )
         compute = CPUBackend.compute
@@ -754,12 +755,11 @@ class ParserTests(unittest.TestCase):
                     def blocks(block_size, count):
                         for index in range(count):
                             data = {
-                                "positions": np.zeros((block_size, 2, 3), dtype=np.float64),
                                 "velocities": np.ones((block_size, 2, 3), dtype=np.float32),
                                 "cells": np.repeat(np.eye(3)[None], block_size, axis=0),
                             }
                             references.append(tuple(weakref.ref(data[name]) for name in
-                                                    ("positions", "velocities")))
+                                                    ("cells", "velocities")))
                             yield TrajectoryBatch(index * block_size, data)
 
                     def check_released(backend, vels, cells, result):
@@ -788,7 +788,7 @@ class ParserTests(unittest.TestCase):
                     ):
                         step_compute_sed(params)
                     self.assertEqual(len(completed), 3)
-                    self.assertEqual(estimated_blocks, [4 * 2 * 3 * (8 + 4) + 4 * 9 * 8])
+                    self.assertEqual(estimated_blocks, [4 * 2 * 3 * 4 + 4 * 9 * 8])
 
     def test_dump_group_supercell_overrides_the_trajectory_cell_for_bz(self) -> None:
         params = SimpleNamespace(
@@ -951,6 +951,16 @@ class ParserTests(unittest.TestCase):
             )
 
             self.assertEqual(bz.num_qpoints, 18)
+            np.testing.assert_array_equal(
+                bz.repetition_matrix, [[32, 0, 0], [0, 32, 0], [2, 2, 6]],
+            )
+            origins = bz.build_cell_origins()
+            self.assertEqual(origins.shape, (6144, 3))
+            np.testing.assert_allclose(
+                origins[[0, 1, 6, -1]],
+                np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0], [31, 31, 5]]) @ params.prim_unitcell,
+                atol=1e-9,
+            )
             np.testing.assert_allclose(
                 bz.qpoints[[0, 12, 17]],
                 [[0, 0, 0], [1.86832756, 0, 0], [2.49110341, 0, 0]],

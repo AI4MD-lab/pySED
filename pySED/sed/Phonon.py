@@ -19,7 +19,7 @@
 Read in this order: compute_sed -> _loop_over_blocks -> sed_kernel.
 Backends only fill a block spectrum; normalization remains in the physics layer.
 
-Trajectory readers supply positions in Angstrom and velocities in m/s.
+Trajectory readers supply cell vectors in Angstrom and velocities in m/s.
 This module prepares the crystal mapping, accumulates normalized blocks,
 and exposes the final spectrum for FileIO to write.
 """
@@ -31,7 +31,7 @@ from scipy.fftpack import fftfreq
 
 from pySED.backends import create_backend
 from pySED.console import SED_PROGRESS_WIDTH, print_detail, print_section
-from pySED.io.schema import POSITIONS, VELOCITIES
+from pySED.io.schema import VELOCITIES
 from pySED.sed.sed_kernel import (
     SEDKernelConfig, block_normalization, finalize_spectrum,
     SED_UNIT, LEGACY_SED_UNIT,
@@ -72,8 +72,9 @@ class spectral_energy_density:
 
         ``params`` supplies the time step in fs, saved-frame stride, and
         block count. ``trajectory_info`` supplies the actual atom count.
-        ``dt`` and the duration ``t_o`` are stored in seconds; no trajectory
-        arrays are read here. The initial FFT grid includes both signs.
+        ``dt`` is the saved-frame interval in seconds. ``block_duration_seconds``
+        is the MD time covered by one averaging block. No trajectory arrays
+        are read here. The initial FFT grid includes both signs.
         """
         self.legacy_unit = bool(getattr(params, "legacy_unit", False))
         self.sed_unit = LEGACY_SED_UNIT if self.legacy_unit else SED_UNIT
@@ -93,7 +94,7 @@ class spectral_energy_density:
         self.dt = params.time_step * params.output_data_stride / 1e15
 
         # Total simulated time represented by one averaging block.
-        self.t_o = (
+        self.block_duration_seconds = (
             params.time_step
             * params.total_num_steps
             / params.num_blocks
@@ -135,10 +136,10 @@ class spectral_energy_density:
         )
         kernel_config = self._prepare_kernel(params, lattice_info)
 
-        # The trajectory source owns disk I/O. This generator only reduces
-        # each supplied block to velocity and its averaged phase references.
+        # Build the numbered cell origins once; all velocity blocks share them.
+        self._cell_origins = lattice_info.build_cell_origins()
         trajectory_blocks = (
-            self._get_simulation_data(block, lattice_info)
+            self._get_simulation_data(block)
             for block in trajectory_blocks
         )
         with create_backend(
@@ -259,7 +260,7 @@ class spectral_energy_density:
         by the block count and frequency folding happen after this loop.
         """
         scaling_const = block_normalization(
-            self.dt, self.t_o, self.num_unit_cells,
+            self.dt, self.block_duration_seconds, self.num_unit_cells,
             legacy_unit=getattr(self, "legacy_unit", False),
         )
         self._trajectory_wait = 0.0
@@ -311,26 +312,25 @@ class spectral_energy_density:
             self.sed_avg = self.sed_avg.transpose(0, 3, 1, 2)
         del self._sed_sum
 
-    def _get_simulation_data(self, block, lattice_info):
-        """Return velocities, averaged cell references, and trajectory array bytes.
+    def _get_simulation_data(self, block):
+        """Return velocities, fixed cell references, and trajectory array bytes.
 
         The returned arrays have shapes (frames, atoms, 3), in m/s, and
-        (cells, 3), in Angstrom. ``cell_ref_ids`` selects one reference atom
-        per cell; its mean position provides the spatial Fourier phase.
-        Array indices must refer to the same atom order as basis.in.
-        The byte count includes positions, velocities, and the stored cells.
+        (cells, 3), in Angstrom. Cell origins follow basis.in numbering and
+        are reused for all blocks. Atom order must agree with basis.in.
+        The byte count includes the arrays loaded for this trajectory block.
         """
 
         try:
             vels = block.data[VELOCITIES]
-            pos = block.data[POSITIONS]
-
-            # Reference atoms identify corresponding cells across the block.
-            cell_vecs = pos[:, lattice_info.cell_ref_ids, :].mean(axis=0)
             trajectory_bytes = sum(array.nbytes for array in block.data.values())
-            return vels, cell_vecs, trajectory_bytes
+            return vels, self._cell_origins, trajectory_bytes
         except Exception as error:
+            details = str(error)
+            if isinstance(error, KeyError) and error.args == (VELOCITIES,):
+                details = "Velocity data are missing from this trajectory block."
             raise EOFError(
-                "******* Can't prepare a trajectory block\n"
-                f"Error: {error}; check the trajectory and 'basis.in'. *******"
+                "Could not prepare a trajectory block.\n"
+                f"Details: {details}\n"
+                "Check that the trajectory contains velocities and is complete."
             ) from error

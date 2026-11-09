@@ -43,7 +43,7 @@ from pySED.io.text import (
     iter_lammps_dump,
 )
 
-_SED_FIELDS = (POSITIONS, VELOCITIES, CELLS)
+_SED_FIELDS = (VELOCITIES, CELLS)
 _END = object()
 
 
@@ -66,8 +66,9 @@ class NetCDFBlockSource:
     def iter_blocks(self, block_size: int, num_blocks: int):
         """Yield consecutive frame slices using the caller-supplied block layout.
 
-        Read positions, velocities, and cells through NetCDFReader, so returned
-        batches use canonical units. The caller must ensure block_size*num_blocks
+        Each block contains velocities and cells in canonical units.
+        Atom coordinates are not needed for the numbered reference lattice.
+        The caller must ensure block_size*num_blocks
         equals required_frames; this method does not validate the layout.
         Frames beyond the requested blocks are not read.
         """
@@ -115,12 +116,14 @@ class DirectTextBlockSource:
             return iter_gpumd_xyz(
                 self.path,
                 batch_size=self.parser_batch_size,
+                read_positions=False,
             )
         if self.source_format == LAMMPS_DUMP:
             return iter_lammps_dump(
                 self.path,
                 batch_size=self.parser_batch_size,
                 lammps_unit=self.lammps_unit,
+                read_positions=False,
             )
         raise ValueError(
             f"direct text reading does not support '{self.source_format}'"
@@ -129,8 +132,8 @@ class DirectTextBlockSource:
     def iter_blocks(self, block_size: int, num_blocks: int):
         """Yield exact SED blocks assembled from possibly different-sized parser batches.
 
-        Require positions, velocities, and cells in every batch. Fill each block
-        buffer across parser boundaries and stop after the requested frame count.
+        Copy velocities and cells across parser-batch boundaries.
+        Stop after the requested frame count.
         An incomplete final block raises EOFError rather than entering the FFT;
         the underlying text iterator is closed on completion or failure.
         """
@@ -159,12 +162,11 @@ class DirectTextBlockSource:
                         + ", ".join(missing)
                     )
                 if self.info is None:
-                    positions = batch.data[POSITIONS]
                     self.info = TrajectoryInfo(
                         path=self.path,
                         n_frames=self.required_frames,
-                        n_atoms=int(positions.shape[1]),
-                        fields=frozenset(batch.data),
+                        n_atoms=int(batch.data[VELOCITIES].shape[1]),
+                        fields=frozenset(batch.data) | {POSITIONS},
                         source_program=(
                             "GPUMD"
                             if self.source_format == GPUMD_XYZ

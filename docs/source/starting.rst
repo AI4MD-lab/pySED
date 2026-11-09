@@ -118,12 +118,14 @@ In ``input.in``, use:
 Use ``lammps_unit = 'metal'`` for velocities in Angstrom/ps and
 ``lammps_unit = 'real'`` for velocities in Angstrom/fs.
 
-Unwrapped coordinates avoid periodic-boundary jumps when averaging positions.
-They are recommended for trajectories with boundary crossings, including Li
-diffusion. pySED selects the supplied coordinates automatically; it does not
-unwrap trajectories itself and needs no additional parameter. This addresses
-coordinate continuity; the applicability of fixed-lattice SED to diffusive
-motion still needs separate consideration.
+NetCDF conversion prefers supplied unwrapped coordinates, but does not unwrap
+trajectories itself and needs no additional parameter. SED calculation skips
+coordinate columns and builds a fixed reference lattice from cell numbering
+and the production box. ``basis.in`` must follow the generator's ``i, j, k``
+expansion order, with ``k`` changing fastest; its four columns are unchanged.
+See :doc:`sed_workflow` for the numbering rule and a reference-position example.
+Unwrapped coordinates alone do not make fixed-lattice SED appropriate for
+diffusive motion.
 
 What to Check Before Running pySED
 ----------------------------------

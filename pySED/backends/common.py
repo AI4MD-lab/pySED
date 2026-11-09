@@ -135,8 +135,7 @@ def print_cpu_memory_estimate(
 
     Include the current trajectory block, output and accumulated spectra,
     shared-memory copies, queued results, and a possible prefetched block.
-    trajectory_bytes is measured from the block's arrays, including positions;
-    the estimate assumes subsequent blocks have the same shapes and dtypes.
+    trajectory_bytes counts the velocity and cell arrays loaded for the block.
     CPU execution also includes active workers' temporary arrays; GPU working
     memory is reported separately by the GPU backend.
     """

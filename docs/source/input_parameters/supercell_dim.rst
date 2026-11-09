@@ -28,6 +28,15 @@ supercell_dim
    the local Q grid; pySED obtains the repetition matrix directly from
    local cell and ``prim_unitcell``.
 
+   Fixed-reference SED supports diagonal and upper/lower triangular repetition
+   matrices with positive diagonal entries. Their diagonal sets the generator's
+   ``i, j, k`` ranges, with ``k`` changing fastest in ``basis.in``. For local
+   groups these ranges come from the inferred matrix, not ``supercell_dim``.
+   The full matrix is used to recover primitive vectors for triangular repeats;
+   see :doc:`dump_group_supercell <dump_group_supercell>` for an example.
+   Triclinic boxes are supported. Other matrix shapes remain supported by the
+   q-path helper, but are rejected by this numbered-reference SED workflow.
+
    For a simple diagonal supercell with repetition matrix
    :math:`P=\mathrm{diag}(N_x,N_y,N_z)`, a path from Gamma to the zone boundary
    along one reduced reciprocal direction, for example

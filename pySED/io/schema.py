@@ -55,6 +55,7 @@ class TrajectoryBatch:
     have shape (frames, atoms, 3), cells (frames, 3, 3), and atom IDs (atoms,).
     Coordinates and cells are in Angstrom, velocities in m/s, and optional
     times in ps. Cell lattice vectors are rows. stop is the exclusive end index.
+    SED blocks omit positions; their reference lattice comes from cell numbering.
     """
 
     start: int
@@ -63,7 +64,10 @@ class TrajectoryBatch:
     @property
     def n_frames(self) -> int:
         """Return the number of frames in this batch."""
-        return int(self.data[POSITIONS].shape[0])
+        for field in (VELOCITIES, POSITIONS, CELLS):
+            if field in self.data:
+                return int(self.data[field].shape[0])
+        raise ValueError("trajectory batch has no frame-dependent arrays")
 
     @property
     def stop(self) -> int:

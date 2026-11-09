@@ -23,7 +23,7 @@ from fractions import Fraction
 import numpy as np
 
 from pySED.structure import generate_data
-from pySED.console import print_detail, print_matrix, print_section
+from pySED.console import print_detail, print_matrix, print_section, terminal_label
 
 
 class BZ_methods(object):
@@ -32,8 +32,8 @@ class BZ_methods(object):
     Read basis.in and match the supplied primitive cell to the trajectory cell.
     After construction, qpoints contains Cartesian reciprocal vectors including
     2*pi, reduced_qpoints contains primitive reciprocal coordinates, and
-    q_distances/q_labels describe the ordered path. cell_ref_ids selects one
-    reference atom per unit cell for the SED spatial phase.
+    q_distances/q_labels describe the ordered path. Cell numbers follow the
+    structure generator's i, j, k loops, with k changing fastest.
     """
     def __init__(
         self,
@@ -47,10 +47,8 @@ class BZ_methods(object):
         self.box_info = box_info
         self.qpoints_info = qpoints_info
 
-        # Read the unitcell and basis positions from a file
+        # Read the atom-to-cell and basis mapping.
         self._get_basis_lattice(params)
-        self.cell_ref_ids = np.argwhere(self.basis_index == 1)
-        self.cell_ref_ids = self.cell_ref_ids.reshape(len(self.cell_ref_ids))
 
         # Compare lattice cell
         self._compare_cell(params, box_in_traj)
@@ -58,6 +56,52 @@ class BZ_methods(object):
         ############## Construct Brillouin zone ################
         # calculate direct lattice vectors (for orthogonal or triclinic lattice vectors)
         self._construct_BZ_path(params)
+
+    def build_cell_origins(self):
+        """Build fixed cell origins in basis.in order, without atom coordinates.
+
+        Cell numbers follow replicate_supercell: i outermost, then j, then k.
+        The diagonal of a triangular repetition matrix gives the i, j, k
+        ranges. Recover primitive vectors from the production cell, then
+        combine them using each numbered cell's integer (i, j, k).
+        The box may be triclinic; repeats on the diagonal must be positive.
+        Four-column basis.in does not encode arbitrary spatial permutations.
+        """
+        repetitions = self.repetition_matrix
+        repeats = np.diag(repetitions)
+        triangular = (
+            np.array_equal(repetitions, np.tril(repetitions))
+            or np.array_equal(repetitions, np.triu(repetitions))
+        )
+        if np.any(repeats <= 0) or not triangular:
+            if np.any(repeats <= 0):
+                message = f"Supercell repeat counts must be positive; found {repeats.tolist()}."
+            else:
+                message = "Unsupported supercell expansion; only diagonal or triangular expansions are supported."
+            raise ValueError(
+                f"{message}\n"
+                "Check prim_unitcell and the matching simulation cell "
+                "(dump_group_supercell for a local group)."
+            )
+        num_cells = int(self.unitcell_index[-1])
+        expected_cells = math.prod(int(n) for n in repeats)
+        if num_cells != expected_cells:
+            raise ValueError(
+                f"Fixed lattice has {expected_cells} cells, but basis.in describes {num_cells}."
+            )
+        cell_numbers = np.arange(num_cells)
+        _, ny, nz = repeats
+        cell_indices = np.column_stack((
+            cell_numbers // (ny * nz),
+            (cell_numbers // nz) % ny,
+            cell_numbers % nz,
+        ))
+        if np.array_equal(repetitions, np.diag(repeats)):
+            primitive_vectors = self.supercell / repeats[:, None]
+        else:
+            # H = P @ C: remove the cross-direction shifts before forming origins.
+            primitive_vectors = np.linalg.solve(repetitions, self.supercell)
+        return cell_indices @ primitive_vectors
 
     def _get_basis_lattice(self, params):
         """Read and validate the generated basis layout once before calculation.
@@ -95,8 +139,9 @@ class BZ_methods(object):
             or not np.array_equal(self.basis_index, rows % num_basis + 1)
         ):
             raise ValueError(
-                "basis.in must list complete unit cells in order, with basis indices "
-                "1..N in each cell. Regenerate the structure and basis.in together with pySED."
+                "Invalid cell or basis numbering in basis.in.\n"
+                "Check that basis.in matches your structure and trajectory atom order.\n"
+                "Alternatively, generate basis.in using pySED."
             )
         if not np.all(self.masses.reshape(-1, num_basis) == self.masses[:num_basis]):
             raise ValueError("basis.in masses for each basis index must match across all unit cells.")
@@ -147,7 +192,7 @@ class BZ_methods(object):
             if self.box_info:
                 print_section("Structural information")
                 print_detail("Mode", "local-group SED")
-                print_detail("Q-point cell", "dump_group_supercell from input")
+                print_detail("Q-point cell", "using user-provided cell")
                 print(
                     "            Atom positions and velocities are read unchanged "
                     "from the trajectory."
@@ -234,6 +279,10 @@ class BZ_methods(object):
                 ) from error
             raise
         self._validate_dump_group_supercell(params, bz_path)
+        # Reuse the reconciled geometry used for q points, including prim_axis
+        # and non-diagonal repetition matrices for local groups.
+        self.primitive_cell = bz_path.primitive.copy()
+        self.repetition_matrix = bz_path.P.copy()
 
         qpoints_list = []
         q_distances = []
@@ -256,7 +305,7 @@ class BZ_methods(object):
 
         if self.qpoints_info:
             print_section("Q-point information")
-            print_detail("Path", params.q_path_name)
+            print("        " + "-" * 72)
 
         for group_index, group in enumerate(groups):
             if self.qpoints_info and group_index:
@@ -304,10 +353,16 @@ class BZ_methods(object):
                 cumulative_distance += length
                 add_label(cumulative_distance, label_map.get(end_label, end_label))
                 if self.qpoints_info:
-                    print_detail(f"Path segment {segment_index}", f"{start_label} → {end_label}")
+                    display_start = terminal_label(label_map.get(start_label, start_label))
+                    display_end = terminal_label(label_map.get(end_label, end_label))
+                    print_detail(f"Path segment {segment_index}", f"{display_start} → {display_end}")
+                    print_detail("Start", "(" + ", ".join(f"{v:.4f}" for v in endpoints[0]) + ")")
+                    print_detail("End", "(" + ", ".join(f"{v:.4f}" for v in endpoints[1]) + ")")
                     print_detail("Number of q-points", len(qpoints_cart))
+                    print("        Reduced q-points:")
                     for q in bz_path.cartesian_to_reduced(qpoints_cart):
                         print("            (reduced) q = (" + ", ".join(f"{v:.4f}" for v in q) + ")")
+                    print("\n        " + "-" * 72)
                 segment_index += 1
             coordinate_offset += len(group)
 
