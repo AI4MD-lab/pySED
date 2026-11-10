@@ -211,6 +211,7 @@ class GPUBackend:
                     xp=cp,
                     fft_function=transform,
                     project_function=project,
+                    q_start=q_start,
                 )
                 # q is the last axis for both total and partial SED.
                 gpu_result[..., q_start:q_stop] = batch_result

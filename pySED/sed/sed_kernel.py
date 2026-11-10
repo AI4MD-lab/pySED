@@ -46,6 +46,8 @@ class SEDKernelConfig:
     For vacancies, ``basis_cell_ids`` pairs each surviving atom with its
     reference cell; None entries use all cells. An empty tuple is the
     ordinary complete-crystal case. ``num_unit_cells`` counts the full lattice.
+    ``mode_weights`` contains positive-sign weights (Q, basis, xyz, mode),
+    already conjugated for projection; the kernel must not conjugate again.
     """
 
     basis_ids: tuple
@@ -57,6 +59,15 @@ class SEDKernelConfig:
     amu_2_kg: float
     basis_cell_ids: tuple = ()
     num_unit_cells: int = 0
+    mode_weights: np.ndarray | None = None
+
+    @property
+    def num_modes(self):
+        return 0 if self.mode_weights is None else self.mode_weights.shape[-1]
+
+    @property
+    def ordinary_components(self):
+        return self.num_types * 3 if self.output_partial else 1
 
 
 def calculate_q_batch(
@@ -69,6 +80,7 @@ def calculate_q_batch(
     fft_function=fft,
     project_function=None,
     cell_ids_by_basis=None,
+    q_start=0,
 ):
     """Compute mass-weighted FFT power for a batch of q points.
 
@@ -83,6 +95,8 @@ def calculate_q_batch(
     This function returns (F, Q) for total SED, or (F, types, 3, Q) for
     partial SED. The final output stage later moves q to axis 1 for saving
     and plotting; no axis reordering is needed inside this kernel.
+    With mode_weights, pack ordinary channels followed by modes into
+    (F, channels, Q). q_start selects the matching global weight slice.
 
     The same operations support NumPy and CuPy arrays through ``xp`` and
     ``fft_function``. This returns a new array of power; sampling-time
@@ -106,6 +120,9 @@ def calculate_q_batch(
     else:
         shape = (num_frames, num_qpoints)
     result = xp.zeros(shape, dtype=xp.float64)
+    if config.num_modes:
+        weights = xp.asarray(config.mode_weights[q_start:q_start + num_qpoints])
+        mode_amplitude = xp.zeros((num_frames, config.num_modes, num_qpoints), dtype=xp.complex128)
 
     # Each group selects the same basis site in the occupied cells.
     for basis_index, atom_indices in enumerate(basis_ids_by_basis):
@@ -125,6 +142,13 @@ def calculate_q_batch(
         # 3. FFT along time (axis 0), independently for each direction and q.
         transformed_vels = fft_function(velocity_sum, axis=0)
 
+        if config.num_modes:
+            # W already contains the conjugate of the positive-sign basis.
+            # Accumulate complex amplitudes across ALL basis sites before power.
+            mode_amplitude += xp.einsum(
+                "faq,qam->fmq", transformed_vels, weights[:, basis_index],
+            ) * xp.sqrt(config.masses[basis_index] * config.amu_2_kg)
+
         # Mass-weighted |FFT|^2 for this basis atom: (frequency, xyz, q).
         spectra = (
             xp.abs(transformed_vels) ** 2
@@ -142,6 +166,14 @@ def calculate_q_batch(
         else:
             # Sum x/y/z power (axis 1); result has shape (frequency, q).
             result += spectra.sum(axis=1)
+    if config.num_modes:
+        packed = xp.empty(
+            (num_frames, config.ordinary_components + config.num_modes, num_qpoints),
+            dtype=xp.float64,
+        )
+        packed[:, :config.ordinary_components] = result.reshape(num_frames, -1, num_qpoints)
+        packed[:, config.ordinary_components:] = xp.abs(mode_amplitude) ** 2
+        return packed
     return result
 
 

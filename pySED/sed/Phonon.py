@@ -77,6 +77,7 @@ class spectral_energy_density:
         are read here. The initial FFT grid includes both signs.
         """
         self.legacy_unit = bool(getattr(params, "legacy_unit", False))
+        self.mode_projection = None
         self.sed_unit = LEGACY_SED_UNIT if self.legacy_unit else SED_UNIT
 
         self.num_frame = (
@@ -249,12 +250,19 @@ class spectral_energy_density:
             num_types=self.num_types,
             output_partial=bool(self.output_partial),
             amu_2_kg=self.amu_2_kg,
+            mode_weights=None if self.mode_projection is None else self.mode_projection.weights,
         )
         self.reduced_qpoints = np.asarray(
             lattice_info.reduced_qpoints,
             dtype=float,
         )
         self._allocate_sed_accumulator(lattice_info, unique_masses)
+        if kernel_config.num_modes:
+            self._sed_sum = np.zeros((
+                self.num_frames_per_block,
+                kernel_config.ordinary_components + kernel_config.num_modes,
+                lattice_info.num_qpoints,
+            ))
 
         return kernel_config
 
@@ -351,6 +359,23 @@ class spectral_energy_density:
             self._sed_sum, self.freq_fft, self.num_blocks,
             legacy_unit=getattr(self, "legacy_unit", False),
         )
+        if self.mode_projection is not None:
+            ordinary = self.num_types * 3 if self.output_partial else 1
+            self.mode_sed_avg = self.sed_avg[:, ordinary:, :].transpose(0, 2, 1)
+            self.sed_avg = self.sed_avg[:, :ordinary, :]
+            if self.output_partial:
+                self.sed_avg = self.sed_avg.reshape(
+                    len(self.freq_fft), self.num_types, 3, -1,
+                )
+            else:
+                self.sed_avg = self.sed_avg[:, 0, :]
+            total = self.sed_avg.sum(axis=(1, 2)) if self.output_partial else self.sed_avg
+            difference = np.max(np.abs(self.mode_sed_avg.sum(axis=2) - total))
+            scale = np.max(np.abs(total))
+            self.mode_sum_relative_error = difference / scale if scale else difference
+            print_detail("Mode sum / total SED max error", f"{self.mode_sum_relative_error:.3e}")
+            if self.mode_sum_relative_error > 1e-6:
+                raise ValueError("Summed mode spectra do not reproduce total SED")
         if self.output_partial:
             # Expose (frequency, q, type, xyz) to file output and plotting.
             # This is a view; the spectrum data are not copied.

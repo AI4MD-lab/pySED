@@ -114,6 +114,14 @@ def estimate_kernel_working_bytes(vels, config, max_q_batch, *, cpu=False):
         * result_components
         * np.dtype(np.float64).itemsize
     )
+    if config.num_modes:
+        # Complex accumulator and einsum temporary; power and packed output;
+        # selected device weights and CPU worker configuration storage.
+        modes = num_frames * config.num_modes * max_q_batch
+        transforms += modes * (2 * 16 + 2 * 8) + result
+        transforms += config.mode_weights.nbytes if cpu else (
+            max_q_batch * config.mode_weights.shape[1] * 3 * config.num_modes * 16
+        )
     return basis_velocities + phases + transforms + result
 
 

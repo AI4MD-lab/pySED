@@ -34,7 +34,7 @@ from pySED.io.netcdf import NetCDFReader, is_netcdf
 from pySED.io.prepare import prepare_trajectory
 from pySED.io.schema import CELLS
 from pySED.io.text import read_text_position_field
-from pySED.io.trajectory import prefetch_one, trajectory_block_source
+from pySED.io.trajectory import prefetch_one, trajectory_block_source, read_first_positions
 from pySED.parameters import validate_qpoint_slice_index
 from pySED.postprocess import FileIO, Lorentz, output_files, Plot_SED
 from pySED.sed import Phonon, construct_BZ
@@ -43,6 +43,12 @@ from pySED.sed import Phonon, construct_BZ
 
 def _plot_data_ready(params):
     """Return whether all four saved SED data files exist."""
+    if getattr(params, "eigenvector_file", None):
+        mapping = np.loadtxt(params.basis_lattice_file, skiprows=2, ndmin=2)
+        if output_files.available_modes(params.out_files_name) != list(range(1, 3 * int(mapping[:, 2].max()) + 1)):
+            return False
+    if getattr(params, "mode_index", 0) and not output_files.mode_sed_data(params.out_files_name, params.mode_index).is_file():
+        return False
     return all(
         path.is_file()
         for path in output_files.sed_data_files(params.out_files_name)
@@ -78,11 +84,22 @@ def _plot_ready(params):
 def _fit_ready(params):
     """Return whether the currently requested fit output exists."""
 
+    if getattr(params, "fit_all_modes", False):
+        modes = output_files.available_modes(params.out_files_name)
+        if not modes:
+            return False
+        for mode in modes:
+            selected = copy(params)
+            selected.fit_all_modes = False
+            selected.mode_index = mode
+            if not _fit_ready(selected):
+                return False
+        return True
     if params.lorentz_fit_all_qpoint:
-        output = output_files.combined_lifetime_data()
+        output = output_files.combined_lifetime_data(params)
     else:
         output = output_files.qpoint_lifetime_data(
-            params.qpoint_slice_index
+            params.qpoint_slice_index, params
         )
     return output.is_file()
 
@@ -90,6 +107,8 @@ def _fit_ready(params):
 def _sed_component_description(params):
     """Describe the total or partial SED selected for plotting."""
 
+    if getattr(params, "mode_index", 0):
+        return f"mode {params.mode_index} SED"
     if not getattr(params, "plot_partial_SED", False):
         return "total SED"
     direction = params.plot_partial_dir or "x+y+z (summed)"
@@ -165,6 +184,9 @@ def step_compute_sed(params):
     t0 = time.perf_counter()
 
     trajectory = trajectory_block_source(params)
+    reference_positions = (
+        read_first_positions(params) if getattr(params, "eigenvector_file", None) else None
+    )
     num_frames = params.total_num_steps // params.output_data_stride
     block_size = num_frames // params.num_blocks
     raw_blocks = trajectory.iter_blocks(block_size, params.num_blocks)
@@ -194,6 +216,18 @@ def step_compute_sed(params):
         )
         BZ_info = construct_BZ.BZ_methods(params, bz_cell)
         sed = Phonon.spectral_energy_density(params, trajectory.info)
+        if reference_positions is not None:
+            from pySED.sed.mode_projection import load_mode_projection
+            sed.mode_projection = load_mode_projection(params.eigenvector_file, BZ_info, reference_positions)
+            _print_detail("Eigenvector file", params.eigenvector_file)
+            _print_detail("Projected modes per q", sed.mode_projection.weights.shape[-1])
+            _print_detail("Reordered basis sites", np.count_nonzero(
+                sed.mode_projection.atom_map != np.arange(len(sed.mode_projection.atom_map)),
+            ))
+            _print_detail("Periodic-image corrections", np.count_nonzero(
+                np.any(sed.mode_projection.cell_shifts != 0, axis=1),
+            ))
+            del reference_positions
         # An exhausted iterator releases its first block; a tuple passed to
         # chain directly would keep that block alive until the final block.
         trajectory_blocks = chain(iter((first_block,)), blocks)
@@ -287,6 +321,17 @@ def step_fit_sed(params):
     mode can rebuild that summary when re_output_total_freq_lifetime is set.
     Loading and fitting do not convert the stored SED intensity scale.
     """
+    if getattr(params, "fit_all_modes", False):
+        modes = output_files.available_modes(params.out_files_name)
+        if not modes:
+            raise FileNotFoundError("No mode spectra found; compute with eigenvector_file first")
+        for mode in modes:
+            selected = copy(params)
+            selected.fit_all_modes = False
+            selected.mode_index = mode
+            print_section(f"Fitting mode {mode}/{max(modes)}")
+            step_fit_sed(selected)
+        return
     _require_plot_data(params)
     lifetime_figure = None
     lifetime_figure_action = "written"
@@ -330,7 +375,7 @@ def step_fit_sed(params):
         _print_detail("Q-points processed", total_qpoints)
         _print_detail("Fitted peaks", total_modes)
         _print_detail("Lifetime data", total_file)
-        _print_detail("Q-point figures", output_files.FITTING_QPOINT_DIRECTORY)
+        _print_detail("Q-point figures", output_files.fitting_qpoint_figure(0, params).parent)
         print_section("All-Q spectral fitting complete", "✓")
         if incomplete_qpoints:
             incomplete_peak_count = sum(
@@ -355,7 +400,7 @@ def step_fit_sed(params):
                     f"        Q-point #{qpoint_index:<8}: "
                     f"{fitted_peak_word} {peak_list}"
                 )
-            print("\n        Check these figures in Fitting-Qpoint/.")
+            print(f"\n        Check these figures in {output_files.fitting_qpoint_figure(0, params).parent}.")
             print("        Adjust peak_min_significance if needed.")
         print(
             "\n    Tip: Check all fit figures. To refine one Q point, set its"
@@ -379,7 +424,7 @@ def step_fit_sed(params):
         if getattr(params, "re_output_total_freq_lifetime", False):
             total_qpoints = len(data.q_distances)
             available = sum(
-                output_files.qpoint_lifetime_data(i).is_file()
+                output_files.qpoint_lifetime_data(i, params).is_file()
                 for i in range(total_qpoints)
             )
             if available < total_qpoints:
@@ -407,7 +452,7 @@ def step_fit_sed(params):
                 )
         print_section("Single-Q spectral fit done", "✓")
         if not getattr(params, "re_output_total_freq_lifetime", False):
-            fit_figure = output_files.fitting_qpoint_figure(params.qpoint_slice_index)
+            fit_figure = output_files.fitting_qpoint_figure(params.qpoint_slice_index, params)
             print(f"\n    Tip: Check the fit in {fit_figure}.")
             print("         If satisfactory, set action = fit and")
             print("         lorentz_fit_all_qpoint = 1 to fit all q-points.")

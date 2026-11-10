@@ -183,6 +183,7 @@ PARAMETERS = {
 
     # Structure
     "basis_lattice_file": Parameter("basis.in", read_text),
+    "eigenvector_file": Parameter(None, read_text),
     "defect_index_file": Parameter(None, read_text),
     "supercell_dim": Parameter(np.array([1, 1, 1]), read_int3),
     "dump_group_supercell": Parameter(None, read_matrix3),
@@ -198,6 +199,8 @@ PARAMETERS = {
     "plot_cutoff_freq": Parameter(None, read_optional_float),
     "plot_interval": Parameter(5.0, read_float),
     "plot_slice": Parameter(False, read_bool),
+    "mode_index": Parameter(0, read_int),
+    "fit_all_modes": Parameter(False, read_bool),
     "qpoint_slice_index": Parameter(0, read_int),
     "plot_color": Parameter("RdBu_r", read_text),
     "colorbar_min": Parameter(None, read_optional_float),
@@ -238,6 +241,12 @@ def validate_common(params):
     units, block/worker counts, and NetCDF tuning values. Invalid settings
     raise ValueError; SED geometry and fitting checks are in validate_sed.
     """
+    if getattr(params, "mode_index", 0) < 0:
+        raise ValueError("mode_index must be 0 (total/partial SED) or a positive mode number")
+    partial = getattr(params, "plot_partial_SED", False)
+    partial = partial[0] if isinstance(partial, tuple) else partial
+    if (getattr(params, "mode_index", 0) or getattr(params, "fit_all_modes", False)) and partial:
+        raise ValueError("mode_index and plot_partial_SED cannot be selected together")
     if params.action not in supported_actions:
         supported = ", ".join(sorted(supported_actions))
         raise ValueError(
@@ -318,6 +327,9 @@ def validate_sed(params):
     """
 
     needs_compute = params.action in {"thinking", "compute"}
+    eigenvector_file = getattr(params, "eigenvector_file", None)
+    if needs_compute and eigenvector_file and not Path(eigenvector_file).is_file():
+        raise ValueError(f"eigenvector_file does not exist: {eigenvector_file}")
     if needs_compute and params.num_atoms <= 0:
         raise ValueError("num_atoms must be positive for SED computation")
     if needs_compute and params.total_num_steps <= 0:

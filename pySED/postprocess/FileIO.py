@@ -86,6 +86,18 @@ def write_output(phonons, params, BZ_lattice_info):
             header=header,
         )
 
+    if hasattr(phonons, "mode_sed_avg"):
+        for mode in range(phonons.mode_sed_avg.shape[2]):
+            path = output_files.mode_sed_data(params.out_files_name, mode + 1)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            reference = " ".join(f"{f:.10g}" for f in phonons.mode_projection.frequencies[:, mode])
+            np.savetxt(
+                path, phonons.mode_sed_avg[:, :, mode],
+                header=(header + f"\nmode: {mode + 1} (one-based YAML band index)"
+                        + f"\nreference_frequencies_THz (q order): {reference}"
+                        + f"\nmode_sum_relative_error: {phonons.mode_sum_relative_error:.6e}"),
+            )
+
     np.savetxt(qpoints_path, BZ_lattice_info.reduced_qpoints, fmt='%.8f')
     np.savetxt(frequency_path, phonons.freq_fft, fmt='%.8f')
 
@@ -188,6 +200,10 @@ class load_data(object):
         self.partial_files = (
             _partial_sed_files(params) if getattr(params, 'plot_partial_SED', False) else []
         )
+        if getattr(params, "mode_index", 0):
+            sed_path = output_files.mode_sed_data(params.out_files_name, params.mode_index)
+            if not sed_path.is_file():
+                raise FileNotFoundError(f"Mode SED is missing: {sed_path}; compute with eigenvector_file first")
         for index, path in enumerate(self.partial_files or [sed_path]):
             values, legacy = _read_sed(path, getattr(params, 'legacy_unit', False))
             if index == 0:
@@ -270,7 +286,7 @@ def write_phonon_lifetime(lorentz, params):
     """
 
     output_file = output_files.qpoint_lifetime_data(
-        params.qpoint_slice_index
+        params.qpoint_slice_index, params
     )
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_lines = [
@@ -282,7 +298,25 @@ def write_phonon_lifetime(lorentz, params):
     ]
 
     lifetimes = hwhm_to_lifetime_ps(lorentz.popt[:, 2])
-    for fit_parameters, lifetime in zip(lorentz.popt, lifetimes):
+    mode = getattr(params, "mode_index", 0)
+    if mode:
+        output_lines[0] += f"; mode={mode}; q_index={params.qpoint_slice_index}; peaks={len(lifetimes)}"
+        output_lines[1] = (
+            "Frequency_THz lifetime_ps HWHM_THz q_index mode status; "
+            "status bits: 1=incomplete, 2=unresolved, 4=upper_bound, 8=invalid_lifetime"
+        )
+    for i, (fit_parameters, lifetime) in enumerate(zip(lorentz.popt, lifetimes)):
+        if mode:
+            flags = sum(
+                bit * int(getattr(lorentz, attr, np.zeros(len(lifetimes), dtype=bool))[i])
+                for bit, attr in [(1, "incomplete_peak_shapes"), (2, "unresolved_widths"), (4, "upper_bound_hits")]
+            )
+            flags |= 8 if not np.isfinite(lifetime) else 0
+            output_lines.append(
+                f"{fit_parameters[0]:.6f} {lifetime:.8f} {fit_parameters[2]:.8f} "
+                f"{params.qpoint_slice_index} {mode} {flags}"
+            )
+            continue
         if not np.isfinite(lifetime):  # don't output failed fits
             continue
         output_lines.append(
@@ -312,7 +346,7 @@ def read_lifetime_data(path):
         return np.empty(0, dtype=float), np.empty(0, dtype=float)
 
     values = np.atleast_2d(np.loadtxt(data_lines, dtype=float))
-    if values.shape[1] != 2:
+    if values.shape[1] not in {2, 6}:
         raise ValueError(f"invalid frequency-lifetime data in {path}")
     return values[:, 0], values[:, 1]
 
@@ -333,9 +367,13 @@ def deal_total_fre_lifetime(params, total_qpoints):
         ),
     ]
     total_num_fre_lifetime = 0
+    mode = getattr(params, "mode_index", 0)
+    if mode:
+        output_lines[0] += f"; mode={mode}"
+        output_lines[1] = "Frequency_THz lifetime_ps HWHM_THz q_index mode status"
 
     for i in range(total_qpoints):
-        load_file_name = output_files.qpoint_lifetime_data(i)
+        load_file_name = output_files.qpoint_lifetime_data(i, params)
         try:
             frequency, lifetime = read_lifetime_data(load_file_name)
         except OSError as error:
@@ -350,13 +388,16 @@ def deal_total_fre_lifetime(params, total_qpoints):
             )
             continue
 
-        output_lines.extend(
-            f"{freq:.6f} {tau:.8f}"
-            for freq, tau in zip(frequency, lifetime)
-        )
+        if mode:
+            output_lines.extend(Path(load_file_name).read_text(encoding="utf-8").splitlines()[2:])
+        else:
+            output_lines.extend(
+                f"{freq:.6f} {tau:.8f}"
+                for freq, tau in zip(frequency, lifetime)
+            )
         total_num_fre_lifetime += frequency.size
 
-    output_file = output_files.combined_lifetime_data()
+    output_file = output_files.combined_lifetime_data(params)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(
         "\n".join(output_lines) + "\n",

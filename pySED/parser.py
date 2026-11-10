@@ -131,7 +131,7 @@ def read_input(input_file="input_SED.in"):
             ) from error
         setattr(params, key, value)
 
-    for key in ("trajectory_file", "basis_lattice_file", "defect_index_file"):
+    for key in ("trajectory_file", "basis_lattice_file", "defect_index_file", "eigenvector_file"):
         if getattr(params, key) is None:
             continue
         path = Path(getattr(params, key)).expanduser()

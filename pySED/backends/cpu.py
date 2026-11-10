@@ -79,6 +79,7 @@ def _compute_shared_q_batch(
             qpoints=_CPU_WORKER_CONFIG.qpoints[q_start:q_stop],
             basis_ids_by_basis=_CPU_WORKER_CONFIG.basis_ids,
             config=_CPU_WORKER_CONFIG,
+            q_start=q_start,
         )
         return q_start, q_stop, result
     finally:
@@ -162,7 +163,7 @@ class CPUBackend:
         parallel = workers > 1
         reserved = (int(parallel) + 2 * int(self._prefetch)) * vels.nbytes
         if parallel:
-            components = self.config.num_types * 3 if self.config.output_partial else 1
+            components = self.config.ordinary_components + self.config.num_modes
             reserved += vels.shape[0] * len(self.config.qpoints) * components * 8
             reserved += workers * _WORKER_OVERHEAD
         return reserved
@@ -223,6 +224,7 @@ class CPUBackend:
                     result[..., start:stop] = calculate_q_batch(
                         vels, cell_vecs, self.config.qpoints[start:stop],
                         self.config.basis_ids, self.config,
+                        q_start=start,
                     )
             return
 

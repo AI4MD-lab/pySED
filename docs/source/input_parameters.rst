@@ -36,6 +36,7 @@ meaning, defaults, examples, practical notes, and related parameters.
    input_parameters/out_files_name
    input_parameters/legacy_unit
    input_parameters/basis_lattice_file
+   input_parameters/eigenvector_file
    input_parameters/defect_index_file
    input_parameters/lammps_unit
    input_parameters/output_partial
@@ -180,6 +181,15 @@ meaning, defaults, examples, practical notes, and related parameters.
    * - `defect_index_file <input_parameters/defect_index_file.html>`_
      - Files
      - Optional reference-to-trajectory mapping for static vacancies.
+   * - `eigenvector_file <input_parameters/eigenvector_file.html>`_
+     - Files
+     - Phonopy band.yaml for mode-resolved SED in mode-resoved-SED/.
+   * - `mode_index <input_parameters/eigenvector_file.html#plotting-and-fitting>`_
+     - Plotting and fitting
+     - One-based mode selection; 0 selects ordinary total/partial SED.
+   * - `fit_all_modes <input_parameters/eigenvector_file.html#plotting-and-fitting>`_
+     - Fitting
+     - Fit every saved mode at the selected q point or all q points.
    * - `lammps_unit <input_parameters/lammps_unit.html>`_
      - Files
      - LAMMPS unit style for velocity conversion.
