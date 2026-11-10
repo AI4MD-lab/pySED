@@ -1,5 +1,5 @@
 eigenvector_file
-===============
+================
 
 Syntax and default
 ------------------
