@@ -23,12 +23,18 @@ Explicit actions run the requested stage without an automatic skip.
 import os
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor, wait
+from contextlib import redirect_stdout, redirect_stderr
 from copy import copy
+from io import StringIO
 from itertools import chain
+from multiprocessing import get_context
 from pathlib import Path
 
 import numpy as np
+from threadpoolctl import threadpool_limits
 
+from pySED.backends.cpu import _cpu_budget
 from pySED.console import print_detail as _print_detail, print_section
 from pySED.io.netcdf import NetCDFReader, is_netcdf
 from pySED.io.prepare import prepare_trajectory
@@ -47,7 +53,10 @@ def _plot_data_ready(params):
         mapping = np.loadtxt(params.basis_lattice_file, skiprows=2, ndmin=2)
         if output_files.available_modes(params.out_files_name) != list(range(1, 3 * int(mapping[:, 2].max()) + 1)):
             return False
-    if getattr(params, "mode_index", 0) and not output_files.mode_sed_data(params.out_files_name, params.mode_index).is_file():
+    if getattr(params, "plot_all_modes", False):
+        if not output_files.available_modes(params.out_files_name):
+            return False
+    elif getattr(params, "mode_index", 0) and not output_files.mode_sed_data(params.out_files_name, params.mode_index).is_file():
         return False
     return all(
         path.is_file()
@@ -70,6 +79,17 @@ def _require_plot_data(params):
 def _plot_ready(params):
     """Return whether the images requested by the current input exist."""
 
+    if getattr(params, "plot_all_modes", False):
+        modes = output_files.available_modes(params.out_files_name)
+        if not modes:
+            return False
+        for mode in modes:
+            selected = copy(params)
+            selected.plot_all_modes = False
+            selected.mode_index = mode
+            if not _plot_ready(selected):
+                return False
+        return True
     if not output_files.dispersion_figure(params).is_file():
         return False
     if getattr(params, "plot_partial_SED", False) and getattr(params, "save_partial_SED", True):
@@ -108,7 +128,7 @@ def _sed_component_description(params):
     """Describe the total or partial SED selected for plotting."""
 
     if getattr(params, "mode_index", 0):
-        return f"mode {params.mode_index} SED"
+        return f"mode {params.mode_index} SED (eigenvector projection)"
     if not getattr(params, "plot_partial_SED", False):
         return "total SED"
     direction = params.plot_partial_dir or "x+y+z (summed)"
@@ -168,6 +188,10 @@ def step_prepare_trajectory(params):
         coordinate_source = "GPUMD" if source_format == "gpumd_xyz" else "LAMMPS"
     if position_field in {"unwrapped_position", "xu yu zu", "unwrapped_coordinates"}:
         _print_detail("Coordinates", f"unwrapped ({position_field} from {coordinate_source})")
+    print(f"    ✓  Reading basis mapping: {params.basis_lattice_file}")
+    if getattr(params, "eigenvector_file", None):
+        print(f"    ✓  Reading Phonopy eigenvectors: {params.eigenvector_file}")
+        print(f"    ✓  Reading reference structure: {params.reference_structure_file}")
 
 
 def step_compute_sed(params):
@@ -218,15 +242,24 @@ def step_compute_sed(params):
         sed = Phonon.spectral_energy_density(params, trajectory.info)
         if reference_positions is not None:
             from pySED.sed.mode_projection import load_mode_projection
-            sed.mode_projection = load_mode_projection(params.eigenvector_file, BZ_info, reference_positions)
-            _print_detail("Eigenvector file", params.eigenvector_file)
-            _print_detail("Projected modes per q", sed.mode_projection.weights.shape[-1])
-            _print_detail("Reordered basis sites", np.count_nonzero(
-                sed.mode_projection.atom_map != np.arange(len(sed.mode_projection.atom_map)),
-            ))
-            _print_detail("Periodic-image corrections", np.count_nonzero(
-                np.any(sed.mode_projection.cell_shifts != 0, axis=1),
-            ))
+            print_section("Loading Phonopy eigenvectors")
+            sys.stdout.flush()
+            sed.mode_projection = load_mode_projection(
+                params.eigenvector_file, BZ_info, reference_positions, params.reference_structure_file,
+                show_progress=True,
+            )
+            print_section("Mode-resolved SED")
+            print("        " + "-" * 72)
+            _print_detail("Eigenvector projection", "ON", width=30)
+            _print_detail("Primitive-cell atoms", sed.mode_projection.weights.shape[1], width=30)
+            _print_detail("Q-points", BZ_info.num_qpoints, width=30)
+            _print_detail("Modes per q-point", sed.mode_projection.weights.shape[-1], width=30)
+            print()
+            _print_detail("Total SED source", "sum of projected modes", width=30)
+            _print_detail("Default plots / fits", "eigenvector-projected SED", width=30)
+            _print_detail("Reference only", str(output_files.comparison_sed_prefix(params.out_files_name).parent)
+                          + " (without eigenvectors)", width=30)
+            print("        " + "-" * 72)
             del reference_positions
         # An exhausted iterator releases its first block; a tuple passed to
         # chain directly would keep that block alive until the final block.
@@ -259,6 +292,23 @@ def step_plot_sed(params):
     q-point slice. Data-file metadata supplies intensity labels; the current
     legacy_unit input is only a fallback for unmarked historical files.
     """
+    if getattr(params, "plot_all_modes", False):
+        modes = output_files.available_modes(params.out_files_name)
+        if not modes:
+            raise FileNotFoundError("No mode spectra found; compute with eigenvector_file first")
+        for mode_number, mode in enumerate(modes, 1):
+            selected = copy(params)
+            selected.plot_all_modes = False
+            selected.mode_index = mode
+            selected.if_show_figures = False
+            print_section(f"Plotting mode {mode} ({mode_number}/{len(modes)})")
+            step_plot_sed(selected)
+        print_section("All-mode SED plotting complete", "✓")
+        _print_detail("Modes plotted", len(modes))
+        _print_detail("SED figures", output_files.mode_sed_data(params.out_files_name, modes[0]).parent)
+        if params.plot_slice:
+            _print_detail("Single-q figures", f"index {params.qpoint_slice_index} for each mode (zero-based)")
+        return
     _require_plot_data(params)
 
     data = _load_sed_data(params)
@@ -313,7 +363,173 @@ def _fit_one_qpoint(data, params):
     return fit_result
 
 
-def step_fit_sed(params):
+def _fit_qpoint_task(data, params, q_index, total_qpoints):
+    """Fit one all-q task with the same console output in either execution mode."""
+    mode = getattr(params, "mode_index", 0)
+    subject = f"mode {mode} at " if mode else ""
+    q = ", ".join(f"{value:.4f}" for value in data.qpoints[q_index])
+    print("\n    " + "-" * 72)
+    print(f"    ▶  Fitting {subject}Q-point #{q_index} ({q_index + 1}/{total_qpoints}): q = ({q})")
+    selected = copy(params)
+    selected.qpoint_slice_index = q_index
+    selected.if_show_figures = False
+    fit_result = _fit_one_qpoint(data, selected)
+    return [
+        int(result["peak_number"]) for result in fit_result.peak_fits
+        if result["incomplete_peak_shapes"][0]
+    ]
+
+
+_FIT_WORKER_DATA = None
+_FIT_WORKER_LIMIT = None
+
+
+def _initialize_fit_worker(data):
+    """Load q-point task data once per process and limit native libraries to one thread."""
+    global _FIT_WORKER_DATA, _FIT_WORKER_LIMIT
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    _FIT_WORKER_DATA = data
+    _FIT_WORKER_LIMIT = threadpool_limits(limits=1)
+
+
+def _fit_parallel_worker(task):
+    """Capture each task's output for ordered printing by the parent process."""
+    kind, params, index, total = task
+    output = StringIO()
+    result, error = None, None
+    with redirect_stdout(output), redirect_stderr(output):
+        try:
+            if kind == "mode":
+                print_section(f"Fitting mode {params.mode_index} ({index + 1}/{total})")
+                params.max_cores = 1
+                params.if_show_figures = False
+                step_fit_sed(params, _batch_mode=True)
+            else:
+                result = _fit_qpoint_task(_FIT_WORKER_DATA, params, index, total)
+        except Exception as exc:
+            error = str(exc)
+    return result, output.getvalue(), error
+
+
+def _parallel_fit_results(tasks, workers, data=None):
+    """Yield results in input order; never interleave worker logs or nest pools."""
+    with ProcessPoolExecutor(
+        max_workers=workers, mp_context=get_context("spawn"),
+        initializer=_initialize_fit_worker, initargs=(data,),
+    ) as executor:
+        futures = [executor.submit(_fit_parallel_worker, task) for task in tasks]
+        show_progress = sys.stdout.isatty()
+        started = time.perf_counter()
+        progress_width = 0
+
+        def progress():
+            nonlocal progress_width
+            if not show_progress:
+                return
+            if not progress_width:
+                print(flush=True)
+            completed = sum(future.done() for future in futures)
+            filled = 32 * completed // len(futures)
+            elapsed = int(time.perf_counter() - started)
+            subject = "modes" if tasks[0][0] == "mode" else "q-points"
+            line = (
+                f"    🚀  Fitting {subject} [{'=' * filled}{'-' * (32 - filled)}]"
+                f" {completed}/{len(futures)} completed | {workers} CPU processes"
+                f" | {elapsed // 60:02d}:{elapsed % 60:02d} elapsed"
+            )
+            print("\r" + line, end="", flush=True)
+            progress_width = len(line) + 1  # The rocket occupies two terminal columns.
+
+        def clear_progress():
+            nonlocal progress_width
+            if progress_width:
+                print("\r" + " " * progress_width + "\r", end="", flush=True)
+                progress_width = 0
+
+        try:
+            for task, future in zip(tasks, futures):
+                kind, params, index, _ = task
+                mode = getattr(params, "mode_index", 0)
+                label = (f"mode {mode}" if kind == "mode" else
+                         (f"mode {mode}, " if mode else "") + f"Q-point #{index}")
+                try:
+                    if show_progress:
+                        while not future.done():
+                            progress()
+                            wait([future], timeout=1.0)
+                    result, output, error = future.result()
+                except Exception as exc:
+                    raise RuntimeError(f"Fitting {label} failed.\n{exc}") from exc
+                clear_progress()
+                print(output, end="", flush=True)
+                if error is not None:
+                    raise RuntimeError(f"Fitting {label} failed.\n{error}")
+                yield result
+            progress()
+            if progress_width:
+                print(flush=True)
+                progress_width = 0
+        except BaseException:
+            clear_progress()
+            for future in futures:
+                future.cancel()
+            raise
+
+
+def _report_lifetime_figure_not_updated(figure):
+    """Explain missing plot data while preserving any previous figure."""
+    exists = figure.is_file()
+    print_section("Lifetime figure not updated" if exists else "Lifetime figure not generated", "⚠")
+    _print_detail("Reason", "no fitted lifetimes can be plotted from the current results")
+    _print_detail("Lifetime figure", figure)
+    if exists:
+        _print_detail("Existing figure", "kept unchanged; shows the previous results")
+
+
+def _update_all_mode_lifetimes(params):
+    """Refresh the parent summary from saved fits, without refitting spectra."""
+    try:
+        path, count = FileIO.combine_all_mode_lifetimes(params)
+    except FileNotFoundError as error:
+        print_section("All-mode lifetime summary not updated", "⚠")
+        print(f"        Missing data: {error}")
+        print("        Complete all modes and q-points before updating this summary.")
+        return
+    except ValueError as error:
+        # Saved files are validated before the combined table is written.
+        # A parent-summary problem must not invalidate the completed mode fit.
+        print_section("All-mode lifetime summary not updated", "⚠")
+        for line in str(error).splitlines():
+            print("        " + line)
+        _print_detail("Existing table / figure", "kept unchanged; show the previous results")
+        return
+    print_section("All-mode lifetime summary")
+    if getattr(params, "fit_reference_peak", True):
+        qpoints_path = output_files.sed_data_files(params.out_files_name)[1]
+        q_count = len(np.loadtxt(qpoints_path, ndmin=2))
+        mode_count = len(output_files.available_modes(params.out_files_name))
+        expected = q_count * mode_count
+        scope = f"{q_count} q-points x {mode_count} phonon branches"
+        peaks = (f"{count} ({scope})" if count == expected else
+                 f"{count} (expected: {expected} = {scope})")
+        _print_detail("Fitted peaks", peaks)
+    else:
+        _print_detail("Fitted peaks", count)
+    _print_detail("Lifetime data", path)
+    frequency, lifetime = FileIO.read_lifetime_data(path)
+    valid = np.isfinite(frequency) & np.isfinite(lifetime) & (frequency >= 0) & (lifetime > 0)
+    figure = output_files.all_modes_lifetime_figure(params)
+    if np.any(valid):
+        Plot_SED.plot_lifetime_summary(frequency, lifetime, params, output_path=figure)
+        _print_detail("Lifetime figure", figure)
+    else:
+        _report_lifetime_figure_not_updated(figure)
+
+
+@threadpool_limits.wrap(limits=1)
+def step_fit_sed(params, *, _batch_mode=False):
     """Fit saved SED at one or all q points and write spectra/lifetime figures.
 
     For each q point, call the fitter, write frequencies and lifetimes, then
@@ -321,42 +537,69 @@ def step_fit_sed(params):
     mode can rebuild that summary when re_output_total_freq_lifetime is set.
     Loading and fitting do not convert the stored SED intensity scale.
     """
+    params = copy(params)
     if getattr(params, "fit_all_modes", False):
         modes = output_files.available_modes(params.out_files_name)
         if not modes:
             raise FileNotFoundError("No mode spectra found; compute with eigenvector_file first")
-        for mode in modes:
+        workers = min(_cpu_budget(getattr(params, "max_cores", 1)), len(modes))
+        tasks = []
+        for index, mode in enumerate(modes):
             selected = copy(params)
             selected.fit_all_modes = False
             selected.mode_index = mode
-            print_section(f"Fitting mode {mode}/{max(modes)}")
-            step_fit_sed(selected)
+            tasks.append(("mode", selected, index, len(modes)))
+        if workers > 1:
+            print(f"    🚀  {'Fitting workers':<24}: {workers} CPU processes")
+            for _ in _parallel_fit_results(tasks, workers):
+                pass
+        else:
+            for _, selected, index, total in tasks:
+                print_section(f"Fitting mode {selected.mode_index} ({index + 1}/{total})")
+                step_fit_sed(selected, _batch_mode=True)
+        print_section("Mode fitting complete", "✓")
+        _print_detail("Modes processed", len(modes))
+        if params.lorentz_fit_all_qpoint:
+            qpoints_path = output_files.sed_data_files(params.out_files_name)[1]
+            _print_detail("Q-points per mode", len(np.loadtxt(qpoints_path, ndmin=2)))
+        else:
+            _print_detail("Q-points per mode", f"1 (index {params.qpoint_slice_index}, zero-based)")
+        if params.lorentz_fit_all_qpoint or (
+            getattr(params, "re_output_total_freq_lifetime", False)
+            and output_files.all_modes_lifetime_data(params).is_file()
+        ):
+            _update_all_mode_lifetimes(params)
+        print("\n    Tip: Inspect the fit figures in each mode's Fitting-Qpoint directory.")
+        print("         To refit one mode, set fit_all_modes = 0 and mode_index to that mode.")
+        if not params.lorentz_fit_all_qpoint:
+            print("         To fit all q-points for all modes, keep fit_all_modes = 1")
+            print("         and set lorentz_fit_all_qpoint = 1.")
         return
     _require_plot_data(params)
+    mode = getattr(params, "mode_index", 0)
+    fit_subject = f"mode {mode} at " if mode else ""
     lifetime_figure = None
     lifetime_figure_action = "written"
 
     if params.lorentz_fit_all_qpoint:
-        print_section("Fitting spectral peaks at all Q-points", "▶")
+        print_section(f"Fitting {fit_subject}all Q-points" if mode else
+                      "Fitting spectral peaks at all Q-points", "▶")
         data = _load_sed_data(params)
+        if hasattr(data, "eigenvector_projection"):
+            params._fit_eigenvectors = data.eigenvector_projection
         total_qpoints = len(data.q_distances)
         incomplete_qpoints = []
         _print_detail("Total Q-points", total_qpoints)
-        for j in range(total_qpoints):
-            q = ", ".join(f"{value:.4f}" for value in data.qpoints[j])
-            print("\n    " + "-" * 72)
-            print(
-                f"    ▶  Fitting Q-point #{j} ({j + 1}/{total_qpoints}): q = ({q})"
-            )
-            q_params = copy(params)
-            q_params.qpoint_slice_index = j
-            q_params.if_show_figures = False
-            fit_result = _fit_one_qpoint(data, q_params)
-            incomplete_peaks = [
-                int(result["peak_number"])
-                for result in fit_result.peak_fits
-                if result["incomplete_peak_shapes"][0]
-            ]
+        workers = 1 if _batch_mode else min(
+            _cpu_budget(getattr(params, "max_cores", 1)), total_qpoints,
+        )
+        if workers > 1:
+            print(f"    🚀  {'Fitting workers':<24}: {workers} CPU processes")
+            tasks = [("q-point", params, j, total_qpoints) for j in range(total_qpoints)]
+            results = _parallel_fit_results(tasks, workers, data)
+        else:
+            results = (_fit_qpoint_task(data, params, j, total_qpoints) for j in range(total_qpoints))
+        for j, incomplete_peaks in enumerate(results):
             if incomplete_peaks:
                 incomplete_qpoints.append((j, incomplete_peaks))
 
@@ -364,19 +607,23 @@ def step_fit_sed(params):
             params,
             total_qpoints,
         )
-        if total_modes:
-            frequency, lifetime = FileIO.read_lifetime_data(total_file)
+        frequency, lifetime = FileIO.read_lifetime_data(total_file)
+        valid = np.isfinite(frequency) & np.isfinite(lifetime) & (frequency >= 0) & (lifetime > 0)
+        if mode and not np.any(valid):
+            _report_lifetime_figure_not_updated(output_files.lifetime_summary_figure(params))
+        elif total_modes:
             lifetime_figure = Plot_SED.plot_lifetime_summary(
                 frequency,
                 lifetime,
                 params,
             )
-        print_section("All-Q fitting summary")
+        print_section(f"Mode {mode}: all-Q fitting summary" if mode else "All-Q fitting summary")
         _print_detail("Q-points processed", total_qpoints)
         _print_detail("Fitted peaks", total_modes)
         _print_detail("Lifetime data", total_file)
         _print_detail("Q-point figures", output_files.fitting_qpoint_figure(0, params).parent)
-        print_section("All-Q spectral fitting complete", "✓")
+        print_section(f"Mode {mode}: all-Q spectral fitting complete" if mode else
+                      "All-Q spectral fitting complete", "✓")
         if incomplete_qpoints:
             incomplete_peak_count = sum(
                 len(peaks) for _, peaks in incomplete_qpoints
@@ -402,24 +649,37 @@ def step_fit_sed(params):
                 )
             print(f"\n        Check these figures in {output_files.fitting_qpoint_figure(0, params).parent}.")
             print("        Adjust peak_min_significance if needed.")
-        print(
-            "\n    Tip: Check all fit figures. To refine one Q point, set its"
-        )
-        print(
-            "         qpoint_slice_index, adjust peak_min_significance and"
-        )
-        print(
-            "         fitting_function = auto | lorentz | dho, then set"
-        )
-        print("         lorentz_fit_all_qpoint = 0 and")
-        print("         re_output_total_freq_lifetime = 1.")
+        if not _batch_mode:
+            if mode:
+                print(f"\n    Tip: Check the fit figures for mode {mode}.")
+                print("\n         To refit one q-point and update this mode's lifetime summary:")
+            else:
+                print("\n    Tip: Check all fit figures.")
+                print("\n         To refit one q-point and update the lifetime summary:")
+            print("             action = fit")
+            if mode:
+                print(f"             mode_index = {mode}")
+                print("             fit_all_modes = 0")
+            print("             lorentz_fit_all_qpoint = 0")
+            print("             re_output_total_freq_lifetime = 1")
+            print("\n         Set qpoint_slice_index to the q-point you want to refit.")
+            print("         Adjust peak_min_significance if needed.")
+            print("         For fitting_function, choose one: auto, lorentz, or dho.")
+            if mode:
+                print()
+                print("         To fit all modes at all q-points, set:")
+                print("             action = fit")
+                print("             fit_all_modes = 1")
+                print("             lorentz_fit_all_qpoint = 1")
     else:
         # single Q-point fit
         data = _load_sed_data(params)
+        if hasattr(data, "eigenvector_projection"):
+            params._fit_eigenvectors = data.eigenvector_projection
         validate_qpoint_slice_index(params, data.qpoints)
         q = ", ".join(f"{value:.4f}" for value in data.qpoints[params.qpoint_slice_index])
         print("\n    " + "-" * 72)
-        print(f"    ▶  Fitting Q-point #{params.qpoint_slice_index}: q = ({q})")
+        print(f"    ▶  Fitting {fit_subject}Q-point #{params.qpoint_slice_index}: q = ({q})")
         _fit_one_qpoint(data, params)
         if getattr(params, "re_output_total_freq_lifetime", False):
             total_qpoints = len(data.q_distances)
@@ -438,8 +698,11 @@ def step_fit_sed(params):
                     params,
                     total_qpoints,
                 )
-                if total_modes:
-                    frequency, lifetime = FileIO.read_lifetime_data(total_file)
+                frequency, lifetime = FileIO.read_lifetime_data(total_file)
+                valid = np.isfinite(frequency) & np.isfinite(lifetime) & (frequency >= 0) & (lifetime > 0)
+                if mode and not np.any(valid):
+                    _report_lifetime_figure_not_updated(output_files.lifetime_summary_figure(params))
+                elif total_modes:
                     lifetime_figure = Plot_SED.plot_lifetime_summary(
                         frequency,
                         lifetime,
@@ -450,13 +713,28 @@ def step_fit_sed(params):
                     "    ✓  Combined phonon lifetime data updated → "
                     f"{total_file} ({total_modes} peaks)"
                 )
-        print_section("Single-Q spectral fit done", "✓")
-        if not getattr(params, "re_output_total_freq_lifetime", False):
+        print_section(f"Mode {mode} fit complete at Q-point #{params.qpoint_slice_index}" if mode else
+                      "Single-Q spectral fit done", "✓")
+        if not _batch_mode and not getattr(params, "re_output_total_freq_lifetime", False):
             fit_figure = output_files.fitting_qpoint_figure(params.qpoint_slice_index, params)
             print(f"\n    Tip: Check the fit in {fit_figure}.")
-            print("         If satisfactory, set action = fit and")
-            print("         lorentz_fit_all_qpoint = 1 to fit all q-points.")
+            print()
+            if mode:
+                print(f"         To fit all q-points of mode {mode}, keep mode_index = {mode}")
+                print("         and fit_all_modes = 0; set lorentz_fit_all_qpoint = 1.")
+                print()
+                print("         To fit all modes at all q-points, set:")
+                print("             action = fit")
+                print("             fit_all_modes = 1")
+                print("             lorentz_fit_all_qpoint = 1")
+            else:
+                print("         If satisfactory, set action = fit and")
+                print("         lorentz_fit_all_qpoint = 1 to fit all q-points.")
 
+    if (mode and not _batch_mode
+            and (params.lorentz_fit_all_qpoint or getattr(params, "re_output_total_freq_lifetime", False))
+            and output_files.all_modes_lifetime_data(params).is_file()):
+        _update_all_mode_lifetimes(params)
     if lifetime_figure is not None:
         print(
             f"\n    🖼  Lifetime figure {lifetime_figure_action}: {lifetime_figure}"
@@ -504,7 +782,7 @@ def _run_thinking(params, steps):
     """
 
     if not _plot_data_ready(params):
-        print("    💡 thinking: process trajectory + compute + plot")
+        print("    💡 thinking: process trajectory + compute + plot\n")
         steps["compute"](params)
         steps["plot"](params)
         return

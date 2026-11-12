@@ -147,21 +147,23 @@ class spectral_energy_density:
                         f"({vacancy_count} / {reference_count} {symbol} atoms)",
                     )
         print_section("SED calculation setup")
-        print_detail("Total q-points", lattice_info.num_qpoints, width=48)
-        print_detail("Total trajectory frames for calculating SED", self.num_frame, width=48)
+        print("        " + "-" * 72)
+        print_detail("Total q-points", lattice_info.num_qpoints, width=30)
+        print_detail("Total trajectory frames", self.num_frame, width=30)
         print_detail(
-            "Trajectories divided into blocks for averaging",
+            "Averaging blocks",
             f"{params.num_blocks} ({self.num_frames_per_block} frames per block)",
-            width=48,
+            width=30,
         )
         print()
-        print_detail("Velocity unit converted to", "m/s", width=48)
+        print_detail("Velocity unit", "m/s", width=30)
         print_detail(
             "SED unit",
             f"{self.sed_unit} (for pySED 2.x comparison)" if self.legacy_unit else
             f"{self.sed_unit} (phonon kinetic energy per unit frequency)",
-            width=48,
+            width=30,
         )
+        print("        " + "-" * 72)
         kernel_config = self._prepare_kernel(params, lattice_info)
 
         # Build the numbered cell origins once; all velocity blocks share them.
@@ -188,6 +190,8 @@ class spectral_energy_density:
         reference cell. Element/type channels follow sorted unique
         masses, and Cartesian q points include the reciprocal 2*pi factor.
         """
+        if self.mode_projection is not None and getattr(params, "output_partial", False):
+            raise ValueError("Eigenvector projection does not support output_partial = 1; set output_partial = 0 or omit it")
         # These topology values do not change between blocks or Q points.
         self.num_unit_cells = lattice_info.unitcell_index.max()
         num_basis = lattice_info.basis_index.max()
@@ -256,22 +260,17 @@ class spectral_energy_density:
             lattice_info.reduced_qpoints,
             dtype=float,
         )
-        self._allocate_sed_accumulator(lattice_info, unique_masses)
-        if kernel_config.num_modes:
-            self._sed_sum = np.zeros((
-                self.num_frames_per_block,
-                kernel_config.ordinary_components + kernel_config.num_modes,
-                lattice_info.num_qpoints,
-            ))
+        self._allocate_sed_accumulator(lattice_info, unique_masses, kernel_config.num_modes)
 
         return kernel_config
 
-    def _allocate_sed_accumulator(self, lattice_info, unique_masses):
+    def _allocate_sed_accumulator(self, lattice_info, unique_masses, num_modes=0):
         """Allocate the running sum on the full, two-sided FFT grid.
 
         Its shape is (frames_per_block, q_points), or
-        (frames_per_block, types, 3, q_points) for partial output. Only one
-        running sum is retained, rather than a spectrum for every block.
+        (frames_per_block, types, 3, q_points) for partial output. With modes,
+        the ordinary comparison total and modes are packed into one channel axis.
+        Only one running sum is retained, rather than a spectrum for every block.
         """
 
         if self.output_partial:
@@ -285,23 +284,14 @@ class spectral_energy_density:
                 symbol = self.type_symbols[type_index]
                 print(f"            {symbol:<8}  {str(mass):>12}")
 
-            # Match the kernel layout: (frequency, type, xyz, q).
-            self._sed_sum = np.zeros(
-                (
-                    self.num_frames_per_block,
-                    self.num_types,
-                    3,
-                    lattice_info.num_qpoints,
-                )
-            )
+        if num_modes:
+            components = num_modes + 1
+            shape = (self.num_frames_per_block, components, lattice_info.num_qpoints)
+        elif self.output_partial:
+            shape = (self.num_frames_per_block, self.num_types, 3, lattice_info.num_qpoints)
         else:
-            print_detail("Partial SED", "disabled (total SED only)")
-            self._sed_sum = np.zeros(
-                (
-                    self.num_frames_per_block,
-                    lattice_info.num_qpoints,
-                )
-            )
+            shape = (self.num_frames_per_block, lattice_info.num_qpoints)
+        self._sed_sum = np.zeros(shape)
 
     def _loop_over_blocks(self, backend, trajectory_blocks):
         """Compute each full block, apply its normalization, and add to the sum.
@@ -360,22 +350,25 @@ class spectral_energy_density:
             legacy_unit=getattr(self, "legacy_unit", False),
         )
         if self.mode_projection is not None:
-            ordinary = self.num_types * 3 if self.output_partial else 1
-            self.mode_sed_avg = self.sed_avg[:, ordinary:, :].transpose(0, 2, 1)
-            self.sed_avg = self.sed_avg[:, :ordinary, :]
-            if self.output_partial:
-                self.sed_avg = self.sed_avg.reshape(
-                    len(self.freq_fft), self.num_types, 3, -1,
-                )
-            else:
-                self.sed_avg = self.sed_avg[:, 0, :]
-            total = self.sed_avg.sum(axis=(1, 2)) if self.output_partial else self.sed_avg
-            difference = np.max(np.abs(self.mode_sed_avg.sum(axis=2) - total))
-            scale = np.max(np.abs(total))
-            self.mode_sum_relative_error = difference / scale if scale else difference
-            print_detail("Mode sum / total SED max error", f"{self.mode_sum_relative_error:.3e}")
-            if self.mode_sum_relative_error > 1e-6:
-                raise ValueError("Summed mode spectra do not reproduce total SED")
+            # Keep the ordinary total separate from the authoritative mode sum.
+            # Partial output with eigenvectors is rejected in _prepare_kernel.
+            self.unprojected_sed_avg = self.sed_avg[:, 0, :]
+            self.mode_sed_avg = self.sed_avg[:, 1:, :].transpose(0, 2, 1)
+            self.sed_avg = self.mode_sed_avg.sum(axis=2)
+            difference = np.max(np.abs(self.sed_avg - self.unprojected_sed_avg))
+            reference_peak = np.max(np.abs(self.unprojected_sed_avg))
+            self.mode_sum_relative_error = (
+                difference / reference_peak if reference_peak > 0
+                else (0.0 if difference == 0 else np.inf)
+            )
+            passed = np.isfinite(self.mode_sum_relative_error) and self.mode_sum_relative_error <= 1e-6
+            print_section("SED consistency check")
+            print_detail("With eigenvectors", "total SED = sum of all mode spectra", width=40)
+            print_detail("Without eigenvectors", "total SED from atomic velocities, without eigenvector projection", width=40)
+            print_detail("Agreement of the two total spectra", "PASSED" if passed else "FAILED", width=40)
+            print_detail("Max difference / unprojected peak", f"{self.mode_sum_relative_error:.3e}", width=40)
+            if not passed:
+                raise ValueError("Summed mode spectra differ from the ordinary reference SED (relative tolerance 1e-6)")
         if self.output_partial:
             # Expose (frequency, q, type, xyz) to file output and plotting.
             # This is a view; the spectrum data are not copied.

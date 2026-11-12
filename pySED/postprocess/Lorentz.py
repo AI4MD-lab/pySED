@@ -25,6 +25,7 @@ handle saved results and figures separately.
 """
 
 import numpy as np
+from textwrap import fill
 from scipy.optimize import curve_fit
 from scipy.signal import find_peaks, windows
 
@@ -39,17 +40,58 @@ _AUTO_AICC_EQUIVALENCE = 2.0
 _DHO_MIN_DISTINGUISHABLE_DAMPING_RATIO = 0.05
 
 
-def hwhm_to_lifetime_ps(hwhm):
+def _fit_error_message(reason, action):
+    """Format actionable error text for the normal pySED error banner."""
+    return "\n".join(fill(text, width=100, initial_indent=f"{label:<24}: ",
+                          subsequent_indent=" " * 26)
+                     for label, text in (("Reason", reason), ("What to do", action)))
+
+
+def _solver_error_message(error):
+    """Explain solver errors without changing which exceptions are handled."""
+    message = str(error)
+    if message.startswith("Reason "):
+        return message
+    lower = message.lower()
+    if "maximum number of function evaluations" in lower or "maxfev" in lower:
+        reason = "The fit did not converge."
+        action = "Check the fit figure; adjust initial_guess_hwhm or try another fitting_function."
+    elif "nan" in lower or "infs" in lower or "infinite" in lower or "not finite" in lower:
+        reason = "Invalid values in the data or initial fit."
+        action = "Check the .SED and .THz files and initial_guess_hwhm."
+    elif "infeasible" in lower or "outside of provided bounds" in lower:
+        reason = "The initial peak parameters are outside the fitting limits."
+        action = "Check initial_guess_hwhm, peak_max_hwhm, and the selected frequency range."
+    else:
+        reason = "The selected line shape could not be fitted to this peak."
+        action = "Check the fit figure; adjust initial_guess_hwhm or try another fitting_function."
+    return _fit_error_message(reason, action)
+
+
+def uses_eigenvectors(params):
+    """Identify the fitted spectrum, including saved modes without a YAML input."""
+    return bool(getattr(params, "mode_index", 0) or
+                getattr(params, "_fit_eigenvectors", getattr(params, "eigenvector_file", None)))
+
+
+def lifetime_definition(params=None):
+    factor = 4 if uses_eigenvectors(params) else 2
+    return f"tau_SED = 1/({factor}*pi*HWHM_THz)"
+
+
+def hwhm_to_lifetime_ps(hwhm, params=None):
     """Convert an array of ordinary-frequency HWHM values from THz to lifetimes in ps.
 
-    Use tau = 1/(2*pi*HWHM). Zero, negative, or non-finite widths produce NaN,
+    Eigenvector spectra use 1/(4*pi*HWHM); ordinary spectra use 1/(2*pi*HWHM).
+    Zero, negative, or non-finite widths produce NaN,
     allowing the caller to omit invalid lifetime records.
     """
 
     hwhm = np.asarray(hwhm, dtype=float)
     lifetime = np.full(hwhm.shape, np.nan, dtype=float)
     valid = np.isfinite(hwhm) & (hwhm > 0)
-    lifetime[valid] = 1.0 / (2.0 * np.pi * hwhm[valid])
+    factor = 4.0 if uses_eigenvectors(params) else 2.0
+    lifetime[valid] = 1.0 / (factor * np.pi * hwhm[valid])
     return lifetime
 
 
@@ -109,7 +151,9 @@ def _smoothed_log_sed(sed):
     positive = sed[np.isfinite(sed) & (sed > 0)]
     if not positive.size:
         raise ValueError(
-            "peak detection requires positive finite SED values"
+            _fit_error_message(
+                "No valid, positive SED values were found.",
+                "Check the selected spectrum; an all-zero spectrum has no peak to fit.")
         )
     log_floor = max(np.min(positive) * 1.0e-12, np.finfo(float).tiny)
     log_sed = np.log(
@@ -133,7 +177,9 @@ def _find_sed_peaks(sed, peak_min_significance=4.0):
         not np.isfinite(peak_min_significance)
         or peak_min_significance <= 0
     ):
-        raise ValueError("peak_min_significance must be positive and finite")
+        raise ValueError(_fit_error_message(
+            "peak_min_significance must be positive and finite.",
+            "Set peak_min_significance to a positive number, such as 4.0."))
 
     smooth_log_sed = _smoothed_log_sed(sed)
     positive = sed[np.isfinite(sed) & (sed > 0)]
@@ -199,8 +245,9 @@ def _select_lorentz_frequency_range(
         mask &= frequency <= freq_max
     if np.count_nonzero(mask) < 3:
         raise ValueError(
-            "the requested spectral fitting frequency range contains "
-            "fewer than three frequency samples"
+            _fit_error_message(
+                "Fewer than three data points in the selected frequency range.",
+                "Widen the range using lorentz_fit_freq_min and lorentz_fit_freq_max.")
         )
     return frequency[mask], sed[mask]
 
@@ -214,9 +261,8 @@ def _lorentzian(xarr, center, amplitude, hwhm):
 def _velocity_dho(xarr, center, amplitude, hwhm):
     """Return a peak-normalized velocity-spectrum DHO line shape.
 
-    ``hwhm`` is half of the damping linewidth in ordinary-frequency units, so
-    its weak-damping FWHM is ``2*hwhm``.  The current pySED conversion is
-    therefore ``tau = 1 / (2*pi*hwhm)`` for both line shapes.
+    ``hwhm`` is half of the damping linewidth in ordinary-frequency units.
+    Lifetime conversion uses the spectrum's convention in hwhm_to_lifetime_ps.
     """
 
     xarr = np.asarray(xarr, dtype=float)
@@ -256,7 +302,9 @@ def _half_maximum_frequencies(fitting_function, center, hwhm):
             0.5 * (root - damping_width),
             0.5 * (root + damping_width),
         )
-    raise ValueError(f"unsupported fitting function '{fitting_function}'")
+    raise ValueError(_fit_error_message(
+        f"The fitting function '{fitting_function}' is not supported.",
+        "Set fitting_function to auto, lorentz, or dho in the input file."))
 
 
 def _aicc(residuals, num_parameters):
@@ -368,21 +416,29 @@ def _fit_single_peak_candidate(
     """
 
     if fitting_function not in _FITTING_FUNCTIONS:
-        raise ValueError(f"unsupported fitting function '{fitting_function}'")
+        raise ValueError(_fit_error_message(
+            f"The fitting function '{fitting_function}' is not supported.",
+            "Set fitting_function to auto, lorentz, or dho in the input file."))
 
     xarr = np.asarray(frequency[start : end + 1], dtype=float)
     values = np.asarray(sed[start : end + 1], dtype=float)
     if xarr.size < 5:
-        raise ValueError("the fitting interval has fewer than five samples")
+        raise ValueError(_fit_error_message(
+            f"Only {xarr.size} data points in the fit range; at least five are needed.",
+            "Widen the fit range; if frequency sampling is too coarse, use longer SED time blocks."))
     spacing = np.diff(xarr)
     positive_spacing = spacing[spacing > 0]
     if not positive_spacing.size:
-        raise ValueError("the fitting frequency axis must be increasing")
+        raise ValueError(_fit_error_message(
+            "The selected frequency values are not in increasing order.",
+            "Use matching .SED and .THz files from the same calculation."))
     frequency_step = float(np.median(positive_spacing))
     center = float(frequency[peak_index])
     if fitting_function == "dho" and center <= frequency_step:
         raise ValueError(
-            "velocity DHO is not identifiable for a zero-frequency peak"
+            _fit_error_message(
+                "DHO cannot fit a peak this close to zero frequency.",
+                "Set fitting_function = auto or lorentz for this q-point.")
         )
 
     minimum_hwhm = max(frequency_step * 1.0e-6, np.finfo(float).eps)
@@ -392,7 +448,9 @@ def _fit_single_peak_candidate(
     if fitting_function == "dho":
         center_lower = max(0.0, center_lower)
     if center_upper <= center_lower:
-        raise ValueError("the peak center cannot be bounded")
+        raise ValueError(_fit_error_message(
+            "The frequency values around this peak do not give a valid fitting range.",
+            "Check the .THz file and use matching .SED and .THz files from the same calculation."))
 
     observed_amplitude = max(
         float(sed[peak_index]),
@@ -478,7 +536,9 @@ def _fit_single_peak(
     """
 
     if fitting_function not in {*_FITTING_FUNCTIONS, "auto"}:
-        raise ValueError(f"unsupported fitting function '{fitting_function}'")
+        raise ValueError(_fit_error_message(
+            f"The fitting function '{fitting_function}' is not supported.",
+            "Set fitting_function to auto, lorentz, or dho in the input file."))
     requested_functions = (
         _FITTING_FUNCTIONS if fitting_function == "auto" else (fitting_function,)
     )
@@ -499,10 +559,12 @@ def _fit_single_peak(
                 )
             )
         except (RuntimeError, TypeError, ValueError) as error:
-            errors.append(f"{candidate_function}: {error}")
+            errors.append(f"{candidate_function.upper()} fit\n{_solver_error_message(error)}")
 
     if not candidates:
-        raise RuntimeError("; ".join(errors) or "all peak fits failed")
+        raise RuntimeError("\n\n".join(errors) or _fit_error_message(
+            "None of the requested line shapes could be fitted to this peak.",
+            "Inspect the fit figure and check the frequency range, initial_guess_hwhm, and fitting_function."))
     if fitting_function != "auto":
         return candidates[0]
 
@@ -599,32 +661,86 @@ class lorentz:
             self.sed = np.asarray(selected_sed, dtype=float)
             self.thz = np.asarray(selected_frequency, dtype=float)
 
-        peaks, peak_significance = _find_sed_peaks(
-            self.sed,
-            peak_min_significance=params.peak_min_significance,
-        )
+        reference_fit = bool(getattr(params, "mode_index", 0) and
+                             getattr(params, "fit_reference_peak", True))
+        if reference_fit:
+            # Raw local maxima: no smoothing or significance gate for selection.
+            # Find them before applying the reference window so its endpoints
+            # cannot turn a monotonic tail into a spurious peak.
+            peaks, _ = find_peaks(self.sed)
+            peak_significance = np.full(peaks.size, np.nan)
+        else:
+            peaks, peak_significance = _find_sed_peaks(
+                self.sed,
+                peak_min_significance=params.peak_min_significance,
+            )
         keep = self.thz[peaks] >= 0.0
         peaks = peaks[keep]
         peak_significance = peak_significance[keep]
-        # Smooth only the signal used to locate valleys between peaks. The
-        # fitter below receives self.sed, preserving the original peak widths.
-        valley_signal = _smoothed_log_sed(self.sed)
-
         print_section("Peak detection")
-        print_detail("Peaks found", len(peaks))
-        print_detail("Minimum significance", f"{params.peak_min_significance:g}")
+        if not reference_fit:
+            print_detail("Peaks found", len(peaks))
+            print_detail("Minimum significance", f"{params.peak_min_significance:g}")
+        selected_peaks = np.arange(len(peaks))
+        self.reference_frequency = None
+        self.reference_source = getattr(data, "reference_source", None)
+        if reference_fit:
+            references = getattr(data, "reference_frequencies", None)
+            if references is None:
+                raise ValueError(_fit_error_message(
+                    f"Reference frequencies are missing from the SED data for mode {params.mode_index}.",
+                    "Recalculate with eigenvector_file, or use fit_reference_peak = 0 to fit all peaks."))
+            reference = float(references[self.q_index])
+            self.reference_frequency = reference
+            window = getattr(params, "fit_reference_window", 0.5)
+            source = "from eigenvector calculation"
+            if self.reference_source:
+                source += f": {self.reference_source}"
+            print_detail("Reference frequency", f"{reference:.6f} THz ({source})")
+            print_detail("Peak search window", f"reference frequency +/-{window:g} THz")
+            print_detail("Peak selection", "highest SED peak near the eigenvector reference frequency")
+            candidates = np.flatnonzero((self.thz[peaks] >= reference - window) &
+                                        (self.thz[peaks] <= reference + window))
+            selected_peaks = np.empty(0, dtype=int)
+            if not len(candidates):
+                reason = "no SED peak found within the reference frequency window"
+            else:
+                highest = int(np.argmax(self.sed[peaks[candidates]]))
+                selected_peaks = candidates[highest:highest + 1]
+                reason = None
+            if reason:
+                print_detail("Peak fitting", f"skipped: {reason}")
+                print_detail("What to do", "inspect this mode's SED; widen fit_reference_window if the peak lies outside it")
+            else:
+                print_detail("Peak to fit", f"{self.thz[peaks[selected_peaks[0]]]:.6f} THz")
+        elif getattr(params, "mode_index", 0):
+            print_detail("Peak selection", "all detected peaks (fit_reference_peak = 0)")
         if self.fitting_function == "auto":
             print_detail("Line shape", "automatic Lorentz or DHO")
         else:
             print_detail("Line shape", self.fitting_function)
         print_detail("Fit figure", output_files.slice_figure(params, fitting=True))
 
+        # Only a selected peak needs valley boundaries. An empty/zero reference
+        # spectrum can report no peak without taking the logarithm of zero.
+        if selected_peaks.size:
+            valley_signal = _smoothed_log_sed(self.sed)
+        boundary_peaks = peaks
+        if reference_fit and selected_peaks.size:
+            # Keep the original whole-spectrum peak/valley boundaries. Raw
+            # fluctuations used for selecting the target must not split its fit.
+            boundary_peaks, _ = _find_sed_peaks(self.sed, params.peak_min_significance)
+            boundary_peaks = boundary_peaks[self.thz[boundary_peaks] >= 0.0]
+            # The selected target is included even if the detector missed it.
+            boundary_peaks = np.unique(np.r_[boundary_peaks, peaks[selected_peaks]])
         self.peak_fits = []
-        for peak_number, peak in enumerate(peaks, start=1):
+        for selected_index in selected_peaks:
+            peak = peaks[selected_index]
+            peak_number = 1 if reference_fit else int(selected_index) + 1
             left_base, right_base = _local_peak_bases(
                 valley_signal,
-                peaks,
-                peak_number - 1,
+                boundary_peaks,
+                int(np.searchsorted(boundary_peaks, peak)),
             )
             start, end = _peak_fit_interval(
                 left_base,
@@ -645,14 +761,15 @@ class lorentz:
                     fitting_function=self.fitting_function,
                 )
             except RuntimeError as error:
-                print(
-                    "    WARNING: spectrum fit failed for peak at "
-                    f"{self.thz[peak]:.6f} THz: {error}"
-                )
+                print_section("Peak fitting failed", "⚠")
+                print_detail("Peak frequency", f"{self.thz[peak]:.6f} THz")
+                for line in str(error).splitlines():
+                    print("        " + line if line else "")
+                print_detail("Result", "this peak was skipped; no lifetime was calculated")
                 continue
 
             result["peak_significance"] = float(
-                peak_significance[peak_number - 1]
+                peak_significance[selected_index]
             )
             result["peak_number"] = peak_number
             self.peak_fits.append(result)
@@ -688,30 +805,16 @@ class lorentz:
             if result["incomplete_peak_shapes"][0]
         ]
         if upper_bound_peaks:
-            print(
-                "    Note: fitted HWHM reached peak_max_hwhm for peak(s): "
-                + ", ".join(upper_bound_peaks)
-            )
+            print_section("Peak width reached the fitting limit", "⚠")
+            print_detail("Peak number(s)", ", ".join(upper_bound_peaks))
+            print_detail("Reason", "fitted HWHM reached peak_max_hwhm")
+            print_detail("What to do", "check the fit figure; increase peak_max_hwhm only if the peak needs a larger width")
         if incomplete_peaks:
-            peak_list = ", ".join(incomplete_peaks)
-            if len(incomplete_peaks) == 1:
-                print(
-                    f"    Note: peak {peak_list} is incomplete; HWHM is "
-                    "model-extrapolated."
-                )
-                print(
-                    "          Lifetime is qualitative. Adjust "
-                    "peak_min_significance if needed."
-                )
-            else:
-                print(
-                    f"    Note: peaks {peak_list} are incomplete; HWHMs are "
-                    "model-extrapolated."
-                )
-                print(
-                    "          Lifetimes are qualitative. Adjust "
-                    "peak_min_significance if needed."
-                )
+            print_section("Incomplete peak shape", "⚠")
+            print_detail("Peak number(s)", ", ".join(incomplete_peaks))
+            print_detail("Reason", "the fit range does not cover both sides of the peak at half maximum")
+            print_detail("Lifetime", "qualitative estimate from an incomplete peak")
+            print_detail("What to do", "check the fit figure; adjust the fit range or peak_min_significance")
 
         if self.peak_fits:
             self.popt = np.vstack(
@@ -761,9 +864,10 @@ class lorentz:
             self.incomplete_peak_shapes = np.empty(0, dtype=bool)
             self.peak_significance = np.empty(0, dtype=float)
 
-        lifetimes = hwhm_to_lifetime_ps(self.popt[:, 2])
+        lifetimes = hwhm_to_lifetime_ps(self.popt[:, 2], params)
         print_section("Spectral fitting results")
-        print_detail("Lifetime definition", "tau_SED = 1 / (2*pi*HWHM)")
+        factor = 4 if uses_eigenvectors(params) else 2
+        print_detail("Lifetime definition", f"tau_SED = 1 / ({factor}*pi*HWHM)")
         print(
             "        Frequency (THz)      HWHM (THz)      Tau_SED (ps)"
             "        Model"
@@ -788,7 +892,6 @@ class lorentz:
             & (self.popt[:, 2] >= self.popt[:, 0])
         )
         if np.any(overdamped_dho):
-            print(
-                "    Note: overdamped DHO lifetimes are included for "
-                "qualitative comparison only."
-            )
+            print_section("Strongly damped DHO peak", "⚠")
+            print_detail("Reason", "the fitted HWHM is as large as, or larger than, the peak frequency")
+            print_detail("What to do", "check the fit figure; use this lifetime only as a qualitative estimate")

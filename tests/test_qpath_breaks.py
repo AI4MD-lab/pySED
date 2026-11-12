@@ -153,14 +153,24 @@ class DisconnectedPathTests(unittest.TestCase):
                 for call, (start, stop) in zip(contour.call_args_list, lattice.q_path_ranges):
                     np.testing.assert_allclose(call.args[1], data.q_distances[start:stop])
                     self.assertEqual(call.args[3].shape[1], stop - start)
-                self.assertIn("U|K", [t.get_text() for t in figures[0].axes[0].get_xticklabels()])
+                self.assertIn("U/K", [t.get_text() for t in figures[0].axes[0].get_xticklabels()])
                 np.testing.assert_allclose(figures[0].axes[0].get_ylim(), [0, 12])
             # Historical output has no range comments and is still loadable.
             labels = Path(params.out_files_name + ".Q_distances_and_labels")
             original = labels.read_text()
             labels.write_text("\n".join(line for line in original.splitlines() if not line.startswith("#")))
             self.assertEqual(FileIO.load_data(params).q_path_ranges, [])
-            labels.write_text(original.replace("0:21", "1:21"))
+            # Older compact range comments retain the same topology.
+            legacy = "\n".join(line for line in original.splitlines() if not line.startswith("#"))
+            legacy += "\n# q_path_ranges: " + " ".join(
+                f"{start}:{stop}" for start, stop in lattice.q_path_ranges
+            ) + "\n"
+            labels.write_text(legacy)
+            self.assertEqual(FileIO.load_data(params).q_path_ranges, lattice.q_path_ranges)
+            labels.write_text(legacy.replace("0:21", "1:21"))
+            with self.assertRaisesRegex(ValueError, "Invalid q_path_ranges"):
+                FileIO.load_data(params)
+            labels.write_text(original.replace(f"# {1:7d}  {0:13d}", f"# {1:7d}  {1:13d}"))
             with self.assertRaisesRegex(ValueError, "Invalid q_path_ranges"):
                 FileIO.load_data(params)
 

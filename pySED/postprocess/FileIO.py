@@ -20,10 +20,12 @@ the intensity scale so later plotting and fitting can label existing numbers
 correctly. Intensity conversion belongs to the calculation, not this module.
 """
 from pathlib import Path
+from shutil import copyfile
 import numpy as np
 
+from pySED.console import print_detail, print_section
 from pySED.postprocess import output_files
-from pySED.postprocess.Lorentz import hwhm_to_lifetime_ps
+from pySED.postprocess.Lorentz import hwhm_to_lifetime_ps, lifetime_definition, uses_eigenvectors
 from pySED.sed.sed_kernel import SED_UNIT, LEGACY_SED_UNIT, LEGACY_UNIT_NOTICE
 from pySED.structure.atoms import atomic_masses
 
@@ -38,7 +40,8 @@ def write_output(phonons, params, BZ_lattice_info):
     """Write the computed spectrum and its matching q/frequency metadata.
 
     phonons.sed_avg is (frequency, q), or (frequency, q, type, xyz) for partial
-    output. In the latter case, write both the summed total and each component.
+    output. With mode projection, the total is always the sum of mode_sed_avg;
+    the unprojected comparison total is saved in a separate directory.
     The data are already in their final scale; the header records that scale.
     .Qpts, .THz, and .Q_distances_and_labels use the same q/frequency order.
     """
@@ -56,15 +59,20 @@ def write_output(phonons, params, BZ_lattice_info):
             + LEGACY_UNIT_NOTICE
         )
     output_partial = getattr(params, 'output_partial', 0)
-    if output_partial:
-        # Overall SED = sum over element and direction.
-        sed_total = phonons.sed_avg.sum(axis=(-2, -1))
-        np.savetxt(
-            sed_path,
-            sed_total,
-            header=header,
-        )
+    if hasattr(phonons, "mode_sed_avg"):
+        # The exported total and default plot belong to the projected spectra.
+        sed_total = phonons.mode_sed_avg.sum(axis=2)
+        total_header = header + "\nspectrum_source: sum_of_projected_modes"
+        if hasattr(phonons, "mode_sum_relative_error"):
+            total_header += f"\nmode_sum_max_error_over_reference_peak: {phonons.mode_sum_relative_error:.6e}"
+    else:
+        sed_total = (phonons.sed_avg.sum(axis=(-2, -1))
+                     if output_partial else phonons.sed_avg)
+        total_header = header
+    np.savetxt(sed_path, sed_total, header=total_header)
 
+    if output_partial:
+        # Element/direction partials keep the original velocity-SED definition.
         dir_labels = ['x', 'y', 'z']
         for t_idx, element in enumerate(phonons.type_symbols):
             for d_idx, d_lab in enumerate(dir_labels):
@@ -79,14 +87,9 @@ def write_output(phonons, params, BZ_lattice_info):
                     phonons.sed_avg[:, :, t_idx, d_idx],
                     header=header,
                 )
-    else:
-        np.savetxt(
-            sed_path,
-            phonons.sed_avg,
-            header=header,
-        )
-
     if hasattr(phonons, "mode_sed_avg"):
+        eigenvector_file = getattr(params, "eigenvector_file", None)
+        reference_source = f" in {Path(eigenvector_file).name}" if eigenvector_file else ""
         for mode in range(phonons.mode_sed_avg.shape[2]):
             path = output_files.mode_sed_data(params.out_files_name, mode + 1)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,8 +97,7 @@ def write_output(phonons, params, BZ_lattice_info):
             np.savetxt(
                 path, phonons.mode_sed_avg[:, :, mode],
                 header=(header + f"\nmode: {mode + 1} (one-based YAML band index)"
-                        + f"\nreference_frequencies_THz (q order): {reference}"
-                        + f"\nmode_sum_relative_error: {phonons.mode_sum_relative_error:.6e}"),
+                        + f"\nreference_frequencies_THz{reference_source} (q order): {reference}"),
             )
 
     np.savetxt(qpoints_path, BZ_lattice_info.reduced_qpoints, fmt='%.8f')
@@ -110,10 +112,25 @@ def write_output(phonons, params, BZ_lattice_info):
         f.write("High-symmetry points and their distances:\n")
         for distance, label in BZ_lattice_info.q_labels:
             f.write(f"{float(distance):.10f}   {label}\n")
-        # Half-open column ranges retain the computed path topology when replotting.
+        # Display inclusive q indices; internally the ranges remain half-open.
         ranges = getattr(BZ_lattice_info, 'q_path_ranges', [])
         if ranges:
-            f.write("# q_path_ranges: " + " ".join(f"{start}:{stop}" for start, stop in ranges) + "\n")
+            f.write("\n# Q-path segments (zero-based q-point indices, both endpoints included):\n")
+            f.write(f"# {'Segment':>7}  {'First q-point':>13}  {'Last q-point':>12}\n")
+            for segment, (start, stop) in enumerate(ranges, 1):
+                f.write(f"# {segment:7d}  {start:13d}  {stop - 1:12d}\n")
+
+    if hasattr(phonons, "unprojected_sed_avg"):
+        comparison_prefix = output_files.comparison_sed_prefix(params.out_files_name)
+        comparison_files = output_files.sed_data_files(comparison_prefix)
+        comparison_files[0].parent.mkdir(parents=True, exist_ok=True)
+        np.savetxt(
+            comparison_files[0], phonons.unprojected_sed_avg,
+            header=(header + "\nspectrum_source: velocity_sed_without_eigenvectors"
+                    + "\npurpose: comparison_with_sum_of_projected_modes"),
+        )
+        for source, target in zip((qpoints_path, frequency_path, labels_path), comparison_files[1:]):
+            copyfile(source, target)
 
 def _read_sed(path, legacy_unit=False):
     """Return (spectrum, legacy_flag) without changing stored intensities.
@@ -223,6 +240,27 @@ class load_data(object):
         if self.sed_avg.shape != (self.freq_fft.size, len(self.qpoints)):
             raise ValueError("SED shape does not match the saved .THz and .Qpts axes")
 
+        self.eigenvector_projection = bool(getattr(params, "mode_index", 0))
+        self.reference_frequencies = None
+        self.reference_source = None
+        if not self.partial_files:
+            with sed_path.open(encoding="utf-8-sig") as stream:
+                for line in stream:
+                    if not line.lstrip().startswith("#"):
+                        break
+                    if "spectrum_source: sum_of_projected_modes" in line:
+                        self.eigenvector_projection = True
+                    if "reference_frequencies_THz" in line:
+                        label, values = line.split(":", 1)
+                        self.reference_frequencies = np.fromstring(values, sep=" ")
+                        if " in " in label:
+                            self.reference_source = label.split(" in ", 1)[1].split(" (q order)", 1)[0]
+                        if (self.reference_frequencies.shape != (len(self.qpoints),)
+                                or not np.isfinite(self.reference_frequencies).all()):
+                            raise ValueError(
+                                f"Cannot read reference frequencies from {sed_path}; "
+                                f"expected one finite frequency for each of the {len(self.qpoints)} q-points")
+
         self.q_distances = []
         self.q_labels = {}
         self.q_path_ranges = []
@@ -233,7 +271,19 @@ class load_data(object):
                 self.q_distances = [float(x) for x in lines[1].split()]
             # q_labels
             if lines[3].strip() == "High-symmetry points and their distances:":
+                reading_segments = False
                 for line in lines[4:]:
+                    if line.startswith("# Q-path segments (zero-based q-point indices, both endpoints included):"):
+                        reading_segments = True
+                        continue
+                    if reading_segments and line.startswith("#"):
+                        fields = line[1:].split()
+                        if fields and fields[0].isdigit():
+                            segment, start, last = map(int, fields)
+                            if segment != len(self.q_path_ranges) + 1:
+                                raise ValueError("Invalid q_path_ranges in Q-point metadata")
+                            self.q_path_ranges.append((start, last + 1))
+                        continue
                     if line.startswith("# q_path_ranges:"):
                         self.q_path_ranges = [
                             tuple(map(int, item.split(":")))
@@ -277,11 +327,35 @@ def save_partial_sed(data, params):
     return path
 
 
+def _lifetime_header(params, description="", *, all_modes=False):
+    """Use the same two-line header style for ordinary and projected spectra."""
+    mode = getattr(params, "mode_index", 0)
+    mode_columns = bool(mode or all_modes)
+    definition = "tau_SED = 1/(4*pi*HWHM_THz)" if all_modes else lifetime_definition(params)
+    columns = "Frequency_THz lifetime_ps"
+    if mode_columns:
+        columns += " HWHM_THz q_index mode"
+    return ["Generated by pySED, Email: liangting.zj@gmail.com" + description,
+            columns + "; " + definition]
+
+
+def _check_lifetime_definition(path, params):
+    """Never label saved lifetimes with a different conversion formula."""
+    with open(path, encoding="utf-8") as stream:
+        next(stream, "")
+        columns = next(stream, "")
+    if lifetime_definition(params) not in columns:
+        raise ValueError("Cannot combine lifetimes calculated with different formulas.\n"
+                         f"Lifetime data           : {path}\n"
+                         f"Required definition     : {lifetime_definition(params)}\n"
+                         "What to do              : refit the remaining modes/q-points before updating the all-mode summary")
+
+
 def write_phonon_lifetime(lorentz, params):
     """Write fitted center frequencies in THz and linewidth-derived lifetimes in ps.
 
     lorentz.popt rows contain (center, amplitude, HWHM). Convert positive finite
-    HWHM using tau = 1/(2*pi*HWHM), skip non-finite lifetimes, and write the
+    HWHM using the spectrum's lifetime definition, skip non-finite lifetimes, and write the
     q-indexed output path returned by output_files. Return that path as a string.
     """
 
@@ -289,35 +363,18 @@ def write_phonon_lifetime(lorentz, params):
         params.qpoint_slice_index, params
     )
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_lines = [
-        "Generated by pySED, Email: liangting.zj@gmail.com",
-        (
-            "Frequency (THz)  linewidth-derived SED lifetime (ps); "
-            "tau_SED = 1/(2*pi*HWHM_THz)"
-        ),
-    ]
-
-    lifetimes = hwhm_to_lifetime_ps(lorentz.popt[:, 2])
+    lifetimes = hwhm_to_lifetime_ps(lorentz.popt[:, 2], params)
     mode = getattr(params, "mode_index", 0)
-    if mode:
-        output_lines[0] += f"; mode={mode}; q_index={params.qpoint_slice_index}; peaks={len(lifetimes)}"
-        output_lines[1] = (
-            "Frequency_THz lifetime_ps HWHM_THz q_index mode status; "
-            "status bits: 1=incomplete, 2=unresolved, 4=upper_bound, 8=invalid_lifetime"
-        )
-    for i, (fit_parameters, lifetime) in enumerate(zip(lorentz.popt, lifetimes)):
+    description = f"; mode={mode}; q_index={params.qpoint_slice_index}; peaks={len(lifetimes)}" if mode else ""
+    output_lines = _lifetime_header(params, description)
+    for fit_parameters, lifetime in zip(lorentz.popt, lifetimes):
+        if not np.isfinite(lifetime):
+            continue
         if mode:
-            flags = sum(
-                bit * int(getattr(lorentz, attr, np.zeros(len(lifetimes), dtype=bool))[i])
-                for bit, attr in [(1, "incomplete_peak_shapes"), (2, "unresolved_widths"), (4, "upper_bound_hits")]
-            )
-            flags |= 8 if not np.isfinite(lifetime) else 0
             output_lines.append(
                 f"{fit_parameters[0]:.6f} {lifetime:.8f} {fit_parameters[2]:.8f} "
-                f"{params.qpoint_slice_index} {mode} {flags}"
+                f"{params.qpoint_slice_index} {mode}"
             )
-            continue
-        if not np.isfinite(lifetime):  # don't output failed fits
             continue
         output_lines.append(
             f"{fit_parameters[0]:.6f} {lifetime:.8f}"
@@ -333,21 +390,26 @@ def write_phonon_lifetime(lorentz, params):
 def read_lifetime_data(path):
     """Read a pySED lifetime file into separate frequency and lifetime arrays.
 
-    Skip the two descriptive header lines and require two numeric columns,
-    in THz and ps respectively. A header-only file returns two empty arrays;
+    Skip the two descriptive header lines. Ordinary spectra have two columns;
+    mode spectra have five. The first two are frequency (THz) and lifetime (ps).
+    A header-only file returns two empty arrays;
     a one-row file still returns one-dimensional arrays of length one.
     """
 
     with open(path, "r", encoding="utf-8") as stream:
         data_lines = [
-            line.strip() for line in stream.readlines()[2:] if line.strip()
+            line.strip() for line in stream.readlines()[2:]
+            if line.strip()
         ]
     if not data_lines:
         return np.empty(0, dtype=float), np.empty(0, dtype=float)
 
     values = np.atleast_2d(np.loadtxt(data_lines, dtype=float))
-    if values.shape[1] not in {2, 6}:
-        raise ValueError(f"invalid frequency-lifetime data in {path}")
+    if values.shape[1] not in {2, 5}:
+        raise ValueError(
+            f"invalid frequency-lifetime data in {path}\n"
+            f"Reason                  : found {values.shape[1]} columns; ordinary SED needs 2 and mode SED needs 5\n"
+            "What to do              : refit this q-point, then update the lifetime summary")
     return values[:, 0], values[:, 1]
 
 
@@ -356,21 +418,12 @@ def deal_total_fre_lifetime(params, total_qpoints):
 
     Preserve q-index order, skip files with no fitted peaks, and fail if an
     expected file is missing. Return (combined_path, number_of_rows). Rows
-    contain frequency and lifetime only; no branch or q label is added.
+    retain the five mode columns, or frequency and lifetime for ordinary SED.
     """
 
-    output_lines = [
-        "Generated by pySED, Email: liangting.zj@gmail.com",
-        (
-            "Frequency (THz)  linewidth-derived SED lifetime (ps); "
-            "tau_SED = 1/(2*pi*HWHM_THz)"
-        ),
-    ]
     total_num_fre_lifetime = 0
     mode = getattr(params, "mode_index", 0)
-    if mode:
-        output_lines[0] += f"; mode={mode}"
-        output_lines[1] = "Frequency_THz lifetime_ps HWHM_THz q_index mode status"
+    output_lines = _lifetime_header(params, f"; mode={mode}" if mode else "")
 
     for i in range(total_qpoints):
         load_file_name = output_files.qpoint_lifetime_data(i, params)
@@ -378,18 +431,27 @@ def deal_total_fre_lifetime(params, total_qpoints):
             frequency, lifetime = read_lifetime_data(load_file_name)
         except OSError as error:
             raise FileNotFoundError(
-                f"cannot read Q-point lifetime data: {load_file_name}"
+                f"Cannot read q-point lifetime data: {load_file_name}\n"
+                "Reason                  : the file is missing or cannot be opened\n"
+                "What to do              : check file access; if missing, fit this q-point first"
             ) from error
 
+        if frequency.size and uses_eigenvectors(params):
+            _check_lifetime_definition(load_file_name, params)
+
         if not frequency.size:
-            print(
-                f"\n    Warning: {load_file_name} contains no fitted "
-                "lifetimes; skipping."
-            )
+            print_section("No fitted lifetimes for this q-point", "⚠")
+            print_detail("Lifetime data", load_file_name)
+            print_detail("Reason", "no fitted lifetimes in this file; no rows added to the summary")
+            print_detail("What to do", "check this q-point's peak detection and fitting messages")
             continue
 
         if mode:
-            output_lines.extend(Path(load_file_name).read_text(encoding="utf-8").splitlines()[2:])
+            output_lines.extend(
+                line
+                for line in Path(load_file_name).read_text(encoding="utf-8").splitlines()[2:]
+                if line.strip()
+            )
         else:
             output_lines.extend(
                 f"{freq:.6f} {tau:.8f}"
@@ -404,3 +466,47 @@ def deal_total_fre_lifetime(params, total_qpoints):
         encoding="utf-8",
     )
     return str(output_file), int(total_num_fre_lifetime)
+
+
+def combine_all_mode_lifetimes(params):
+    """Combine current single-q fit files without fitting or changing their data.
+
+    Require every saved mode at every saved q point, including header-only files
+    for zero detected peaks. Keep all five columns and all peaks, ordered by
+    mode, q index and frequency. Do not write a partial summary on failure.
+    """
+    from copy import copy
+
+    modes = output_files.available_modes(params.out_files_name)
+    if not modes:
+        raise FileNotFoundError("No mode spectra found; compute with eigenvector_file first")
+    qpoints_path = output_files.sed_data_files(params.out_files_name)[1]
+    total_qpoints = len(np.loadtxt(qpoints_path, ndmin=2))
+    output_lines = _lifetime_header(params, f"; modes={len(modes)}; q_points={total_qpoints}", all_modes=True)
+    header_length = len(output_lines)
+    for mode in modes:
+        selected = copy(params)
+        selected.mode_index = mode
+        for q_index in range(total_qpoints):
+            path = output_files.qpoint_lifetime_data(q_index, selected)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            rows = [line for line in lines[2:] if line.strip()]
+            if len(lines) < 2:
+                raise ValueError(
+                    f"invalid frequency-lifetime data in {path}\n"
+                    "Reason                  : the lifetime file header is missing or incomplete\n"
+                    "What to do              : refit this mode at this q-point, then update the summary")
+            if rows:
+                values = np.atleast_2d(np.loadtxt(rows, dtype=float))
+                if (values.shape[1] != 5 or np.any(values[:, 3] != q_index)
+                        or np.any(values[:, 4] != mode)):
+                    raise ValueError(
+                        f"invalid mode frequency-lifetime data in {path}\n"
+                        f"Reason                  : expected 5 columns with q_index = {q_index} and mode = {mode}\n"
+                        "What to do              : refit this mode at this q-point, then update the summary")
+                _check_lifetime_definition(path, selected)
+                output_lines.extend(rows[i] for i in np.argsort(values[:, 0], kind="stable"))
+    output_file = output_files.all_modes_lifetime_data(params)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text("\n".join(output_lines) + "\n", encoding="utf-8")
+    return str(output_file), len(output_lines) - header_length

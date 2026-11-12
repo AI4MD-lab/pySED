@@ -67,7 +67,9 @@ class SEDKernelConfig:
 
     @property
     def ordinary_components(self):
-        return self.num_types * 3 if self.output_partial else 1
+        if self.output_partial:
+            return self.num_types * 3
+        return 1
 
 
 def calculate_q_batch(
@@ -95,7 +97,7 @@ def calculate_q_batch(
     This function returns (F, Q) for total SED, or (F, types, 3, Q) for
     partial SED. The final output stage later moves q to axis 1 for saving
     and plotting; no axis reordering is needed inside this kernel.
-    With mode_weights, pack ordinary channels followed by modes into
+    With mode_weights, pack the unprojected comparison total followed by modes into
     (F, channels, Q). q_start selects the matching global weight slice.
 
     The same operations support NumPy and CuPy arrays through ``xp`` and
@@ -149,23 +151,19 @@ def calculate_q_batch(
                 "faq,qam->fmq", transformed_vels, weights[:, basis_index],
             ) * xp.sqrt(config.masses[basis_index] * config.amu_2_kg)
 
-        # Mass-weighted |FFT|^2 for this basis atom: (frequency, xyz, q).
-        spectra = (
-            xp.abs(transformed_vels) ** 2
-            * config.masses[basis_index]
-            * config.amu_2_kg
-        )
-        # Release the complex temporary arrays; spectra holds the power.
+        if config.ordinary_components:
+            # With eigenvectors, retain the ordinary total for comparison.
+            spectra = (
+                xp.abs(transformed_vels) ** 2
+                * config.masses[basis_index]
+                * config.amu_2_kg
+            )
+            if config.output_partial:
+                type_index = config.basis_to_type[basis_index]
+                result[:, type_index, :, :] += spectra
+            else:
+                result += spectra.sum(axis=1)
         del velocity_sum, transformed_vels
-
-        # 4. Add this basis atom's power to the partial or total spectrum.
-        if config.output_partial:
-            type_index = config.basis_to_type[basis_index]
-            # Both sides have shape (frequency, xyz, q).
-            result[:, type_index, :, :] += spectra
-        else:
-            # Sum x/y/z power (axis 1); result has shape (frequency, q).
-            result += spectra.sum(axis=1)
     if config.num_modes:
         packed = xp.empty(
             (num_frames, config.ordinary_components + config.num_modes, num_qpoints),

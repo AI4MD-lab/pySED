@@ -254,7 +254,10 @@ def plot_bands(data, params):
         ax.set_xlim([0, len(qpoints)-1])
         xticks = [0, len(qpoints)-1]
 
-    xticklabels = [r'$\Gamma$' if label == 'G' else label for label in q_labels.values()]  # Replace 'G' with '$\Gamma$'
+    xticklabels = [
+        r'$\Gamma$' if label == 'G' else label.replace('|', '/')
+        for label in q_labels.values()
+    ]
     ax.set_xticks(xticks)
     ax.set_xticklabels(xticklabels, fontsize=16)
 
@@ -401,7 +404,7 @@ def plot_slice(data, params, fit_result=None):
     plt.close(fig)
 
 
-def plot_lifetime_summary(frequency, lifetime, params=None):
+def plot_lifetime_summary(frequency, lifetime, params=None, *, output_path=None):
     """Write a frequency-versus-lifetime scatter plot and return its path.
 
     Inputs contain frequencies in THz and lifetimes in ps. Filter non-finite
@@ -438,7 +441,8 @@ def plot_lifetime_summary(frequency, lifetime, params=None):
     ax.tick_params(axis="both", labelsize=14)
     ax.grid(False, which="both", axis="both")
 
-    output_path = output_files.lifetime_summary_figure(params)
+    if output_path is None:
+        output_path = output_files.lifetime_summary_figure(params)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(
         output_path,

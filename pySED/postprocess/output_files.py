@@ -22,6 +22,12 @@ FITTING_QPOINT_DIRECTORY = Path("Fitting-Qpoint")
 LIFETIME_DIRECTORY = Path("Lifetime")
 
 
+def comparison_sed_prefix(prefix):
+    """Ordinary SED saved separately for comparison with eigenvector spectra."""
+    prefix = Path(prefix)
+    return prefix.parent / "no-eigenvector-SED" / prefix.name
+
+
 def mode_sed_data(prefix, mode_index):
     """One-based mode spectrum, sharing ordinary q and frequency files."""
     prefix = Path(prefix)
@@ -152,3 +158,13 @@ def lifetime_summary_figure(params=None):
     if params is not None and getattr(params, "plot_partial_SED", False):
         return Path(params.out_files_name + "_partial_SED") / filename
     return Path(filename)
+
+
+def all_modes_lifetime_data(params):
+    """Return the parent-directory table for all modes and q points."""
+    return mode_sed_data(params.out_files_name, 1).parent / "Fitting-All-Modes-All-Qpoints.Fre_lifetime"
+
+
+def all_modes_lifetime_figure(params):
+    """Return the all-mode lifetime figure beside the total SED data."""
+    return Path(params.out_files_name).parent / "Fitting-All-Modes-Frequency-Lifetime.png"

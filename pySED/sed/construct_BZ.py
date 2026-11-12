@@ -355,6 +355,7 @@ class BZ_methods(object):
                     f"{groups[group_index - 1][-1]}|{group[0]} (no connecting segment)",
                 )
                 print()
+                print("        " + "-" * 72)
             add_label(cumulative_distance, label_map.get(group[0], group[0]))
             for index in range(len(group) - 1):
                 q_start = q_path[coordinate_offset + index]
