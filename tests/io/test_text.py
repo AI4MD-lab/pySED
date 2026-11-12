@@ -105,7 +105,8 @@ class GPUMDPropertiesTests(unittest.TestCase):
     def _read(self, text, **kwargs):
         with TemporaryDirectory() as directory:
             source = Path(directory) / "dump.xyz"
-            source.write_text(text, encoding="utf-8")
+            # Preserve fixture bytes so progress offsets match on every platform.
+            source.write_bytes(text.encode("utf-8"))
             return list(iter_gpumd_xyz(source, **kwargs))
 
     def test_standard_layout_matches_python_float_parsing_exactly(self):
