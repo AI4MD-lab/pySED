@@ -107,13 +107,21 @@ def estimate_kernel_working_bytes(vels, config, max_q_batch, *, cpu=False):
         2 * np.dtype(np.complex128).itemsize
         + np.dtype(np.float64).itemsize
     )
-    result_components = config.num_types * 3 if config.output_partial else 1
+    result_components = config.ordinary_components
     result = (
         num_frames
         * max_q_batch
         * result_components
         * np.dtype(np.float64).itemsize
     )
+    if config.num_modes:
+        # Complex accumulator and einsum temporary; power and packed output;
+        # selected device weights and CPU worker configuration storage.
+        modes = num_frames * config.num_modes * max_q_batch
+        transforms += modes * (2 * 16 + 2 * 8) + result
+        transforms += config.mode_weights.nbytes if cpu else (
+            max_q_batch * config.mode_weights.shape[1] * 3 * config.num_modes * 16
+        )
     return basis_velocities + phases + transforms + result
 
 
@@ -160,5 +168,6 @@ def print_cpu_memory_estimate(
         persistent_arrays + prefetched_block + shared_velocities + queued_results
         + active_workers * worker_peak
     )
-    print_detail("Estimated CPU array RAM", f"{estimated_bytes / 1e9:.2f} GB")
+    print_detail("Estimated CPU array RAM", f"{estimated_bytes / 1e9:.2f} GB",
+                 width=30 if backend == "cupy" else 24)
     print("            Includes trajectory blocks and SED arrays; excludes Python overhead.")

@@ -36,6 +36,7 @@ meaning, defaults, examples, practical notes, and related parameters.
    input_parameters/out_files_name
    input_parameters/legacy_unit
    input_parameters/basis_lattice_file
+   input_parameters/eigenvector_file
    input_parameters/defect_index_file
    input_parameters/lammps_unit
    input_parameters/output_partial
@@ -63,6 +64,8 @@ meaning, defaults, examples, practical notes, and related parameters.
    input_parameters/modulate_factor
    input_parameters/lorentz_fit_all_qpoint
    input_parameters/re_output_total_freq_lifetime
+   input_parameters/fit_reference_peak
+   input_parameters/fit_reference_window
 
 .. raw:: html
 
@@ -180,6 +183,21 @@ meaning, defaults, examples, practical notes, and related parameters.
    * - `defect_index_file <input_parameters/defect_index_file.html>`_
      - Files
      - Optional reference-to-trajectory mapping for static vacancies.
+   * - `eigenvector_file <input_parameters/eigenvector_file.html>`_
+     - Files
+     - Phonopy band.yaml for mode-resolved SED in mode-resoved-SED/.
+   * - `mode_index <input_parameters/eigenvector_file.html#plotting-and-fitting>`_
+     - Plotting and fitting
+     - Omit for total SED; specify a positive, one-based mode number to select one mode.
+   * - `plot_all_modes <input_parameters/eigenvector_file.html#plot-every-saved-mode>`_
+     - Plotting
+     - Plot every saved mode separately; optionally plot each at the selected q point.
+   * - `reference_structure_file <input_parameters/eigenvector_file.html#reference-matching>`_
+     - Files
+     - Generating primitive POSCAR or extended XYZ; required for mode projection.
+   * - `fit_all_modes <input_parameters/eigenvector_file.html#multi-core-fitting>`_
+     - Fitting
+     - Fit every saved mode at the selected q point or all q points.
    * - `lammps_unit <input_parameters/lammps_unit.html>`_
      - Files
      - LAMMPS unit style for velocity conversion.
@@ -203,7 +221,7 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Set zlib compression for generated NetCDF caches.
    * - `max_cores <input_parameters/max_cores.html>`_
      - Parallelization
-     - CPU compute-thread budget; fixed process/thread allocation.
+     - CPU parallelism budget for SED computation and spectral fitting.
    * - `device <input_parameters/device.html>`_
      - Parallelization
      - Select CPU or GPU computation.
@@ -288,6 +306,12 @@ meaning, defaults, examples, practical notes, and related parameters.
    * - `fitting_function <input_parameters/fitting_function.html>`_
      - Peak fitting
      - Select Lorentz, velocity-DHO, or automatic AICc choice.
+   * - `fit_reference_peak <input_parameters/fit_reference_peak.html>`_
+     - Mode fitting
+     - Select one reference-frequency peak per mode and q point (default: 1).
+   * - `fit_reference_window <input_parameters/fit_reference_window.html>`_
+     - Mode fitting
+     - Reference-frequency search half-window in THz (default: 0.5).
    * - `peak_min_significance <input_parameters/peak_min_significance.html>`_
      - Peak fitting
      - Set the robust local peak-significance threshold.

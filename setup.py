@@ -53,6 +53,7 @@ setup(
         "numpy",
         "scipy",
         "threadpoolctl>=3.1",
+        "PyYAML>=6",
         "netCDF4",
         "matplotlib",
         "seaborn",

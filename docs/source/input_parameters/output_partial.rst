@@ -22,6 +22,10 @@ output_partial
    and partial output.
 
 **Notes**
+   Currently unavailable with ``eigenvector_file``. Combining eigenvector
+   projection with ``output_partial = 1`` raises an input error; use ``0``
+   or omit the parameter. Ordinary SED still supports element/direction partials.
+
    Enable this in compute mode. Plot selected partial components later with
    ``plot_partial_SED``. Every element's x/y/z components are retained so that
    later combinations, such as ``Sr+Ti x+z`` or ``all x``, need no new SED

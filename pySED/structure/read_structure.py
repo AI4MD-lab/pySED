@@ -158,7 +158,7 @@ def get_structure_from_lammps(lammps_input_file, show_log = False):
 
     return structure
 
-def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3):
+def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3, *, verbose=True):
     """Read a standard VASP 5-style POSCAR into a structure dictionary.
 
     Expect species names/counts and then a Direct or Cartesian coordinate
@@ -174,7 +174,8 @@ def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3
         sys.exit(1)
 
     # Read from VASP POSCAR file
-    print("\n********************* Reading From VASP POSCAR structure *********************")
+    if verbose:
+        print("\n********************* Reading From VASP POSCAR structure *********************")
     poscar_file = open(file_name, 'r')
     data_lines = poscar_file.read().split('\n')
     poscar_file.close()
@@ -230,7 +231,7 @@ def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3
 
     return structure
 
-def read_from_file_structure_xyz(file_name='model.xyz'):
+def read_from_file_structure_xyz(file_name='model.xyz', *, verbose=True):
     """Read the first structure in an extended-XYZ file with lattice metadata.
 
     Require a nine-value Lattice entry and Properties describing position and
@@ -244,7 +245,8 @@ def read_from_file_structure_xyz(file_name='model.xyz'):
         sys.exit(1)
 
     # Read from XYZ file
-    print("\n********************* Reading From (ext)XYZ structure *********************")
+    if verbose:
+        print("\n********************* Reading From (ext)XYZ structure *********************")
     with open(file_name, 'r') as f:
         lines = f.readlines()
 

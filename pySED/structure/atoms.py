@@ -1,24 +1,49 @@
 # =============================================================================
-#     Copyright 2025-2026 Ting Liang and pySED development team
-#     This file is part of pySED.
-#     Adapted from phonopy (Copyright Atsushi Togo), used under BSD license.
-#     pySED is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 3 of the License, or
-#     (at your option) any later version.
-#     pySED is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#     You should have received a copy of the GNU General Public License
-#     along with pySED.  If not, see <http://www.gnu.org/licenses/>.
+# Adapted from phonopy/structure/atoms.py; upstream BSD-3-Clause notice:
+# Copyright (C) 2011 Atsushi Togo
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in
+#   the documentation and/or other materials provided with the
+#   distribution.
+#
+# * Neither the name of the phonopy project nor the names of its
+#   contributors may be used to endorse or promote products derived
+#   from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+# pySED modifications: Copyright 2025-2026 Ting Liang and pySED development team.
+# These modifications are distributed under GPL-3.0-or-later; see LICENSE.
+# The upstream BSD notice and conditions above remain applicable.
+# See LICENSE for upstream provenance and additional copyright notices.
 # =============================================================================
 
 
 """
 @author: Togo (adapted for pySED)
-Get from phonopy's atom.py
-************************ 2021/4/22 22:40:19 *********************
+Mass values aligned with Phonopy v4.10.0 (checked 2026-11-11):
+https://github.com/phonopy/phonopy/blob/v4.10.0/phonopy/structure/atomic_data.py
+Unavailable masses retain pySED's 0 placeholder (Phonopy uses None).
 """
 
 atom_data = [
@@ -65,7 +90,7 @@ atom_data = [
     [40, "Zr", "Zirconium", 91.224],
     [41, "Nb", "Niobium", 92.90638],
     [42, "Mo", "Molybdenum", 95.96],
-    [43, "Tc", "Technetium", 0],
+    [43, "Tc", "Technetium", 98],
     [44, "Ru", "Ruthenium", 101.07],
     [45, "Rh", "Rhodium", 102.90550],
     [46, "Pd", "Palladium", 106.42],
@@ -83,7 +108,7 @@ atom_data = [
     [58, "Ce", "Cerium", 140.116],
     [59, "Pr", "Praseodymium", 140.90765],
     [60, "Nd", "Neodymium", 144.242],
-    [61, "Pm", "Promethium", 0],
+    [61, "Pm", "Promethium", 145],
     [62, "Sm", "Samarium", 150.36],
     [63, "Eu", "Europium", 151.964],
     [64, "Gd", "Gadolinium", 157.25],
@@ -111,11 +136,11 @@ atom_data = [
     [86, "Rn", "Radon", 0],
     [87, "Fr", "Francium", 0],
     [88, "Ra", "Radium", 0],
-    [89, "Ac", "Actinium", 0],
+    [89, "Ac", "Actinium", 227],
     [90, "Th", "Thorium", 232.03806],
     [91, "Pa", "Protactinium", 231.03588],
     [92, "U", "Uranium", 238.02891],
-    [93, "Np", "Neptunium", 0],
+    [93, "Np", "Neptunium", 237],
     [94, "Pu", "Plutonium", 0],
     [95, "Am", "Americium", 0],
     [96, "Cm", "Curium", 0],

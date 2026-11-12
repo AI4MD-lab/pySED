@@ -47,6 +47,22 @@ _SED_FIELDS = (VELOCITIES, CELLS)
 _END = object()
 
 
+def read_first_positions(params):
+    """Read one frame for eigenvector site matching, outside prefetch threads."""
+    path = Path(params.trajectory_path)
+    if is_netcdf(path):
+        with NetCDFReader(path) as source:
+            return source.read_positions(slice(0, 1))[0]
+    if params.source_format == GPUMD_XYZ:
+        batches = iter_gpumd_xyz(path, batch_size=1)
+    else:
+        batches = iter_lammps_dump(path, batch_size=1, lammps_unit=params.lammps_unit)
+    try:
+        return next(batches).data[POSITIONS][0]
+    finally:
+        batches.close()
+
+
 class NetCDFBlockSource:
     """Yield exact consecutive SED blocks from one NetCDF trajectory."""
 

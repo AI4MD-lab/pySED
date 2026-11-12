@@ -275,6 +275,8 @@ non-diagonal repetition matrices, the count must be obtained from the integer
 condition :math:`\mathbf{q}(f)\mathbf{P}^{T}\in\mathbb{Z}^{3}` for the selected
 path segment.
 
+.. _sed-lifetime-conventions:
+
 Lorentzian Fitting and Lifetime
 -------------------------------
 
@@ -296,15 +298,45 @@ the lifetime as
    =
    \frac{1}{2\gamma}.
 
-In the current code output, frequencies are handled in THz for plotting and
-fitting, and the lifetime is written in ps using the relation implemented in
-``pySED/postprocess/FileIO.py``:
+In code, the fitted HWHM is in ordinary-frequency THz, not angular frequency.
+Thus the angular HWHM is :math:`2\pi h`, and the energy-lifetime convention
+above becomes :math:`1/(4\pi h)`. Eigenvector-projected spectra use
 
 .. math::
 
    \tau_{\mathrm{ps}}
    =
-   \frac{1}{2\pi\gamma_{\mathrm{THz}}}.
+   \frac{1}{4\pi h_{\mathrm{THz}}}.
+
+For an isolated weakly damped mode with negligible pure dephasing, an amplitude
+envelope :math:`\exp(-\gamma t)` corresponds to an energy envelope
+:math:`\exp(-2\gamma t)`. Therefore
+
+.. math::
+
+   \tau_A = \frac{1}{\gamma} = \frac{1}{2\pi h},
+   \qquad
+   \tau_E = \frac{1}{2\gamma} = \frac{1}{4\pi h}.
+
+Here :math:`\gamma` denotes angular-frequency HWHM. Symbols for damping rates
+vary between publications; always check whether a reported linewidth is HWHM
+or FWHM. The amplitude/energy distinction and the effect of pure dephasing are
+discussed by Dubajic et al. [DubajicLifetime]_. Phono3py likewise converts its
+ordinary-frequency linewidths to lifetimes using the additional :math:`2\pi`
+factor [Phono3pyLifetime]_.
+
+Without eigenvectors, pySED retains its existing linewidth-derived convention
+:math:`\tau_\mathrm{SED}=1/(2\pi h)` to preserve the established output of
+ordinary SED calculations. In the simple model above it equals :math:`\tau_A`,
+not :math:`\tau_E`. This is an output convention retained by pySED, not a
+different physical linewidth relation caused by omitting eigenvectors.
+The reference-frequency selection switch does not change either formula.
+
+For a resolved single-mode peak, the projected :math:`\tau_E` is a candidate
+for comparison with BTE single-mode (RTA) scattering lifetimes. Projection
+helps distinguish mode contributions but does not guarantee a single peak or
+exclude dephasing and other broadening. An unresolved sum of modes has no
+unique mode lifetime. See :ref:`bte-lifetime-comparison` for practical guidance.
 
 Use the single-Q workflow first to tune ``peak_min_significance``,
 ``initial_guess_hwhm``, ``peak_max_hwhm``, and the
@@ -339,6 +371,13 @@ their use in polar materials, see the qNEP article [qNEP2026]_.
 
 References
 ----------
+
+.. [DubajicLifetime] M. Dubajic, A. Pusch, M. P. Nielsen, and S. D. Stranks,
+   "On the accurate determination of phonon lifetimes from the spectral domain,"
+   *PRX Energy*. https://doi.org/10.1103/vklp-9bvg
+
+.. [Phono3pyLifetime] Phono3py documentation, "Input / Output files: gamma."
+   https://phonopy.github.io/phono3py/input-output-files.html#gamma
 
 .. [Liang2025] T. Liang, W. Jiang, K. Xu, H. Bu, Z. Fan, W. Ouyang, and
    J. Xu, "PYSED: A tool for extracting kinetic-energy-weighted phonon

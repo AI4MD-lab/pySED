@@ -14,6 +14,12 @@ peak_min_significance
    estimate. See :doc:`the illustrated automatic-detection guide
    <../peak_fitting>` for the complete workflow and tuning examples.
 
+   This threshold applies to automatic all-peak detection. For an eigenvector
+   mode with ``fit_reference_peak = 1``, pySED instead selects the highest
+   raw local peak inside the reference window without using this threshold
+   to reject it. The original detector still uses this setting to identify
+   neighboring peaks when determining the complete local fitting interval.
+
 **Default**
    ``4.0``.
 

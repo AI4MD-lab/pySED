@@ -130,7 +130,8 @@ class GPUBackend:
             self.close()
             raise
         print_section("GPU resources", "🚀")
-        print_detail("GPU backend", "CuPy (single CUDA device)")
+        print("        " + "-" * 72)
+        print_detail("GPU backend", "CuPy (single CUDA device)", width=30)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -154,6 +155,7 @@ class GPUBackend:
             trajectory_bytes=trajectory_bytes,
         )
         self._check_gpu_memory(vels, cell_vecs, result)
+        print("        " + "-" * 72)
 
     def compute(self, vels, cell_vecs, result):
         """Calculate one block on the GPU and fill the host result array in place.
@@ -211,6 +213,7 @@ class GPUBackend:
                     xp=cp,
                     fft_function=transform,
                     project_function=project,
+                    q_start=q_start,
                 )
                 # q is the last axis for both total and partial SED.
                 gpu_result[..., q_start:q_stop] = batch_result
@@ -303,10 +306,10 @@ class GPUBackend:
         self._gpu_q_batch_size = selected_batch
         used_bytes = total_bytes - free_bytes
         print()
-        print_detail("GPU memory before SED", f"{used_bytes / 1e9:.2f} GB used / {total_bytes / 1e9:.2f} GB total")
-        print_detail("GPU memory available", f"{free_bytes / 1e9:.2f} GB")
-        print_detail("Estimated SED GPU memory", f"{candidate_bytes / 1e9:.2f} GB")
-        print_detail("GPU q batch size", selected_batch)
+        print_detail("GPU memory before SED", f"{used_bytes / 1e9:.2f} GB used / {total_bytes / 1e9:.2f} GB total", width=30)
+        print_detail("GPU memory available", f"{free_bytes / 1e9:.2f} GB", width=30)
+        print_detail("Estimated SED GPU memory", f"{candidate_bytes / 1e9:.2f} GB", width=30)
+        print_detail("GPU q batch size", selected_batch, width=30)
 
     def report(self, total_elapsed, trajectory_wait):
         """Print accumulated GPU-stage times alongside CPU trajectory-wait time.

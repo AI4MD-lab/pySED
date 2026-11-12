@@ -8,7 +8,8 @@ max_cores
    max_cores = 4
 
 **Meaning**
-   CPU parallelism budget for SED computation. pySED uses a fixed rule to set
+   CPU parallelism budget for SED computation and spectral fitting.
+   For SED computation, pySED uses a fixed rule to set
    processes and native BLAS/OpenMP threads per process, keeping their product
    at or below ``max_cores``. The budget is also capped by the process's
    CPU affinity where available. It is a compute-thread budget, not CPU pinning
@@ -55,6 +56,22 @@ max_cores
    excludes Python/library overhead. On clusters,
    request sufficient job memory; the system RAM query does not replace the
    scheduler's job memory limit.
+
+**Spectral fitting**
+   With ``fit_all_modes = 1``, up to ``max_cores`` modes are fitted concurrently;
+   q points within each mode remain sequential. For one spectrum with
+   ``lorentz_fit_all_qpoint = 1``, q points are fitted concurrently instead.
+   These two levels of parallelism are never nested. One selected q point
+   runs serially, and ``max_cores = 1`` keeps all fitting serial.
+
+   The actual process count is limited by CPU affinity and the number of tasks.
+   Each worker uses one native numerical-library thread. Fitting uses the CPU
+   even when ``device = gpu``. The console reports, for example,
+   ``Fitting workers : 4 CPU processes``. Detailed output is printed in mode
+   or q-point order after each task finishes, without interleaved worker output.
+   Parallel workers save figures without opening interactive windows.
+   Fit calculations, text formats and plotting styles are unchanged; summaries
+   are written after their contributing tasks finish successfully.
 
 **Clusters and library use**
    Set ``max_cores`` no higher than the CPU count allocated to this pySED process
