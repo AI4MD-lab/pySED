@@ -81,8 +81,10 @@ re_output_total_freq_lifetime
    follows the same rule; numerical summary tables still reflect the new fit.
 
    When ``lorentz_fit_all_qpoint = 1``, pySED always rebuilds
-   ``Lifetime/Fitting-All-Qpoints.Fre_lifetime`` and redraws
-   ``Fitting-Frequency-Lifetime.png`` after all Q points have been fitted.
+   ``Lifetime/Fitting-All-Qpoints.Fre_lifetime`` after all Q points have
+   been fitted. It redraws ``Fitting-Frequency-Lifetime.png`` when the
+   summary contains data suitable for plotting; otherwise it keeps the
+   previous figure and prints a warning as described above.
    In that mode, ``re_output_total_freq_lifetime`` is ignored and should
    normally be left at ``0``.
 

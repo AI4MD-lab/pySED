@@ -22,10 +22,12 @@ The SED map can be used to:
 - inspect anharmonic broadening and temperature effects,
 - estimate phonon lifetimes by fitting individual SED peaks.
 
-The lifetime values obtained from SED peak fitting should normally be treated as
-qualitative or semi-quantitative. For highly accurate thermal conductivity,
-methods such as HNEMD, EMD, NEMD, or appropriate Boltzmann transport workflows
-are usually more suitable.
+The interpretation of a fitted lifetime depends on the spectrum. A resolved,
+weakly damped eigenvector-projected mode can provide an energy-lifetime
+estimate for comparison with BTE scattering lifetimes. Without eigenvectors,
+overlapping modes can prevent a peak width from representing one mode's decay.
+See :ref:`bte-lifetime-comparison` for the two lifetime conventions and the
+conditions for comparison.
 
 Normal-Mode SED
 ---------------
@@ -402,3 +404,11 @@ References
    potential with dynamic charges for large-scale atomistic simulations,"
    *Journal of Chemical Theory and Computation* **22**, 4787-4801 (2026).
    https://doi.org/10.1021/acs.jctc.6c00146
+
+Units and output conventions
+----------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   sed_units

@@ -12,12 +12,26 @@ enhancing its versatility and applicability in various research scenarios.
 
 Main Features
 -------------
-- **SED Visualization**: Generates high-quality SED images for detailed analysis of phonon dispersion and lifetimes.
-- **Lorentzian Fitting**: Utilizes Lorentzian fitting to accurately model SED peaks.
-- **Comprehensive Peak Fitting**: Capable of fitting all peaks simultaneously to output phonon lifetimes or fitting them individually as needed.
-- **User-Friendly Interface**: Designed for simplicity and ease of use.
-- **Qualitative Phonon Lifetimes**: Provides qualitative insights into phonon lifetimes based on SED analysis.
-- **Parallel Processing**: Supports parallel execution to accelerate SED computations and obtain results quickly.
+- Multi-core CPU and GPU acceleration for SED calculations.
+- Total, element- and direction-resolved SED analysis.
+- SED analysis of crystals with random vacancies.
+- Analysis of individual phonon modes using
+  `Phonopy <https://phonopy.github.io/phonopy/>`_ eigenvectors.
+- Accurate peak detection and fast spectral fitting.
+- Lorentzian and damped harmonic oscillator peak fitting.
+- Support for GPUMD and LAMMPS trajectories.
 
-For the additional trajectory formats, CPU/GPU computation, and fitting options
-in pySED 3.0, see :doc:`sed_workflow` and :doc:`peak_fitting`.
+Choosing an analysis
+--------------------
+
+**Without eigenvectors**, calculate total SED or separate contributions from
+elements and Cartesian directions. This is also the workflow for crystals
+with random vacancies. See :doc:`starting` and :doc:`structure_generation`.
+
+**With eigenvectors**, supply a Phonopy ``band.yaml`` and the primitive
+reference structure to calculate the spectrum of each phonon mode in a
+complete periodic crystal. See :doc:`input_parameters/eigenvector_file`.
+
+Both workflows can fit spectral peaks. Their lifetime definitions and the
+conditions for comparison with BTE are explained in
+:ref:`bte-lifetime-comparison`.

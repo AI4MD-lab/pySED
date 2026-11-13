@@ -92,12 +92,8 @@ def _sync_publications_page():
                 title,
                 '=' * len(title),
                 '',
-                'Publications using pySED are grouped by year. This page is '
-                'synced from '
-                '`publications/readme.md <https://github.com/AI4MD-lab/pySED/tree/main/publications>`_. '
-                'To update it, edit ``publications/readme.md`` and push the '
-                'change to GitHub; ReadTheDocs will refresh the page during '
-                'the next build.',
+                'Publications using pySED are grouped by year. See also the '
+                '`publication list on GitHub <https://github.com/AI4MD-lab/pySED/tree/main/publications>`_.',
                 '',
             ])
         elif stripped.startswith('## '):
