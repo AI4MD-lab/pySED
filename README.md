@@ -16,10 +16,6 @@
 - Lorentzian and damped harmonic oscillator peak fitting
 - Support for [GPUMD](https://github.com/brucefan1983/GPUMD) and [LAMMPS](https://www.lammps.org/) trajectories
 
-## Documentation
-
-The complete manual is available on [Read the Docs](https://pysed.readthedocs.io/).
-
 ## Installation
 
 pySED requires **Python 3.10 or newer**. Install the current source with:
@@ -39,7 +35,7 @@ one [CuPy package](https://docs.cupy.dev/en/stable/install.html) matching your i
 python -m pip install cupy-cuda12x
 
 # For CUDA 13.x, use this instead (do not install both):
-# python -m pip install cupy-cuda13x
+python -m pip install cupy-cuda13x
 ```
 
 Then set this in `input_SED.in`:
@@ -55,6 +51,7 @@ Alternatively, install or upgrade from PyPI:
 
 ```bash
 python -m pip install --upgrade pysed-phonon
+pysed -h
 ```
 
 The previous input format and workflow remain available on the
@@ -88,7 +85,10 @@ action = fit       # Fit peaks and calculate lifetimes
 Choose one `action` in your input file. The default, `action = thinking`,
 selects the next task based on the output files already present.
 
-See the [online manual](https://pysed.readthedocs.io/) for details on all input parameters.
+## Documentation
+
+The complete manual, including details on all input parameters, is available on
+[Read the Docs](https://pysed.readthedocs.io/).
 
 ## Examples
 
