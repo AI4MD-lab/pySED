@@ -142,6 +142,7 @@ Phys. Rev. B **81**, 081411 (2010).
 
 Representative publications that use pySED are listed below:
 
+- Yuanwen Feng, Lin Xie, Seiko Ohira-Kawamura, Ji Qi, Dehong Yu, Dan Huang, Haoyu Wang, Kirrily C. Rule, Bingqi Linghu, Jie Zhu, Dawei Tang, Yanxu Wang, Jiaqing He, Bing Li, [Coexisting Liquid-, Glassy-, and Crystal-like Phonons in a Crystalline Solid](https://doi.org/10.1021/jacs.6c17837), Journal of the American Chemical Society, (2026).
 - Fuwei Yang, Wenjiang Zhou, Yelingyi Wang, Yuxi Wang, Deli Peng, Quanshui Zheng, Bai Song, [Moving Heterointerface with Robustly High Thermal Conductance](https://doi.org/10.1103/yzn5-723b), Physical Review X, **16**, 041005 (2026).
 - Ziyang Wang, Bingqi Linghui, Donghao Li, Jie Zhu, Dawei Tang, [Systematic investigation of interfacial heat transport at Metal/GaN interfaces: Experimental and simulation validation](https://doi.org/10.1016/j.ijheatmasstransfer.2026.128564), International Journal of Heat and Mass Transfer, **261**, 128564 (2026).
 - Jincheng Yue, Rongkun Chen, Xinkai Sun, Yinong Liu, Xiaolong Li, Shiqian Hu, [Phonon overdamping defines the ultimate limit of lattice thermal conductivity](https://doi.org/10.1103/jhfd-vzjy), Physical Review B, **113**, L161401 (2026).
