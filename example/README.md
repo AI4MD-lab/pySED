@@ -6,9 +6,13 @@ before applying pySED to a new material.
 
 Use this directory together with the
 [online manual](https://pysed.readthedocs.io/en/latest/). If any setting in
-`input_SED.in` is unclear, check the
-[`input_SED.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html)
+`input.in` is unclear, check the
+[`input.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html)
 first.
+
+> The illustrations retain the original pySED 2.4 results. Recompute the SED
+> and fits with pySED 3.0 before comparing intensities or lifetimes. The
+> original numerical results remain in [the 2.4 archive](legacy/pySED-2.4/).
 
 ---
 
@@ -20,8 +24,8 @@ Each modern GPUMD example follows this sequence:
 
 - [x] **[1. Structure]** Generate `model.xyz` for GPUMD and `basis.in` for pySED.
 - [x] **[2. MD]** Run GPUMD to produce `dump.xyz` with positions and velocities.
-- [x] **[3. Compute]** Run pySED with `plot_SED = 0`.
-- [x] **[4. Plot/Fit]** Run pySED with `plot_SED = 1`, then tune plotting or Lorentz fitting parameters.
+- [x] **[3. Compute]** Run pySED with `action = compute`.
+- [x] **[4. Plot/Fit]** Run pySED with `action = plot`; use `action = fit` for peak fitting.
 - [x] **[5. Validate]** Compare with lattice dynamics when an LD workflow is provided.
 
 For workflow automation, you can put the structure generation, MD run, pySED
@@ -77,4 +81,4 @@ in the structure-generation script, then write `model.xyz` and `basis.in`.
   for atom-type and direction-resolved partial SED.
 
 **Author:** pySED development team
-**Recommended version:** pySED v2.2.0 and above
+**Version for these commands:** pySED 3.0

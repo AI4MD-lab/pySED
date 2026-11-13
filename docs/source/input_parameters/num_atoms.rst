@@ -9,7 +9,8 @@ num_atoms
 
 **Meaning**
    Number of atoms in the MD supercell used for the trajectory. It must match
-   both the trajectory file and the atom mapping in ``basis.in``.
+   the trajectory file. For ordinary complete crystals, it also matches the
+   atom count in ``basis.in``.
 
 **Default**
    ``0``. This must be set for real calculations.
@@ -18,8 +19,9 @@ num_atoms
    In the MoS\ :sub:`2` GPUMD example, ``num_atoms = 13824``.
 
 **Notes**
-   The value must match the maximum atom id in ``basis.in``. pySED stops if
-   these two values are inconsistent.
+   Without :doc:`defect_index_file`, the value must match the maximum atom
+   ID in ``basis.in``. With a defect mapping, it counts only the surviving
+   atoms; ``basis.in`` still describes the complete reference lattice.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

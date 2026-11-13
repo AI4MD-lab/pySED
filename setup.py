@@ -1,49 +1,79 @@
-try:
-    from setuptools import setup, find_packages
-    use_setuptools = True
-    print("setuptools is used.")
-except ImportError:
-    from distutils.core import setup, find_packages
-    use_setuptools = False
-    print("distutils is used.")
+# =============================================================================
+#     Copyright 2025-2026 Ting Liang and pySED development team
+#     This file is part of pySED.
+#     pySED is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#     pySED is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#     You should have received a copy of the GNU General Public License
+#     along with pySED.  If not, see <http://www.gnu.org/licenses/>.
+# =============================================================================
 
-def get_version_number():
-    with open('pySED/version.py', 'r') as f:
-        for line in f:
-            if line.startswith('__version__'):
-                exec(line, globals())
-                return __version__
-    raise ValueError("Version number not found.")
+"""Package metadata for pySED."""
 
-with open('README.md', 'r', encoding='utf-8') as f:
-    long_description = f.read()
+from pathlib import Path
+
+from setuptools import find_packages, setup
+
+
+ROOT = Path(__file__).parent
+VERSION = {}
+exec((ROOT / "pySED" / "version.py").read_text(encoding="utf-8"), VERSION)
+
 
 setup(
-    name='pySED',
-    version=get_version_number(),
-    description='To implement the SED method in 2010, phonon lifetime can be calculated',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    author='Liang Ting',
-    url='https://github.com/Tingliangstu/pySED',
-    author_email='liangting.zj@gmail.com',
-    packages=find_packages(),
-    python_requires=">=3.7",
+    name="pysed-phonon",
+    version=VERSION["__version__"],
+    description=(
+        "pySED is a tool for calculating Phonon Spectral Energy Density and phonon lifetimes from MD simulation trajectories"
+    ),
+    long_description=(ROOT / "README.md").read_text(encoding="utf-8"),
+    long_description_content_type="text/markdown",
+    author="Liang Ting",
+    author_email="liangting.zj@gmail.com",
+    url="https://github.com/AI4MD-lab/pySED",
+    project_urls={
+        "Documentation": "https://pysed.readthedocs.io/",
+        "Source": "https://github.com/AI4MD-lab/pySED",
+        "Issues": "https://github.com/AI4MD-lab/pySED/issues",
+    },
+    license="GPL-3.0-or-later",
+    license_files=["LICENSE"],
+    packages=find_packages(include=("pySED", "pySED.*")),
+    include_package_data=False,
+    package_data={"pySED": ["templates/*.in"]},
+    python_requires=">=3.10",
+    # CuPy remains optional because its wheel must match the user's CUDA
+    # runtime; it is intentionally not installed as a generic dependency.
     install_requires=[
-        "numpy>=1.15.0",
-        "matplotlib>=3.5.2",
-        "seaborn",
-        "h5py",
+        "numpy",
         "scipy",
-        "psutil",
+        "threadpoolctl>=3.1",
+        "PyYAML>=6",
+        "netCDF4",
+        "matplotlib",
+        "seaborn",
     ],
-    license='MIT License',
+    extras_require={
+        "test": ["pytest>=7"],
+    },
     entry_points={
-        'console_scripts': [
-            'pySED = pySED.main:main',
-            'pysed = pySED.main:main',
-            'PYSED = pySED.main:main',
+        "console_scripts": [
+            "pySED=pySED.main:main",
+            "pysed=pySED.main:main",
+            "PYSED=pySED.main:main",
         ],
     },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Topic :: Scientific/Engineering :: Physics",
+    ],
 )
-

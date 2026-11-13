@@ -156,10 +156,13 @@ The total SED is recovered by summing over all species and directions:
    \sum_s \sum_{\alpha=x,y,z}
    \Phi'_{s,\alpha}(\mathbf{q},\omega).
 
-In the input file, use ``output_partial = 1`` during the SED-computing mode.
-pySED writes one partial SED file for each atom type and direction. In plotting
-mode, use ``plot_partial_SED = 3`` to plot the sum of ``x+y+z`` for type 3, or
-``plot_partial_SED = 3 x`` to plot only the x-direction contribution of type 3.
+In the input file, use ``output_partial = 1`` during computation. pySED
+writes one partial SED file for each element and direction. In plotting mode,
+use ``plot_partial_SED = Si`` to plot the sum of ``x+y+z`` for silicon,
+or ``plot_partial_SED = Si x`` for its x-direction contribution.
+Element and direction sums, such as ``Sr+Ti x+z`` or ``all x``, are assembled
+from these saved intensities during postprocessing. The ``+`` operation sums
+powers; it does not combine complex amplitudes or project onto a new direction.
 
 Partial SED is not the same as local or spatial-bin SED. The standard SED method
 requires a mapping between the supercell and the primitive cell to define
@@ -170,9 +173,10 @@ Allowed Wave Vectors
 --------------------
 
 In periodic systems, only wave vectors commensurate with the MD supercell are
-allowed. pySED follows the same commensurate-supercell q-point idea used in
-dynasor 2 [Dynasor2025]_, and the implementation in ``pySED/construct_BZ.py``
-credits dynasor's lattice helper as the reference for this path construction.
+allowed. pySED constructs these points with a GCD/Bézout integer-lattice
+solver in ``pySED/sed/construct_BZ.py``. Earlier versions referenced the
+dynasor lattice helper [Dynasor2025]_; the current path solver uses the
+joint integer construction described below.
 For a one-dimensional direction, the Born-von Karman boundary condition gives
 
 .. math::
@@ -218,6 +222,33 @@ and keeps only values of :math:`f` satisfying
 
    \mathbf{q}(f)\mathbf{P}^{T} \in \mathbb{Z}^{3}.
 
+Set :math:`\mathbf{a}=\mathbf{q}_{\mathrm{start}}\mathbf{P}^{T}` and
+:math:`\mathbf{b}=(\mathbf{q}_{\mathrm{end}}-\mathbf{q}_{\mathrm{start}})
+\mathbf{P}^{T}`. Clear their rational denominators with a common multiple
+:math:`D`, giving integer vectors :math:`\mathbf{A}=D\mathbf{a}` and
+:math:`\mathbf{B}=D\mathbf{b}`. For a nonzero direction, let
+:math:`g=\gcd(|B_1|,|B_2|,|B_3|)` and :math:`\mathbf{v}=\mathbf{B}/g`.
+The extended Euclidean algorithm gives Bézout coefficients
+:math:`\mathbf{w}` satisfying :math:`\mathbf{w}\cdot\mathbf{B}=g`.
+With :math:`m=\mathbf{w}\cdot\mathbf{A}`, all allowed parameters have the form
+
+.. math::
+
+   f_k = \frac{Dk-m}{g}, \qquad
+   \left\lceil\frac{m}{D}\right\rceil \le k \le
+   \left\lfloor\frac{m+g}{D}\right\rfloor,
+
+provided every component of :math:`\mathbf{A}-m\mathbf{v}` is divisible by
+:math:`D`. If this divisibility condition fails, or the integer interval is
+empty, the segment has no allowed points. These calculations use exact
+integer arithmetic and apply to non-diagonal repetition matrices as well.
+A zero-length segment contributes one point only when that point itself
+satisfies the supercell condition.
+
+The same normalized rational endpoints are used to solve the path and to
+generate its coordinates. See :doc:`input_parameters/q_path` for decimal
+normalization and exact fraction input.
+
 The resulting reduced q-points are mapped to Cartesian reciprocal space by
 
 .. math::
@@ -225,6 +256,13 @@ The resulting reduced q-points are mapped to Cartesian reciprocal space by
    \mathbf{q}_{\mathrm{cart}}(f)
    =
    \mathbf{q}(f)\left[2\pi(\mathbf{p}^{-1})^{T}\right].
+
+Both cell matrices must be finite and nonsingular. The inferred repetition
+matrix must be nonsingular and integer within an absolute tolerance of
+``1e-4`` per entry, with no relative tolerance. After conversion to Cartesian
+coordinates, pySED also checks that
+:math:`\mathbf{q}_{\mathrm{cart}}\mathbf{S}^{T}/(2\pi)` is integer within
+the same absolute tolerance.
 
 Larger supercells provide denser commensurate q-point sampling, but also
 increase trajectory size, memory use, and SED compute time.
@@ -236,6 +274,8 @@ commensurate q-points, or :math:`N_i/2+1` when :math:`N_i` is even. For
 non-diagonal repetition matrices, the count must be obtained from the integer
 condition :math:`\mathbf{q}(f)\mathbf{P}^{T}\in\mathbb{Z}^{3}` for the selected
 path segment.
+
+.. _sed-lifetime-conventions:
 
 Lorentzian Fitting and Lifetime
 -------------------------------
@@ -258,19 +298,50 @@ the lifetime as
    =
    \frac{1}{2\gamma}.
 
-In the current code output, frequencies are handled in THz for plotting and
-fitting, and the lifetime is written in ps using the relation implemented in
-``pySED/FileIO.py``:
+In code, the fitted HWHM is in ordinary-frequency THz, not angular frequency.
+Thus the angular HWHM is :math:`2\pi h`, and the energy-lifetime convention
+above becomes :math:`1/(4\pi h)`. Eigenvector-projected spectra use
 
 .. math::
 
    \tau_{\mathrm{ps}}
    =
-   \frac{1}{2\pi\gamma_{\mathrm{THz}}}.
+   \frac{1}{4\pi h_{\mathrm{THz}}}.
 
-Use the single-q-point fitting workflow first to tune ``peak_height``,
-``peak_prominence``, ``initial_guess_hwhm``, ``peak_max_hwhm``, and
-``lorentz_fit_cutoff`` before fitting all q-points.
+For an isolated weakly damped mode with negligible pure dephasing, an amplitude
+envelope :math:`\exp(-\gamma t)` corresponds to an energy envelope
+:math:`\exp(-2\gamma t)`. Therefore
+
+.. math::
+
+   \tau_A = \frac{1}{\gamma} = \frac{1}{2\pi h},
+   \qquad
+   \tau_E = \frac{1}{2\gamma} = \frac{1}{4\pi h}.
+
+Here :math:`\gamma` denotes angular-frequency HWHM. Symbols for damping rates
+vary between publications; always check whether a reported linewidth is HWHM
+or FWHM. The amplitude/energy distinction and the effect of pure dephasing are
+discussed by Dubajic et al. [DubajicLifetime]_. Phono3py likewise converts its
+ordinary-frequency linewidths to lifetimes using the additional :math:`2\pi`
+factor [Phono3pyLifetime]_.
+
+Without eigenvectors, pySED retains its existing linewidth-derived convention
+:math:`\tau_\mathrm{SED}=1/(2\pi h)` to preserve the established output of
+ordinary SED calculations. In the simple model above it equals :math:`\tau_A`,
+not :math:`\tau_E`. This is an output convention retained by pySED, not a
+different physical linewidth relation caused by omitting eigenvectors.
+The reference-frequency selection switch does not change either formula.
+
+For a resolved single-mode peak, the projected :math:`\tau_E` is a candidate
+for comparison with BTE single-mode (RTA) scattering lifetimes. Projection
+helps distinguish mode contributions but does not guarantee a single peak or
+exclude dephasing and other broadening. An unresolved sum of modes has no
+unique mode lifetime. See :ref:`bte-lifetime-comparison` for practical guidance.
+
+Use the single-Q workflow first to tune ``peak_min_significance``,
+``initial_guess_hwhm``, ``peak_max_hwhm``, and the
+``lorentz_fit_freq_min``/``lorentz_fit_freq_max`` interval before fitting
+all Q points. See :doc:`peak_fitting` and :doc:`sed_units`.
 
 LO-TO Splitting
 ---------------
@@ -300,6 +371,13 @@ their use in polar materials, see the qNEP article [qNEP2026]_.
 
 References
 ----------
+
+.. [DubajicLifetime] M. Dubajic, A. Pusch, M. P. Nielsen, and S. D. Stranks,
+   "On the accurate determination of phonon lifetimes from the spectral domain,"
+   *PRX Energy*. https://doi.org/10.1103/vklp-9bvg
+
+.. [Phono3pyLifetime] Phono3py documentation, "Input / Output files: gamma."
+   https://phonopy.github.io/phono3py/input-output-files.html#gamma
 
 .. [Liang2025] T. Liang, W. Jiang, K. Xu, H. Bu, Z. Fan, W. Ouyang, and
    J. Xu, "PYSED: A tool for extracting kinetic-energy-weighted phonon

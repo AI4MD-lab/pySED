@@ -8,8 +8,11 @@ two-dimensional material.
 
 Use this example together with the
 [online manual](https://pysed.readthedocs.io/en/latest/). For any unclear
-`input_SED.in` setting, go directly to the
-[`input_SED.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+`input.in` setting, go directly to the
+[`input.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+
+> The illustration below is retained from pySED 2.4. The commands use
+> pySED 3.0; recompute the SED and fits for current intensities and lifetimes.
 
 ---
 
@@ -21,9 +24,9 @@ Use this example together with the
 |---|---|---|---|
 | `[1. Structure]` | `structure/` | `POSCAR_MoS2`, `generate_lammps_data.py` | `model.xyz`, `basis.in` |
 | `[2. GPUMD]` | `gpumd_run/` | `run.in`, `nep.txt` | `dump.xyz` |
-| `[3. pySED]` | `SED/` | `input_SED.in` | `bulk_MoS2.SED`, `bulk_MoS2.Qpts`, `bulk_MoS2.THz` |
-| `[4. Plot]` | `SED/` | `input_SED.in` | `bulk_MoS2-SED.png` |
-| `[5. Fit]` | `SED/` | Lorentzian options | `TOTAL-LORENTZ-Qpoints.Fre_lifetime` |
+| `[3. pySED]` | `SED/` | `input.in` | `bulk_MoS2.SED`, `bulk_MoS2.Qpts`, `bulk_MoS2.THz` |
+| `[4. Plot]` | `SED/` | `input.in` | `bulk_MoS2-SED.png` |
+| `[5. Fit]` | `SED/` | Lorentzian options | `Lifetime/Fitting-All-Qpoints.Fre_lifetime` |
 
 ---
 
@@ -89,7 +92,7 @@ The matching pySED settings are:
 total_num_steps = 500000
 time_step = 1
 output_data_stride = 50
-dump_xyz_file = '../gpumd_run/dump.xyz'
+trajectory_file = '../gpumd_run/dump.xyz'
 ```
 
 ---
@@ -100,13 +103,13 @@ Go to the SED folder:
 
 ```bash
 cd ../SED
-pysed input_SED.in
+pysed input.in
 ```
 
 For the first run, use:
 
 ```text
-plot_SED = 0
+action = compute
 ```
 
 The out-of-plane path is `G-A`:
@@ -121,10 +124,10 @@ q_path = 0.0 0.0 0.0  0.0 0.0 0.5
 
 ## 📈 [Step 4] -> Plot low-frequency SED
 
-After the SED files exist, set the following values in `SED/input_SED.in`:
+After the SED files exist, set the following values in `SED/input.in`:
 
 ```text
-plot_SED = 1
+action = plot
 plot_cutoff_freq = 2.0
 plot_interval = 0.5
 ```
@@ -138,23 +141,25 @@ visible.
 
 ## 🎯 [Step 5] -> Fit Lorentzian peaks
 
-For single-q-point fitting, set these values in `SED/input_SED.in`:
+For single-q-point fitting, set these values in `SED/input.in`:
 
 ```text
 plot_slice = 1
-lorentz = 1
-lorentz_fit_cutoff = 2
+action = fit
+fitting_function = lorentz
+lorentz_fit_all_qpoint = 0
+lorentz_fit_freq_max = 2
 ```
 
-Tune these key parameters in `SED/input_SED.in`:
+Tune these key parameters in `SED/input.in`:
 
 - [`qpoint_slice_index`](https://pysed.readthedocs.io/en/latest/input_parameters.html#qpoint-slice-index)
-- [`peak_height`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-height)
-- [`peak_prominence`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-prominence)
+- [`peak_min_significance`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-min-significance)
 - [`initial_guess_hwhm`](https://pysed.readthedocs.io/en/latest/input_parameters.html#initial-guess-hwhm)
 
-After all-q-point fitting, pySED writes
-`TOTAL-LORENTZ-Qpoints.Fre_lifetime`.
+Set `lorentz_fit_all_qpoint = 1` and rerun `pysed input.in` to fit all
+q-points. After all-q-point fitting, pySED writes
+`Lifetime/Fitting-All-Qpoints.Fre_lifetime`.
 
 ---
 

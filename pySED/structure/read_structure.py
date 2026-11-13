@@ -1,34 +1,49 @@
-'''
-@author:
-**************************  LiangTing ***************************
-                      liangting.zj@gmail.com
-************************ 2020/9/22 14:22:15 *********************
-'''
-import os, sys, re
+# =============================================================================
+#     Copyright 2025-2026 Ting Liang and pySED development team
+#     This file is part of pySED.
+#     pySED is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#     pySED is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#     You should have received a copy of the GNU General Public License
+#     along with pySED.  If not, see <http://www.gnu.org/licenses/>.
+# =============================================================================
+
+import os
+import re
+import sys
 import numpy as np
 from pySED.structure.atoms import atom_data
 
 def mass_to_symbol(mass, tolerance=5e-2):
 
+    """Match a mass in amu to an element within tolerance, or raise ValueError."""
     for element in atom_data:
-        if element[3] is not None and abs(mass - element[3]) < tolerance:
+        if element[3] is not None and element[3] > 0 and abs(mass - element[3]) < tolerance:
             return element[1]
 
-    return 'H'           # If no match is found, use H as the wildcard
+    raise ValueError(
+        f"No element matches atomic mass {mass!r} amu within {tolerance:g} amu."
+    )
 
 def symbol_to_mass(symbol):
 
+    """Return an element's positive mass in amu, or raise ValueError if unavailable."""
     for element in atom_data:
-        if element[1] is not None and symbol==element[1]:
+        if symbol == element[1] and element[3] is not None and element[3] > 0:
             return element[3]
 
-    return 1           # If no match is found, use H mass as the wildcard
+    raise ValueError(f"Unknown element symbol or unavailable atomic mass: {symbol!r}.")
 
 def get_units(lammps_input_file):
-    """
-    Get the units label for LAMMPS "units" command from a list of LAMMPS input commands
-    :param lammps_input_file: LAMMPS input file name (strings)
-    :return units: string containing the units
+    """Read the units command from a LAMMPS input file.
+
+    Return the unit-style token on the first matching line. If no units
+    command is found, return lj, matching the LAMMPS default.
     """
     lammps_commands_list = open(lammps_input_file).read().split('\n')
 
@@ -39,12 +54,13 @@ def get_units(lammps_input_file):
     return 'lj'
 
 
-def get_structure_from_lammps(lammps_input_file, show_log = False):  # This function is not recommended for use
+def get_structure_from_lammps(lammps_input_file, show_log = False):
     """
-    Get the crystal structure from lammps input, if using the function one need a installed python-lammps interface on your machine,
-    so it is not recommended. This function maybe only use for test and maybe will be removed in the future.
-    :param command_list: LAMMPS input file (One or more lines)
-    :return: numpy array matrix with forces of atoms [Natoms x 3]
+    Read a structure through the optional LAMMPS Python interface.
+
+    :param lammps_input_file: Path to the LAMMPS input commands.
+    :param show_log: Whether LAMMPS writes its screen and log output.
+    :return: Dictionary containing the cell, positions, masses, and symbols.
     """
 
     print("\n********************* Reading From LAMMPS Data **********************")
@@ -61,15 +77,12 @@ def get_structure_from_lammps(lammps_input_file, show_log = False):  # This func
     else:
         sys.exit('\n\tFile error: The in file that lammps needs to read does not exist!\n')
 
-    # lines = open(in_lammps,'r').readlines()
-    # for line in lines: self.lmp.command(line)
     """
     Do the same as lmp.command(filename) but don't allow the script to be
     continued after quit.
     """
     lines = open(lammps_input_file, 'r').readlines()
     for line in lines:
-        # print(line)
         if "quit" in line and line[0] != "#":
             sys.exit('\n\tQuit error: It is not appropriate '
                      'to exit the execution of the in.file at this time\n')  ## Quit lammps if find the keyword 'quit'
@@ -145,12 +158,14 @@ def get_structure_from_lammps(lammps_input_file, show_log = False):  # This func
 
     return structure
 
-def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3):
-    """
-    Read crystal structure from a VASP POSCAR type file
-    :param file_name: POSCAR filename
-    :param number_of_dimensions: number of dimensions of the crystal structure
-    :return: Atoms (like phonopy) type object containing the crystal structure
+def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3, *, verbose=True):
+    """Read a standard VASP 5-style POSCAR into a structure dictionary.
+
+    Expect species names/counts and then a Direct or Cartesian coordinate
+    mode; a Selective dynamics line is not handled. Direct positions are
+    converted with the scaled row-wise lattice. Return cell, positions,
+    optional scaled_positions, masses, and symbols in file atom order.
+    The usual input is a three-dimensional cell.
     """
 
     # Check file exists
@@ -159,7 +174,8 @@ def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3
         sys.exit(1)
 
     # Read from VASP POSCAR file
-    print("\n********************* Reading From VASP POSCAR structure *********************")
+    if verbose:
+        print("\n********************* Reading From VASP POSCAR structure *********************")
     poscar_file = open(file_name, 'r')
     data_lines = poscar_file.read().split('\n')
     poscar_file.close()
@@ -187,6 +203,7 @@ def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3
         elif coordinates_type.startswith('c'):
             positions = np.array([data_lines[8 + k].split()[0:3]
                                   for k in range(sum(number_of_types))], dtype=float)
+            positions *= multiply
 
         else:
             print('*********** [ERROR] Coordinates type not recognized in POSCAR file! **********\n')
@@ -214,11 +231,13 @@ def read_from_file_structure_poscar(file_name='POSCAR', number_of_dimensions = 3
 
     return structure
 
-def read_from_file_structure_xyz(file_name='model.xyz'):
-    """
-    Read crystal structure from an extended XYZ file (with Lattice and Properties)
-    :param file_name: EXTXYZ filename
-    :return: Dictionary containing the crystal structure
+def read_from_file_structure_xyz(file_name='model.xyz', *, verbose=True):
+    """Read the first structure in an extended-XYZ file with lattice metadata.
+
+    Require a nine-value Lattice entry and Properties describing position and
+    species columns. Return the row-wise cell, Cartesian positions, masses,
+    and symbols in file atom order. This structure reader uses the supplied
+    coordinate units; it does not perform trajectory velocity conversion.
     """
     # Check file exists
     if not os.path.isfile(file_name):
@@ -226,7 +245,8 @@ def read_from_file_structure_xyz(file_name='model.xyz'):
         sys.exit(1)
 
     # Read from XYZ file
-    print("\n********************* Reading From (ext)XYZ structure *********************")
+    if verbose:
+        print("\n********************* Reading From (ext)XYZ structure *********************")
     with open(file_name, 'r') as f:
         lines = f.readlines()
 
@@ -290,8 +310,10 @@ def read_from_file_structure_xyz(file_name='model.xyz'):
 
         atom_line = lines[line_idx].strip().split()
         if len(atom_line) < total_cols:
-            print(f'*********** [WARNING] Atom {i+1} columns insufficient (expected {total_cols})\n')
-            continue
+            raise ValueError(
+                f"{file_name}: atom {i + 1} on line {line_idx + 1} has "
+                f"{len(atom_line)} columns; expected at least {total_cols}."
+            )
 
         pos = [float(atom_line[pos_start + j]) for j in range(3)]
         sym = atom_line[symbol_col].strip()
@@ -314,9 +336,7 @@ def read_from_file_structure_xyz(file_name='model.xyz'):
 
 if __name__ == "__main__":
 
-    file_name = 'HKUST-1_cubic.vasp'                              ## The in file for lammps
-
-    # structure = get_structure_from_lammps(file_name)
+    file_name = 'HKUST-1_cubic.vasp'  # POSCAR-format structure for this reader example.
 
     structure = read_from_file_structure_poscar(file_name=file_name)
     print(structure['masses'])

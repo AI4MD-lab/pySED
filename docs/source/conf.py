@@ -12,15 +12,16 @@ from pathlib import Path
 project = 'pySED'
 copyright = '2025, Ting Liang; Wenwu Jiang'
 author = 'Ting Liang; Wenwu Jiang'
-release = '2.4.1'
+release = '3.0.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = ['recommonmark', 'sphinx_markdown_tables', 'nbsphinx', 'sphinx.ext.mathjax']
+nbsphinx_execute = 'never'
 
 templates_path = ['_templates']
-exclude_patterns = ['notebook/Test_num_qpoints.ipynb']
+exclude_patterns = ['notebook/Test_num_qpoints.ipynb']  # Historical, pre-3.0 exploration.
 
 source_suffix = {
     '.rst': 'restructuredtext',
@@ -93,7 +94,7 @@ def _sync_publications_page():
                 '',
                 'Publications using pySED are grouped by year. This page is '
                 'synced from '
-                '`publications/readme.md <https://github.com/Tingliangstu/pySED/tree/main/publications>`_. '
+                '`publications/readme.md <https://github.com/AI4MD-lab/pySED/tree/main/publications>`_. '
                 'To update it, edit ``publications/readme.md`` and push the '
                 'change to GitHub; ReadTheDocs will refresh the page during '
                 'the next build.',
@@ -147,9 +148,9 @@ html_theme_options = {
 # GitHub context for the edit link
 html_context = {
     'display_github': True,  # Enable the display of the GitHub link
-    'github_user': 'Tingliangstu',  # Replace with your GitHub username
+    'github_user': 'AI4MD-lab',  # Replace with your GitHub username
     'github_repo': 'pySED',  # Replace with your repository name
-    'github_version': 'v2.4.1',
+    'github_version': 'main',
     'conf_py_path': '/docs/source/',  # Path to your conf.py file
 }
 

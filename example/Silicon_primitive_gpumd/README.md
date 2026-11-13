@@ -8,8 +8,11 @@ crystalline material.
 
 Use this example together with the
 [online manual](https://pysed.readthedocs.io/en/latest/). For any unclear
-`input_SED.in` setting, go directly to the
-[`input_SED.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+`input.in` setting, go directly to the
+[`input.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+
+> The illustration below is retained from pySED 2.4. The commands use
+> pySED 3.0; recompute the SED and fits for current intensities and lifetimes.
 
 ---
 
@@ -21,7 +24,7 @@ Use this example together with the
 |---|---|---|---|
 | `[1. Structure]` | `structure/` | `POSCAR_prim`, `generate_lammps_data.py` | `model.xyz`, `basis.in` |
 | `[2. GPUMD]` | `gpumd_run/` | `run.in`, `nep.txt` | `dump.xyz` |
-| `[3. pySED]` | `SED/` | `input_SED.in` | `silicon.SED`, `silicon.Qpts`, `silicon.THz` |
+| `[3. pySED]` | `SED/` | `input.in` | `silicon.SED`, `silicon.Qpts`, `silicon.THz` |
 | `[4. LD]` | `SED/compare_LD/` | LD and plotting scripts | `Silicon.png` |
 | `[5. Fit]` | `SED/` | Lorentzian options | q-point fitting figure |
 
@@ -89,7 +92,7 @@ The matching pySED settings are:
 total_num_steps = 500000
 time_step = 1
 output_data_stride = 10
-dump_xyz_file = '../gpumd_run/dump.xyz'
+trajectory_file = '../gpumd_run/dump.xyz'
 ```
 
 ---
@@ -100,28 +103,28 @@ Go to the SED folder:
 
 ```bash
 cd ../SED
-pysed input_SED.in
+pysed input.in
 ```
 
 For the first run, use:
 
 ```text
-plot_SED = 0
+action = compute
 ```
 
 After `silicon.SED`, `silicon.Qpts`, and `silicon.THz` exist, set
-[`plot_SED`](https://pysed.readthedocs.io/en/latest/input_parameters.html#plot-sed)
-in `SED/input_SED.in`:
+[`action`](https://pysed.readthedocs.io/en/latest/input_parameters.html#action)
+in `SED/input.in`:
 
 ```text
-plot_SED = 1
+action = plot
 ```
 
 The silicon q-path is:
 
 ```text
-num_qpaths = 5
-q_path_name = 'GXUKGL'
+num_qpaths = 4
+q_path_name = GXU|KGL
 q_path = 0.0 0.0 0.0  0.5 0.0 0.5  0.625 0.25 0.625  0.375 0.375 0.75  0.0 0.0 0.0  0.5 0.5 0.5
 ```
 
@@ -129,6 +132,11 @@ For the q-path syntax, see
 [`num_qpaths`](https://pysed.readthedocs.io/en/latest/input_parameters.html#num-qpaths),
 [`q_path_name`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path-name),
 and [`q_path`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path).
+
+The `|` separates Gamma-X-U from K-Gamma-L: no U-K segment is computed or
+interpolated in the plot. It does not assert frequency degeneracy. Recompute
+the SED to save the new path metadata. The 20 x 20 x 20 example samples allowed
+points near U and K; it does not contain those exact endpoints.
 
 The raw pySED SED map is:
 
@@ -155,24 +163,24 @@ background and LD branches.
 ## 🎯 [Step 5] -> Fit a q-point
 
 The example includes a single-q-point fitting result for q-point index 2. To
-repeat or adjust the fit, set these values in `SED/input_SED.in`:
+repeat or adjust the fit, set these values in `SED/input.in`:
 
 ```text
-plot_SED = 1
 plot_slice = 1
 qpoint_slice_index = 2
-lorentz = 1
-lorentz_fit_cutoff = 20
+action = fit
+fitting_function = lorentz
+lorentz_fit_all_qpoint = 0
+lorentz_fit_freq_max = 20
 ```
 
-Tune these key parameters in `SED/input_SED.in`:
+Tune these key parameters in `SED/input.in`:
 
 - [`plot_slice`](https://pysed.readthedocs.io/en/latest/input_parameters.html#plot-slice)
 - [`qpoint_slice_index`](https://pysed.readthedocs.io/en/latest/input_parameters.html#qpoint-slice-index)
-- [`lorentz`](https://pysed.readthedocs.io/en/latest/input_parameters.html#lorentz)
-- [`lorentz_fit_cutoff`](https://pysed.readthedocs.io/en/latest/input_parameters.html#lorentz-fit-cutoff)
-- [`peak_height`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-height)
-- [`peak_prominence`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-prominence)
+- [`fitting_function`](https://pysed.readthedocs.io/en/latest/input_parameters.html#fitting-function)
+- [`lorentz_fit_freq_max`](https://pysed.readthedocs.io/en/latest/input_parameters.html#lorentz-fit-freq-max)
+- [`peak_min_significance`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-min-significance)
 - [`initial_guess_hwhm`](https://pysed.readthedocs.io/en/latest/input_parameters.html#initial-guess-hwhm)
 
 ---
@@ -183,5 +191,5 @@ Tune these key parameters in `SED/input_SED.in`:
 - [x] [`supercell_dim = 20 20 20`](https://pysed.readthedocs.io/en/latest/input_parameters.html#supercell-dim) matches the generated silicon supercell.
 - [x] [`output_data_stride = 10`](https://pysed.readthedocs.io/en/latest/input_parameters.html#output-data-stride) matches `dump_exyz 10 1`.
 - [x] [`prim_unitcell`](https://pysed.readthedocs.io/en/latest/input_parameters.html#prim-unitcell) is consistent with the primitive silicon cell.
-- [x] [`q_path_name = 'GXUKGL'`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path-name) has
-  [`num_qpaths + 1`](https://pysed.readthedocs.io/en/latest/input_parameters.html#num-qpaths) labels.
+- [x] [`q_path_name = GXU|KGL`](https://pysed.readthedocs.io/en/latest/input_parameters.html#q-path-name)
+  has four connected segments, two path groups, and six coordinate triples.

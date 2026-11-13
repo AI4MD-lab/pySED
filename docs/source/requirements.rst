@@ -7,10 +7,12 @@ All this packages can be downloaded easily using PyPI or conda repositories.
 
 Mandatory requirements
 ----------------------
-- python>=3.7
-- numpy>=1.15.0
+- Python >= 3.10
+- numpy
 - seaborn (Visual SED images)
-- h5py (Used to compress large trajectories files)
+- netCDF4 (Trajectory reading and reusable NetCDF caches)
 - scipy (For fast Lorentz fitting)
+- matplotlib (Plotting)
 
-
+CuPy is optional for GPU computation; see :doc:`input_parameters/device`.
+The MoS2 tutorial notebook also uses Jupyter and pandas.

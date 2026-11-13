@@ -1,9 +1,17 @@
-'''
-@author:
-**************************  LiangTing ***************************
-                      liangting.zj@gmail.com
-************************ 2021/4/22 23:03:21 *********************
-'''
+# =============================================================================
+#     Copyright 2025-2026 Ting Liang and pySED development team
+#     This file is part of pySED.
+#     pySED is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#     pySED is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#     You should have received a copy of the GNU General Public License
+#     along with pySED.  If not, see <http://www.gnu.org/licenses/>.
+# =============================================================================
 
 import numpy as np
 import sys
@@ -11,16 +19,26 @@ from pySED.structure import read_structure
 
 class structure_maker(object):
 
+    """Generate a replicated crystal and its matching SED basis mapping.
+
+    Read a primitive structure, call replicate_supercell once, then write
+    XYZ/LAMMPS coordinates and basis.in from the same object. All writers
+    preserve the atom-row order established by replication so coordinates,
+    masses, unit-cell indices, and basis indices refer to the same atoms.
+    After remove_vacancies(), basis.in retains the complete reference lattice;
+    defect_index.in maps those reference sites to the remaining atoms.
+    """
     def __init__(self, structure_file_name='POSCAR',
                        lammps_data_flag=False,
                        lammps_infile_name=None,
-                       description='Create LAMMPS or GPUMD data for SED method by using pySED Codes'):
-        """
-        Generate the required file for SED projects (including lammps data for running lammps and basis.in for Reciprocal space)
-        :param structure_file_name: input file for primitive structure (POSCAR file is recommended).
-        :param lammps_data_flag: using the lammps interface to read input file (not recommended).
-        :param lammps_infile_name: if lammps_data_flag, this file is needed.
-        :param description: Some description.
+                       description='Create LAMMPS or GPUMD data for SED method by using pySED'):
+        """Read the primitive structure and initialize its one-based basis labels.
+
+        structure_file_name selects extended XYZ by its .xyz suffix; other names
+        use the POSCAR reader. lammps_data_flag instead loads lammps_infile_name
+        through the optional LAMMPS Python interface. description becomes the
+        header text in generated data and basis files. This constructor does not
+        yet replicate the structure or write output files.
         """
         self.description = str(description)
         self.lammpsInfile = lammps_infile_name
@@ -52,22 +70,31 @@ class structure_maker(object):
 
     def replicate_supercell(self, supercell=(1, 1, 1), origin_position=False):
 
+        """Replicate whole primitive-cell blocks along the three lattice vectors.
+
+        supercell gives three repeat counts. Each appended cell keeps the original
+        basis order, and positions, symbols, masses, and mapping indices are
+        extended together. origin_position translates the completed coordinates
+        so the minimum Cartesian value in each direction is zero. Results update
+        this object for the structure and basis writers.
+        """
         self.supercell = supercell
-        unitcells = np.copy(self.unitcell_index)                # deep copy
-        basis_atom_index = np.copy(self.basis_index)            # deep copy
+        # Keep the original basis arrays while extending the replicated arrays.
+        unitcells = np.copy(self.unitcell_index)
+        basis_atom_index = np.copy(self.basis_index)
         basis_atom_masses = np.copy(self.masses)
         basis_atom_types = np.copy(self.basis_atoms_symbols)
 
         position = np.copy(self.unitcell_positions[:, :])
 
-        # Generate supercell position
+        # Append each translated cell as a complete block in the original atom order.
         for i in range(self.supercell[0]):
             a1 = np.copy(self.cell[0, :]) * i
             for j in range(self.supercell[1]):
                 a2 = np.copy(self.cell[1, :]) * j
                 for k in range(self.supercell[2]):
                     a3 = np.copy(self.cell[2, :]) * k
-                    # Skip 0 indexes
+                    # The unshifted cell is already present in position.
                     if i == 0 and j == 0 and k == 0:
                         continue
                     new_cell = np.copy(self.unitcell_positions)
@@ -75,7 +102,7 @@ class structure_maker(object):
                     new_cell[:, 1] = new_cell[:, 1] + a1[1] + a2[1] + a3[1]     # y
                     new_cell[:, 2] = new_cell[:, 2] + a1[2] + a2[2] + a3[2]     # z
 
-                    # For unitcell index
+                    # All atoms in this copy share the next one-based cell ID.
                     unitcells = unitcells + 1
                     self.unitcell_index = np.append(self.unitcell_index, unitcells, axis=0)
                     self.basis_index = np.append(self.basis_index, basis_atom_index, axis=0)
@@ -85,7 +112,7 @@ class structure_maker(object):
 
                     position = np.append(position, new_cell, axis=0)
 
-        # For origin_position due to boundary origined from 0
+        # Shift the entire structure without changing relative atom positions.
         if origin_position:
             position[:, 0] = position[:, 0] - position[:, 0].min()
             position[:, 1] = position[:, 1] - position[:, 1].min()
@@ -94,13 +121,72 @@ class structure_maker(object):
         self.supercell_position = position
         self.num_atoms = position.shape[0]
 
+    def remove_vacancies(self, element, fraction, seed=None):
+        """Remove a random fraction of one element after supercell replication.
+
+        Round fraction * remaining element count to the nearest integer (halves
+        round up). Keep surviving atoms in their original order. Reusing the
+        same structure, fraction and seed reproduces the same vacancy pattern.
+        Return the number removed; write_defect_index_file saves the mapping.
+        """
+        if not hasattr(self, "supercell_position"):
+            raise ValueError("Call replicate_supercell before remove_vacancies.")
+        fraction = float(fraction)
+        if not np.isfinite(fraction) or not 0 <= fraction <= 1:
+            raise ValueError("Vacancy fraction must be between 0 and 1, for example 0.05 for 5%.")
+        symbols = np.asarray(self.basis_atoms_symbols)
+        candidates = np.flatnonzero(symbols == element)
+        if candidates.size == 0:
+            raise ValueError(f"Element '{element}' is not present in this structure.")
+        if seed is not None and (not isinstance(seed, (int, np.integer)) or seed < 0):
+            raise ValueError("Vacancy seed must be a non-negative integer.")
+        num_removed = int(np.floor(fraction * candidates.size + 0.5))
+        if num_removed == self.num_atoms:
+            raise ValueError("Vacancy fraction would remove every atom; use a smaller fraction.")
+        removed = np.random.default_rng(seed).choice(candidates, size=num_removed, replace=False)
+        keep = np.ones(self.num_atoms, dtype=bool)
+        keep[removed] = False
+
+        if not hasattr(self, "_reference_basis"):
+            self._reference_basis = np.column_stack((
+                self.unitcell_index.ravel(), self.basis_index.ravel(), self.masses,
+            ))
+            self._reference_atom_ids = np.arange(self.num_atoms)
+        self._reference_atom_ids = self._reference_atom_ids[keep]
+        self.supercell_position = self.supercell_position[keep]
+        self.basis_atoms_symbols = symbols[keep]
+        self.masses = np.asarray(self.masses)[keep]
+        self.unitcell_index = self.unitcell_index[keep]
+        self.basis_index = self.basis_index[keep]
+        self.num_atoms = int(keep.sum())
+        return num_removed
+
+    def write_defect_index_file(self, file_name='defect_index.in'):
+        """Write one-based reference/trajectory indices, with zero at vacancies."""
+        if not hasattr(self, "_reference_basis"):
+            raise ValueError("Call remove_vacancies before write_defect_index_file.")
+        count = len(self._reference_basis)
+        trajectory_index = np.zeros(count, dtype=int)
+        trajectory_index[self._reference_atom_ids] = np.arange(1, self.num_atoms + 1)
+        np.savetxt(
+            file_name, np.column_stack((np.arange(1, count + 1), trajectory_index)),
+            fmt='%d', header='reference_atom_id trajectory_index (0 = vacancy)',
+        )
+
     def write_xyz(self, filename='model.xyz', pbc="T T T"):
+        """Write replicated Cartesian positions as an extended-XYZ structure.
+
+        The header contains the replicated 3x3 lattice, species/position columns,
+        and the supplied pbc flags. Surviving rows retain their original order;
+        defect_index.in relates them to basis.in when vacancies are present.
+        This is an initial structure file, not a trajectory with velocities.
+        """
         lattice = self.calculate_supercell_matrix(self.cell, self.supercell)
         with open(filename, 'w') as fid:
             fid.write('{0:d}\n'.format(self.num_atoms))
 
             lattice_str = 'Lattice="{0:10.10f} {1:10.10f} {2:10.10f} {3:10.10f} {4:10.10f} {5:10.10f} {6:10.10f} ' \
-                          '{7:10.10f} {8:10.10f}" Properties=species:S:1:pos:R:3 config_type="SED by pySED codes"'.format(
+                          '{7:10.10f} {8:10.10f}" Properties=species:S:1:pos:R:3 config_type="SED by pySED"'.format(
                            lattice[0, 0], lattice[0, 1], lattice[0, 2],
                            lattice[1, 0], lattice[1, 1], lattice[1, 2],
                            lattice[2, 0], lattice[2, 1], lattice[2, 2])
@@ -114,6 +200,14 @@ class structure_maker(object):
     def write_lammps_data(self, file_name='lammps_data', lammps_data_types=None, atom_order=None):
 
         # Get lammps data boundary
+        """Write replicated atoms and a restricted-triclinic LAMMPS cell.
+
+        Rotate the cell and positions together into LAMMPS's restricted frame.
+        atom_order chooses species-to-type numbering without reordering atoms.
+        The metal layout writes id/type/x/y/z; the real layout also writes
+        molecule IDs and zero charges. Set lammps_data_types to select that layout;
+        it does not change the basis.in atom order.
+        """
         restricted_cell, rotation = self.calculate_restricted_cell(self.calculate_supercell_matrix(self.cell, self.supercell),
                                                                    return_rotation=True)
         xhi, yhi, zhi, xy, xz, yz = self.lammps_parameters_from_restricted_cell(restricted_cell)
@@ -141,7 +235,7 @@ class structure_maker(object):
 
         # Get lammps unit for generate lammps data
         if lammps_data_types is None and self.lammps_data_flag:
-            self.unit = read_structure.get_units(self.input_file)
+            self.unit = read_structure.get_units(self.lammpsInfile)
             print('Lammps data units is ' + self.unit)
 
         elif lammps_data_types is not None:
@@ -177,14 +271,10 @@ class structure_maker(object):
                                                                      self.basis_atoms_symbols[i]))
 
             elif self.unit == 'real':
-                # Counters for atom and molecule IDs
-                atom_id = 0
-                molecule_id = 0
                 for i, row in enumerate(lammps_positions):
-                    atom_id += 1
-                    if i > 0 and i % self.unitcell_num_atoms == 0: # assign by supercell of z direction
-                        molecule_id += 1
-                    fid.write('{0} {1} {2:d} {3} {4:20.10f} {5:20.10f} {6:20.10f}  # {7}\n'.format(i + 1, molecule_id + 1, # ids and molecular's ids
+                    # Keep the original cell identity even when atoms are missing.
+                    molecule_id = int(self.unitcell_index[i][0])
+                    fid.write('{0} {1} {2:d} {3} {4:20.10f} {5:20.10f} {6:20.10f}  # {7}\n'.format(i + 1, molecule_id,
                                                                      self.unique_types.index(self.basis_atoms_symbols[i]) + 1,  # atom types
                                                                      0.0,   # charge
                                                                      row[0], row[1], row[2],
@@ -198,13 +288,24 @@ class structure_maker(object):
 
         print('\n************* ' + file_name + ' is written successfully' + ' ************\n')
 
-    ## Most important file
     def write_lattice_basis_file(self, file_name='basis.in'):
+        """Write the atom-to-crystal mapping paired with the generated structure.
+
+        After two header lines, each row contains atom ID, unit-cell index,
+        basis index, and mass in amu. The three indices are one-based. Write this
+        from the same replicated object as the coordinates. After removing
+        vacancies this still writes every reference site; defect_index.in
+        supplies the corresponding trajectory rows.
+        """
         basis_file = self.description + '\n'
         basis_file += "atoms_ids unitcell_index basis_index mass_types\n"
-        for i in range(self.num_atoms):
-            basis_file += '{0} {1:d} {2:d} {3:10.6f}\n'.format(i+1, int(self.unitcell_index[i][0]),
-                                                               int(self.basis_index[i][0]), self.masses[i])
+        reference = getattr(self, "_reference_basis", None)
+        if reference is None:
+            reference = np.column_stack((
+                self.unitcell_index.ravel(), self.basis_index.ravel(), self.masses,
+            ))
+        for i, (cell_id, basis_id, mass) in enumerate(reference):
+            basis_file += '{0} {1:d} {2:d} {3:10.6f}\n'.format(i+1, int(cell_id), int(basis_id), mass)
         # write the file
         f = open(file_name, 'w')
         f.write(basis_file)
@@ -214,6 +315,7 @@ class structure_maker(object):
 
     @staticmethod
     def calculate_supercell_matrix(cell, supercell):
+        """Scale the three row-wise lattice vectors by their replication factors."""
         cell = np.asarray(cell, dtype=float)
         supercell = np.asarray(supercell, dtype=float)
 
@@ -228,11 +330,12 @@ class structure_maker(object):
 
     @staticmethod
     def calculate_restricted_cell(cell, return_rotation=False):
-        """
-        Convert any right-handed triclinic cell to the lower-triangular
-        restricted representation used by LAMMPS. The returned rotation maps
-        row-vector Cartesian coordinates from the input cell frame to the
-        restricted frame: new_positions = old_positions @ rotation.
+        """Convert a right-handed 3x3 cell to LAMMPS's lower-triangular frame.
+
+        Lattice vectors are rows. Return the restricted cell, or (cell, rotation)
+        when return_rotation=True. Apply the same rotation to Cartesian row-vector
+        positions: new_positions = old_positions @ rotation. The transformation
+        preserves the cell geometry; degenerate or left-handed cells raise ValueError.
         """
         cell = np.asarray(cell, dtype=float)
         if cell.shape != (3, 3):
@@ -277,6 +380,7 @@ class structure_maker(object):
 
     @staticmethod
     def lammps_parameters_from_restricted_cell(restricted_cell):
+        """Extract box lengths and xy/xz/yz tilts from a restricted cell matrix."""
         restricted_cell = np.asarray(restricted_cell, dtype=float)
         if restricted_cell.shape != (3, 3):
             raise ValueError('restricted_cell must be a 3x3 matrix.')
@@ -292,6 +396,7 @@ class structure_maker(object):
 
     @staticmethod
     def calculate_lattice_parameters(cell, supercell):
+        """Return LAMMPS box lengths and tilts for the replicated cell."""
         supercell_matrix = structure_maker.calculate_supercell_matrix(cell, supercell)
         restricted_cell = structure_maker.calculate_restricted_cell(supercell_matrix)
         xhi, yhi, zhi, xy, xz, yz = structure_maker.lammps_parameters_from_restricted_cell(restricted_cell)

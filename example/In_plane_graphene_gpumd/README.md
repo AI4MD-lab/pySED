@@ -7,8 +7,11 @@ Reproduce this example before applying pySED to a new two-dimensional material.
 
 Use this example together with the
 [online manual](https://pysed.readthedocs.io/en/latest/). For any unclear
-`input_SED.in` setting, go directly to the
-[`input_SED.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+`input.in` setting, go directly to the
+[`input.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+
+> The illustration below is retained from pySED 2.4. The commands use
+> pySED 3.0; recompute the SED and fits for current intensities and lifetimes.
 
 ---
 
@@ -20,8 +23,8 @@ Use this example together with the
 |---|---|---|---|
 | `[1. Structure]` | `structure/` | `POSCAR_graphene`, `generate_gpumd_xyz.py` | `model.xyz`, `basis.in` |
 | `[2. GPUMD]` | `gpumd_run/` | `run.in`, `nep.txt` | `dump.xyz` |
-| `[3. pySED]` | `SED/` | `input_SED.in` | `graphene_all.SED`, `graphene_all.Qpts`, `graphene_all.THz` |
-| `[4. Plot]` | `SED/` | `input_SED.in` | `graphene_all-SED.png` |
+| `[3. pySED]` | `SED/` | `input.in` | `graphene_all.SED`, `graphene_all.Qpts`, `graphene_all.THz` |
+| `[4. Plot]` | `SED/` | `input.in` | `graphene_all-SED.png` |
 | `[5. LD]` | `SED/compare_LD/` | LD and plotting scripts | `Graphene.png` |
 
 ---
@@ -87,7 +90,7 @@ The matching pySED settings are:
 total_num_steps = 500000
 time_step = 1
 output_data_stride = 10
-dump_xyz_file = '../gpumd_run/dump.xyz'
+trajectory_file = '../gpumd_run/dump.xyz'
 ```
 
 ---
@@ -98,13 +101,13 @@ Go to the SED folder:
 
 ```bash
 cd ../SED
-pysed input_SED.in
+pysed input.in
 ```
 
 For the first run, use:
 
 ```text
-plot_SED = 0
+action = compute
 ```
 
 The graphene path is `G-M-K-G`:
@@ -119,14 +122,14 @@ q_path = 0.0 0.0 0.0  0.5 0.0 0.0  0.3333333 0.3333333 0.0  0.0 0.0 0.0
 
 ## 📈 [Step 4] -> Plot SED
 
-After the SED files exist, set the following values in `SED/input_SED.in`:
+After the SED files exist, set the following values in `SED/input.in`:
 
 ```text
-plot_SED = 1
+action = plot
 use_contourf = 1
 ```
 
-Tune these plotting parameters in `SED/input_SED.in` if the contrast is not
+Tune these plotting parameters in `SED/input.in` if the contrast is not
 clear:
 
 - [`plot_cutoff_freq`](https://pysed.readthedocs.io/en/latest/input_parameters.html#plot-cutoff-freq)

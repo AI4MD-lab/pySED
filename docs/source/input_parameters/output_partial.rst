@@ -8,8 +8,8 @@ output_partial
    output_partial = 1
 
 **Meaning**
-   Controls whether pySED writes atom-type and Cartesian-direction resolved SED
-   files. Enable it when you want to plot contributions such as one atom type
+   Controls whether pySED writes element- and Cartesian-direction-resolved SED
+   files. Enable it when you want to plot contributions such as one element
    in the ``x``, ``y``, or ``z`` direction.
 
 **Default**
@@ -17,11 +17,19 @@ output_partial
 
 **Outputs**
    pySED writes partial files under ``<out_files_name>_partial_SED/`` with names
-   such as ``<out_files_name>.SED_type1_x``.
+   such as ``<out_files_name>.SED_O_x``. Their unit is ``eV/THz`` by default;
+   ``legacy_unit = True`` selects the historical 2.x scale for both total
+   and partial output.
 
 **Notes**
+   Currently unavailable with ``eigenvector_file``. Combining eigenvector
+   projection with ``output_partial = 1`` raises an input error; use ``0``
+   or omit the parameter. Ordinary SED still supports element/direction partials.
+
    Enable this in compute mode. Plot selected partial components later with
-   ``plot_partial_SED``.
+   ``plot_partial_SED``. Every element's x/y/z components are retained so that
+   later combinations, such as ``Sr+Ti x+z`` or ``all x``, need no new SED
+   calculation. ``save_partial_SED`` controls saving these postprocessing sums.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 
@@ -29,8 +37,7 @@ Related parameters
 ------------------
 
 - :doc:`plot_partial_SED <plot_partial_SED>`
-- :doc:`plot_SED <plot_SED>`
+- :doc:`save_partial_SED <save_partial_SED>`
 - :doc:`out_files_name <out_files_name>`
+- :doc:`legacy_unit <legacy_unit>`
 - :doc:`basis_lattice_file <basis_lattice_file>`
-- :doc:`file_format <file_format>`
-- :doc:`dump_xyz_file <dump_xyz_file>`

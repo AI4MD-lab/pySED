@@ -9,11 +9,11 @@ releases. For current pySED workflows, start from the modern examples and the
 Using Phonopy and Lammps-python interface to calculate the phonon dispersion and can be use to calculate most of different systems.
 
 Need phonopy module and lammps-python interface installed.
- 
+
 ## Files including in project
 
 - [x] get_2or_force_constant.py (main program)
-- [x] get_structure.py (get input structure from lammps) 
+- [x] get_structure.py (get input structure from lammps)
 - [x] phonopy_link.py (call phonopy to calculate the phonon dispersion)
 - [x] seekpath_link.py (call seekpath)
 - [x] arrange.py
@@ -28,10 +28,10 @@ At the moment I don't want to encapsulate these files as modules, so one need to
 
 **According to one specific needs, modify the potential format in in.lammps**
 
-- [x] **1. Modify the in.lammps file** 
+- [x] **1. Modify the in.lammps file**
 
 ```python
-#read graphite  
+#read graphite
 read_data  				data.si   # Need to modify according the one's systems
 
 #potential        function
@@ -39,7 +39,7 @@ pair_style        tersoff
 pair_coeff        * *  SiCGe.tersoff  Si(D)
 ```
 
-- [x] **2. Modify the get_2or_force_constant.py file** 
+- [x] **2. Modify the get_2or_force_constant.py file**
 
 ```python
 

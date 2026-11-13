@@ -6,5 +6,5 @@ It is strongly recommended that you reproduce this tutorial **exactly** before a
 
 Use this tutorial together with the
 [online manual](https://pysed.readthedocs.io/en/latest/) and the
-[`input_SED.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html)
+[`input.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html)
 when changing the SED settings.

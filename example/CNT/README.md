@@ -7,8 +7,11 @@ Reproduce this example before applying pySED to a new one-dimensional system.
 
 Use this example together with the
 [online manual](https://pysed.readthedocs.io/en/latest/). For any unclear
-`input_SED.in` setting, go directly to the
-[`input_SED.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+`input.in` setting, go directly to the
+[`input.in` parameter guide](https://pysed.readthedocs.io/en/latest/input_parameters.html).
+
+> The illustration below is retained from pySED 2.4. The commands use
+> pySED 3.0; recompute the SED and fits for current intensities and lifetimes.
 
 ---
 
@@ -20,8 +23,8 @@ Use this example together with the
 |---|---|---|---|
 | `[1. Structure]` | `structure/` | `POSCAR_CNT`, `generate_gpumd_xyz.py` | `model.xyz`, `basis.in` |
 | `[2. GPUMD]` | `gpumd_run/` | `run.in`, `nep.txt` | `dump.xyz` |
-| `[3. pySED]` | `SED/` | `input_SED.in` | `CNT.SED`, `CNT.Qpts`, `CNT.THz` |
-| `[4. Plot/Fit]` | `SED/` | `input_SED.in` | `CNT-SED.svg`, lifetime files |
+| `[3. pySED]` | `SED/` | `input.in` | `CNT.SED`, `CNT.Qpts`, `CNT.THz` |
+| `[4. Plot/Fit]` | `SED/` | `input.in` | `CNT-SED.png`, lifetime files |
 
 ---
 
@@ -90,7 +93,7 @@ settings are:
 total_num_steps = 500000
 time_step = 1
 output_data_stride = 8
-dump_xyz_file = '../gpumd_run/dump.xyz'
+trajectory_file = '../gpumd_run/dump.xyz'
 ```
 
 ---
@@ -101,13 +104,13 @@ Go to the SED folder:
 
 ```bash
 cd ../SED
-pysed input_SED.in
+pysed input.in
 ```
 
 For the first run, use:
 
 ```text
-plot_SED = 0
+action = compute
 ```
 
 pySED writes:
@@ -130,20 +133,21 @@ q_path = 0.0 0.0 0.0  0.0 0.0 0.5
 
 ## 📈 [Step 4] -> Plot SED and fit lifetime
 
-After the SED files exist, set the following values in `SED/input_SED.in`:
+After the SED files exist, set `action = plot` in `SED/input.in` and rerun
+`pysed input.in` to plot the dispersion. For a single-q-point fit, use:
 
 ```text
-plot_SED = 1
 plot_slice = 1
-lorentz = 1
+action = fit
+fitting_function = lorentz
+lorentz_fit_all_qpoint = 0
 ```
 
 Tune the single-q-point fit first. These key parameters are all in
-`SED/input_SED.in`:
+`SED/input.in`:
 
 - [`qpoint_slice_index`](https://pysed.readthedocs.io/en/latest/input_parameters.html#qpoint-slice-index)
-- [`peak_height`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-height)
-- [`peak_prominence`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-prominence)
+- [`peak_min_significance`](https://pysed.readthedocs.io/en/latest/input_parameters.html#peak-min-significance)
 - [`initial_guess_hwhm`](https://pysed.readthedocs.io/en/latest/input_parameters.html#initial-guess-hwhm)
 
 After a reasonable single-q-point fit, use:
@@ -152,7 +156,7 @@ After a reasonable single-q-point fit, use:
 lorentz_fit_all_qpoint = 1
 ```
 
-The all-q-point workflow writes `TOTAL-LORENTZ-Qpoints.Fre_lifetime`.
+The all-q-point workflow writes `Lifetime/Fitting-All-Qpoints.Fre_lifetime`.
 
 ---
 

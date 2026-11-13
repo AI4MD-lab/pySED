@@ -1,5 +1,64 @@
 # Changelog
 
+## v3.0.0 - Unreleased
+
+### Release preparation
+
+- Use `pysed-phonon` as the distribution name, retaining the `pySED` Python
+  package and the `pysed`, `pySED`, and `PYSED` commands.
+- Keep the previous release on `legacy/2.4` and document installation from
+  GitHub and PyPI separately.
+
+### Breaking interface changes
+
+- Replaced the pySED 2.x parser with declarative parameter conversion and
+  validation. The SED-only `action` and `device` workflow is now
+  the public interface.
+- Replaced split position/velocity inputs with one `trajectory_file` and
+  automatic format detection. The default input filename is `input_SED.in`;
+  other names must be passed explicitly on the command line.
+- Removed 14 v2 parameters. Each removed key now fails with a targeted
+  migration hint instead of being silently accepted.
+- Changed the cache format/name to `.pysed.nc`, the public SED unit to eV/THz,
+  the minimum Python version to 3.10, and the project license to
+  GPL-3.0-or-later.
+
+### Computation and trajectory I/O
+
+- Added GPUMD extended-XYZ, LAMMPS combined custom-dump, and NetCDF readers,
+  with direct streaming or reusable cache modes.
+- Added block prefetch, persistent CPU multiprocessing with shared memory, and
+  an optional CuPy single-GPU backend with timing and memory reporting.
+- Added energy-preserving one-sided spectra, discrete `dt²` scaling, total and
+  partial SED, and consistent eV/THz output.
+- Preserved exact fractional q-path input and short-decimal normalization.
+- Added local-group q-grid construction through `dump_group_supercell`.
+- Added fixed-lattice SED references, random-vacancy mappings, and disconnected
+  q paths.
+- Added Phonopy eigenvector projection with CPU/GPU support and mode-resolved
+  spectra checked against the unprojected total.
+
+### Fitting, documentation, and quality
+
+- Added `pysed init` to create a basic, commented `input_SED.in` without
+  overwriting existing input files.
+- Keep detailed parameter descriptions in the manual, linked from CLI help
+  and the generated input template.
+- Added significance-based peak detection, Lorentz and velocity-DHO line
+  shapes, AICc automatic model selection, small-amplitude-safe fitting, and
+  combined lifetime outputs.
+- Added reference-guided mode fitting with an adjustable frequency search
+  window, CPU parallel fitting, batch mode plotting, and combined mode lifetimes.
+- Use `1/(4*pi*HWHM_THz)` for projected spectra and preserve
+  `1/(2*pi*HWHM_THz)` for ordinary SED; document the interpretation of both.
+- Added a parameter manual, workflow/output/unit chapters,
+  migrated examples, a deterministic synthetic example, and a v2.4 migration
+  guide.
+- Added cross-platform tests, warnings-as-errors documentation builds, package
+  builds, and installed-wheel CLI smoke tests.
+- Fixed cache invalidation when `lammps_unit` changes, extended-XYZ property
+  reordering, and false-success reporting for failed plot/fit actions.
+
 ## v2.4.1 - 2026-10-30
 
 ### Fixes

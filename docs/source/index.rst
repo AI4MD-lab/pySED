@@ -19,6 +19,7 @@ maps, and fit Lorentzian peaks to estimate phonon lifetimes.
    requirements
    installation
    starting
+   structure_generation
    input_parameters
    tutorials
    example
@@ -27,3 +28,28 @@ maps, and fit Lorentzian peaks to estimate phonon lifetimes.
    publications
    reference
    troubleshooting
+
+.. toctree::
+   :maxdepth: 1
+   :caption: pySED 3.0 additions
+
+   command_line
+   sed_workflow
+   input_parameters/action
+   input_parameters/device
+   input_parameters/trajectory_file
+   input_parameters/trajectory_read_mode
+   input_parameters/trajectory_prefetch
+   input_parameters/netcdf_batch_size
+   input_parameters/netcdf_compression_level
+   input_parameters/num_blocks
+   input_parameters/dump_group_supercell
+   input_parameters/fitting_function
+   input_parameters/peak_min_significance
+   input_parameters/lorentz_fit_freq_min
+   input_parameters/lorentz_fit_freq_max
+   peak_fitting
+   output_files
+   sed_units
+   migration_v3
+   code_architecture
