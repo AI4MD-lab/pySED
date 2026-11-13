@@ -9,7 +9,11 @@ Welcome to pySED's documentation!
 **pySED** is a Python package for calculating kinetic-energy-weighted phonon
 spectral energy density (SED) from molecular dynamics trajectories. It can read
 trajectories from GPUMD and LAMMPS, construct commensurate q-points, plot SED
-maps, and fit Lorentzian peaks to estimate phonon lifetimes.
+maps, and fit spectral peaks to estimate phonon lifetimes. Phonopy eigenvectors
+can be used to analyze individual phonon modes.
+
+Start with :doc:`installation` and :doc:`starting`. Users upgrading from
+2.4.1 can follow :doc:`migration_v3`.
 
 .. toctree::
    :maxdepth: 1
@@ -19,7 +23,6 @@ maps, and fit Lorentzian peaks to estimate phonon lifetimes.
    requirements
    installation
    starting
-   structure_generation
    input_parameters
    tutorials
    example
@@ -28,28 +31,3 @@ maps, and fit Lorentzian peaks to estimate phonon lifetimes.
    publications
    reference
    troubleshooting
-
-.. toctree::
-   :maxdepth: 1
-   :caption: pySED 3.0 additions
-
-   command_line
-   sed_workflow
-   input_parameters/action
-   input_parameters/device
-   input_parameters/trajectory_file
-   input_parameters/trajectory_read_mode
-   input_parameters/trajectory_prefetch
-   input_parameters/netcdf_batch_size
-   input_parameters/netcdf_compression_level
-   input_parameters/num_blocks
-   input_parameters/dump_group_supercell
-   input_parameters/fitting_function
-   input_parameters/peak_min_significance
-   input_parameters/lorentz_fit_freq_min
-   input_parameters/lorentz_fit_freq_max
-   peak_fitting
-   output_files
-   sed_units
-   migration_v3
-   code_architecture

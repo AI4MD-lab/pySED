@@ -46,16 +46,11 @@ Automatic all-peak detection uses one dimensionless control:
 
    peak_min_significance = 4.0
 
-Candidates are located on a seven-bin Hann-smoothed natural-log spectrum.
-Their local prominence is divided by a robust noise estimate derived from a
-31-bin rolling median absolute deviation. A candidate is retained when this
-ratio reaches ``peak_min_significance``. Smoothing is used only for detection
-and fitting-window boundaries; frequencies and linewidths are fitted to the
-original linear SED.
-
 The default 4.0 is a practical starting point. Lower it gradually when a
 reproducible weak peak is missed; raise it when noise fluctuations are accepted.
-It is a robust score, not a formal Gaussian-sigma probability.
+Peak detection uses a smoothed spectrum to distinguish peaks from noise.
+The fit itself uses the original SED values. See
+:doc:`input_parameters/peak_min_significance` for the detection criterion.
 
 Reference-frequency peak selection
 ----------------------------------
@@ -68,33 +63,27 @@ at most one peak per mode and q point:
    fit_reference_peak = 1
    fit_reference_window = 0.5
 
-The window is a **half-width in THz**: the detected peak must lie within
-the saved reference frequency +/-0.5 THz. Change it to ``1.0`` for +/-1 THz.
-References come from ``reference_frequencies_THz`` in each mode SED header,
-in the saved q-point order; fitting does not reread the eigenvector YAML.
-The source filename, when recorded in that header, is shown in the console.
+The window is a **half-width in THz** around the frequency from the eigenvector
+calculation. Change it to ``1.0`` for +/-1 THz. pySED chooses the highest local
+peak in the original SED within this window and the global fitting frequency
+range. ``peak_min_significance`` does not reject this selected peak.
 
-Find local maxima directly in the original SED and select the highest SED
-value within the reference window and global fitting frequency range. There
-is no significance threshold, smoothing for selection, or rejection based on
-the reference frequency being zero, negative, or below one FFT bin. Ties select
-the first local peak in frequency order. ``peak_min_significance`` continues
-to control ordinary all-peak detection but cannot reject the reference-selected target.
+The reference frequency is saved in each mode's SED header as
+``reference_frequencies_THz``. You do not need the original ``band.yaml``
+again when fitting saved mode spectra.
 
-A window containing only a monotonic tail has no local peak: its boundary
-maximum is not treated as a peak. If no local peak is present, the console
-reports this and the lifetime file has its header but no numerical rows.
-Missing or malformed reference metadata raises an error; it never silently
-falls back to all peaks.
+**The search window selects the peak only.** Its frequency and width are
+fitted using the original SED over the complete local peak interval, which
+can extend outside the search window. The reference frequency is not fixed
+as the fitted center. ``peak_min_significance`` can still affect the interval
+boundaries used by the fit.
 
-The reference only selects a peak. Its center and width are fitted to the raw
-SED over the original complete local peak interval. The existing whole-spectrum
-detector and smoothed valleys determine that interval, just as for ordinary
-fitting; raw fluctuations used to select the target do not split it into smaller
-intervals. The selected target is always included even if the original detector
-misses it. Thus ``peak_min_significance`` can still affect interval boundaries,
-but cannot reject the reference-selected target. The search window does not
-truncate the fitting interval or constrain the fitted center.
+If there is no local peak in the window, pySED reports this and writes no
+lifetime for that mode/q point. Inspect the spectrum and adjust the window
+or fitting frequency range as needed. A rising or falling tail alone does
+not count as a peak. If reference frequencies are missing from the mode file,
+recompute the mode SED with the eigenvector input.
+
 Set ``fit_reference_peak = 0`` to fit all detected peaks in a mode spectrum.
 Ordinary total/partial spectra and the sum of projected modes still fit all
 detected peaks: neither has one reference frequency per q point.
@@ -107,15 +96,20 @@ Fitting one Q point
    action                          = fit
    qpoint_slice_index              = 1
    lorentz_fit_all_qpoint          = 0
-   lorentz_fit_freq_min            = 0
-   lorentz_fit_freq_max            = 20
-   peak_min_significance           = 4.0
    fitting_function                = auto
-   initial_guess_hwhm              = 0.001
    re_output_total_freq_lifetime   = 0
 
 Inspect ``Fitting-Qpoint/Fitting-1-qpoint.png``. Once several representative
 Q points are satisfactory, set ``lorentz_fit_all_qpoint = 1``.
+For one phonon mode, also set ``mode_index`` and ``fit_all_modes = 0``;
+its outputs are under that mode's directory. Mode numbers start at 1 and
+q-point indices start at 0.
+
+Choose ``auto``, ``lorentz`` or ``dho`` for ``fitting_function``. Adjust
+``lorentz_fit_freq_min`` and ``lorentz_fit_freq_max`` if you need to limit
+the fitted frequency range. For ordinary all-peak detection, tune
+``peak_min_significance``; for a reference-selected mode, check
+``fit_reference_window``.
 
 Refining a Q point after all-Q fitting
 --------------------------------------
@@ -169,8 +163,10 @@ The two levels are not nested. A single mode at a single q point remains
 serial, and ``max_cores = 1`` makes any fitting task serial. Ordinary total
 or partial SED all-q fitting also uses this q-point parallelism.
 
-The console reports the actual multi-process allocation as
-``Fitting workers : 4 CPU processes`` and prints task output in order.
+The console reports the actual number of CPU processes and shows progress
+while fitting. Detailed results are printed in mode or q-point order as
+the next task in that order becomes available; a slow earlier task can delay
+later details. Fitting uses the CPU even with ``device = gpu``.
 See :doc:`input_parameters/max_cores` for resource limits.
 
 For mode-resolved results, set ``fit_all_modes = 0`` and ``mode_index`` when

@@ -73,22 +73,14 @@ settings are ready. After SED files are written, use ``action = plot`` for
 plotting; use ``action = fit`` for fitting. This avoids rereading trajectories each time
 you only want to tune figure or fitting parameters.
 
-Sync Documentation to ReadTheDocs
----------------------------------
+Further reading
+---------------
 
-The online manual is built from the files under ``docs/source``. The repository
-also contains ``.readthedocs.yml``, so ReadTheDocs rebuilds the manual after the
-documentation changes are pushed to GitHub.
+Users upgrading from 2.4.1 can follow the migration guide. The code
+architecture page is for readers who want implementation details.
 
-Recommended update workflow:
+.. toctree::
+   :maxdepth: 1
 
-.. code-block:: bash
-
-   python -m sphinx -b html docs/source docs/_build/html
-   git add README.md docs/source example publications .readthedocs.yml
-   git commit -m "Update pySED documentation"
-   git push
-
-For the publication list, edit only ``publications/readme.md``. During each
-Sphinx build, pySED copies that file into the manual as the ``Publications``
-page, so the online page stays synchronized after ReadTheDocs rebuilds.
+   migration_v3
+   code_architecture

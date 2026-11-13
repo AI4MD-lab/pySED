@@ -21,7 +21,7 @@ command line, pySED reads ``input_SED.in`` in the current directory:
 Boolean parameters accept ``True``/``False`` (case-insensitive) or ``1``/``0``.
 
 The table below lists the parameters accepted by the pySED input file. Each
-parameter has its own page with the parameter name as the title, plus syntax,
+parameter links to its page or section, with syntax,
 meaning, defaults, examples, practical notes, and related parameters.
 
 .. toctree::
@@ -29,6 +29,19 @@ meaning, defaults, examples, practical notes, and related parameters.
    :maxdepth: 1
    :caption: Input file parameters
 
+   input_parameters/action
+   input_parameters/device
+   input_parameters/trajectory_file
+   input_parameters/trajectory_read_mode
+   input_parameters/trajectory_prefetch
+   input_parameters/netcdf_batch_size
+   input_parameters/netcdf_compression_level
+   input_parameters/num_blocks
+   input_parameters/dump_group_supercell
+   input_parameters/fitting_function
+   input_parameters/peak_min_significance
+   input_parameters/lorentz_fit_freq_min
+   input_parameters/lorentz_fit_freq_max
    input_parameters/num_atoms
    input_parameters/total_num_steps
    input_parameters/time_step

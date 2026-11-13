@@ -4,7 +4,8 @@ SED Workflow and Trajectories
 Workflow
 --------
 
-pySED calculates an eigenvector-free, kinetic-energy-weighted SED:
+Without eigenvectors, pySED calculates kinetic-energy-weighted SED directly
+from atomic velocities:
 
 .. code-block:: text
 
@@ -31,6 +32,12 @@ Recommended order:
 3. Plot the dispersion and representative single-Q spectra.
 4. Tune peak detection and fitting on selected Q points.
 5. Enable all-Q fitting only after representative fits are satisfactory.
+
+To resolve individual phonon modes, also supply a Phonopy eigenvector file
+and primitive reference structure. This produces one spectrum per mode and
+their total. Follow :doc:`input_parameters/eigenvector_file` for the required
+inputs, plotting and fitting settings. Element/direction partial SED and
+vacancy calculations use the workflow without eigenvectors.
 
 For static vacancies, keep the complete reference ``basis.in`` and supply
 :doc:`input_parameters/defect_index_file`. Only surviving atoms contribute

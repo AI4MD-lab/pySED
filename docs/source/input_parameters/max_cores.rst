@@ -68,7 +68,8 @@ max_cores
    Each worker uses one native numerical-library thread. Fitting uses the CPU
    even when ``device = gpu``. The console reports, for example,
    ``Fitting workers : 4 CPU processes``. Detailed output is printed in mode
-   or q-point order after each task finishes, without interleaved worker output.
+   or q-point order as the next task in that order becomes available. A slow
+   earlier task can delay later details; progress is shown while fitting.
    Parallel workers save figures without opening interactive windows.
    Fit calculations, text formats and plotting styles are unchanged; summaries
    are written after their contributing tasks finish successfully.

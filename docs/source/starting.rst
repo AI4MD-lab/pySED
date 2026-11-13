@@ -4,7 +4,8 @@ Quick Start
 The pySED workflow is a post-processing workflow. First run molecular dynamics
 to produce a trajectory with coordinates and velocities, then run pySED to
 prepare the trajectory, construct commensurate q-points, calculate SED, plot
-the result, and optionally fit Lorentzian peaks.
+the result, and optionally fit peaks to estimate lifetimes. Start without
+eigenvectors; add them when you need individual phonon mode spectra.
 
 Recommended Workflow
 --------------------
@@ -38,20 +39,27 @@ Recommended Workflow
    Use GPUMD or LAMMPS. Equilibrate first, then run an NVE production trajectory
    for SED.
 
-4. **Edit ``input.in``.**
+4. **Create and edit ``input_SED.in``.**
+
+   In your calculation directory, create the basic template:
+
+   .. code-block:: bash
+
+      pysed init
+
    Set the trajectory path, number of atoms, MD step information, primitive
    cell, supercell dimensions, and q-path. Choose
-   ``device = cpu`` or ``gpu``. The complete control file is provided
-   in each example's ``SED/input.in``.
+   ``device = cpu`` or ``gpu``. If you start from an example instead, edit
+   its existing input file. A file named ``input.in`` is also supported:
+   run it with ``pysed input.in``.
 
 5. **Compute SED.**
 
    .. code-block:: bash
 
-      cd example/MoS2_gpumd/SED
-      pysed input.in
+      pysed input_SED.in
 
-   For the first run, use ``action = compute``. pySED writes ``.SED``, ``.Qpts``,
+   Set ``action = compute`` before this run. pySED writes ``.SED``, ``.Qpts``,
    ``.THz``, and ``.Q_distances_and_labels`` files.
 
 6. **Plot SED.**
@@ -66,6 +74,10 @@ Recommended Workflow
    ``fitting_function = lorentz``. After a good single-q fit, set
    ``lorentz_fit_all_qpoint = 1``.
 
+For individual modes, see :doc:`input_parameters/eigenvector_file`. The
+:doc:`peak_fitting` guide covers reference-frequency selection, parallel
+fitting and updating summaries after refitting one q point.
+
 GPUMD Trajectory
 ----------------
 
@@ -79,13 +91,13 @@ with positions and velocities. A minimal production block is:
    run            500000
 
 The first number after ``dump_xyz`` is the output stride in MD steps. Use the
-same value for ``output_data_stride`` in ``input.in``. The example uses a
+same value for ``output_data_stride`` in ``input_SED.in``. The example uses a
 GPUMD version supporting ``unwrapped_position``; pySED prefers this field
 over the ordinary ``pos`` coordinates. Without it, ``pos`` is read as before.
 For details, see the GPUMD manual page for
 `dump_xyz <https://gpumd.org/gpumd/input_parameters/dump_xyz.html>`_.
 
-In ``input.in``, use:
+In ``input_SED.in``, use:
 
 .. code-block:: text
 
@@ -94,7 +106,7 @@ In ``input.in``, use:
 LAMMPS Trajectory
 -----------------
 
-For pySED 3.0, LAMMPS must write positions and velocities together in the
+LAMMPS must write positions and velocities together in the
 same custom text dump. Separate position and velocity files are not supported.
 Use one dump sorted by atom id:
 
@@ -108,7 +120,7 @@ Use one dump sorted by atom id:
 ``xu yu zu`` are unwrapped coordinates. pySED prefers them when present;
 files containing only ``x y z`` remain supported. Include all three components.
 
-In ``input.in``, use:
+In ``input_SED.in``, use:
 
 .. code-block:: text
 
@@ -130,8 +142,8 @@ diffusive motion.
 What to Check Before Running pySED
 ----------------------------------
 
-- ``num_atoms`` equals the number of atoms in the trajectory and the maximum
-  atom id in ``basis.in``.
+- ``num_atoms`` equals the number of atoms in the trajectory. For a complete
+  crystal, it also equals the maximum atom id in ``basis.in``.
 - ``total_num_steps``, ``time_step``, and ``output_data_stride`` match the MD
   production run.
 - ``prim_unitcell`` and ``supercell_dim`` reconstruct the MD supercell.
@@ -141,6 +153,10 @@ What to Check Before Running pySED
 - ``q_path`` contains one reduced-coordinate triple per label. For example,
   ``GXU|KGL`` has four connected segments and six triples; U-K is not sampled.
 - The trajectory contains coordinates and velocities for every saved frame.
+
+For a vacancy calculation, ``num_atoms`` is the number of remaining atoms;
+``basis.in`` retains the full reference structure. Follow
+:doc:`input_parameters/defect_index_file` for the mapping.
 
 Recommended First Examples
 --------------------------
@@ -156,3 +172,14 @@ The illustrated 2.4 results show the expected dispersion features. Recompute
 the data with 3.0 before comparing intensities or fitting lifetimes; the
 normalization and fitting controls changed. A small executable check is
 available at :doc:`sed_workflow`.
+
+Further instructions
+--------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   command_line
+   structure_generation
+   sed_workflow
+   output_files

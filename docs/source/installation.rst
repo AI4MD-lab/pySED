@@ -1,18 +1,21 @@
 Installation
 ============
 
-The current source requires **Python 3.10 or newer**. Use a separate virtual
+pySED requires **Python 3.10 or newer**. Use a separate virtual
 or Conda environment. The installation package is ``pysed-phonon``; the command
 to run the program is ``pysed``.
 
 Install from GitHub
 -------------------
 
-Install the latest development code with the command below. Git must be installed.
+Installing from source is recommended. Git must be installed.
 
 .. code-block:: bash
 
-    python -m pip install "git+https://github.com/AI4MD-lab/pySED.git"
+    git clone https://github.com/AI4MD-lab/pySED.git
+    cd pySED
+    python -m pip install .
+    pysed -h
 
 Install from PyPI
 -----------------
@@ -22,22 +25,21 @@ Install or upgrade the published package:
 .. code-block:: bash
 
     python -m pip install --upgrade pysed-phonon
+    pysed -h
 
 .. note::
 
-    The latest development features are not yet published on PyPI. Use the
-    GitHub installation above to try them. The PyPI project named ``pysed``
-    is a different text-processing utility.
+    This manual describes pySED 3.0. If your installed version is older,
+    use the source installation above. The PyPI project named ``pysed``
+    is a different package; install ``pysed-phonon``.
 
-Install from a local checkout
------------------------------
+Editing the source (optional)
+------------------------------
 
 Use this option to edit the source code. Changes take effect without reinstalling.
 
 .. code-block:: bash
 
-    git clone https://github.com/AI4MD-lab/pySED.git
-    cd pySED
     python -m pip install -e .
 
 Verify installation
@@ -55,9 +57,19 @@ GPU support (optional)
 -----------------------
 
 CPU computation, fitting, and plotting work with the standard installation.
-For GPU computation, install
-`CuPy for your CUDA version <https://docs.cupy.dev/en/stable/install.html>`_
-and set ``device = gpu``. Fitting and plotting use the CPU.
+For GPU computation, install one
+`CuPy package matching your CUDA version <https://docs.cupy.dev/en/stable/install.html>`_:
+
+.. code-block:: bash
+
+    # CUDA 12.x
+    python -m pip install cupy-cuda12x
+
+    # For CUDA 13.x, use this instead (do not install both):
+    python -m pip install cupy-cuda13x
+
+Then set ``device = gpu`` in ``input_SED.in``. Fitting and plotting use the CPU;
+``max_cores`` controls parallel fitting. CPU users do not need CuPy or CUDA.
 
 Legacy version
 ---------------

@@ -327,9 +327,9 @@ More Examples
 Additional examples and older LAMMPS workflows are available in the
 `pySED example library <https://github.com/AI4MD-lab/pySED/tree/main/example>`_.
 
-pySED 3.0 additions
--------------------
+Related instructions
+--------------------
 
-The additional :doc:`sed_workflow` chapter covers the deterministic
-example, NetCDF/cache/direct trajectory reading, and CPU/GPU execution.
-See :doc:`peak_fitting` for the additional fitting options.
+See :doc:`sed_workflow` for a small executable example, trajectory reading
+and CPU/GPU execution. Use :doc:`input_parameters/eigenvector_file` for
+individual phonon modes and :doc:`peak_fitting` for lifetime fitting.
