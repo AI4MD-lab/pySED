@@ -18,7 +18,7 @@
 
 ## Installation
 
-pySED requires **Python 3.10 or newer**. Install the current source with:
+pySED requires **Python 3.10 or newer**. Installing from source is recommended:
 
 ```bash
 git clone https://github.com/AI4MD-lab/pySED.git
