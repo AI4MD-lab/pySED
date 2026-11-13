@@ -125,7 +125,7 @@ and the practical aspects of the SED methods it presents.
 
 [CNT Example Folder](https://github.com/AI4MD-lab/pySED/tree/main/example/CNT)\
 <p align="center">
-  <img src="example/CNT/SED/CNT-SED.svg" alt="CNT SED" width="500">
+  <img src="https://raw.githubusercontent.com/AI4MD-lab/pySED/main/example/CNT/SED/CNT-SED.svg" alt="CNT SED" width="500">
 </p>
 
 ### 2D Systems
@@ -136,7 +136,7 @@ and the practical aspects of the SED methods it presents.
 
 [Graphene Example Folder](https://github.com/AI4MD-lab/pySED/tree/main/example/In_plane_graphene_gpumd)\
 <p align="center">
-  <img src="example/In_plane_graphene_gpumd/SED/compare_LD/Graphene.png" alt="Graphene SED" width="500">
+  <img src="https://raw.githubusercontent.com/AI4MD-lab/pySED/main/example/In_plane_graphene_gpumd/SED/compare_LD/Graphene.png" alt="Graphene SED" width="500">
 </p>
 
 
@@ -146,7 +146,7 @@ and the practical aspects of the SED methods it presents.
 
 [Silicon Example Folder](https://github.com/AI4MD-lab/pySED/tree/main/example/Silicon_primitive_gpumd)\
 <p align="center">
-  <img src="example/Silicon_primitive_gpumd/SED/compare_LD/Silicon.png" alt="Silicon SED" width="500">
+  <img src="https://raw.githubusercontent.com/AI4MD-lab/pySED/main/example/Silicon_primitive_gpumd/SED/compare_LD/Silicon.png" alt="Silicon SED" width="500">
 </p>
 
 

@@ -8,11 +8,15 @@
 
 * Penghua Ying, Ting Liang, Yun Chen, Yan Chen, Shiyun Xiong, Zheyong Fan, Jianbin Xu, Yilun Liu, [Structurally Triggered Breakdown of the Phonon Gas Model in Crystalline Metal-Organic Frameworks](https://arxiv.org/abs/2604.03783)
 
-## 2027 (1)
+## 2027 (2)
+
+* Jia-Zhen Chen, Jian Zhou, [Impact of Zn vacancies on the lattice thermal conductivity of diamond-like Cu<sub>2</sub>ZnSnSe<sub>4</sub>: A first-principles machine-learning molecular dynamics study](https://doi.org/10.1016/j.ijheatmasstransfer.2026.129814), International Journal of Heat and Mass Transfer, **274**, 129814 (2027)
 
 * Qikun Tian, Ruyi Li, Hongkai Zhang, Enbo Zhang, Xiong Zheng, Huimin Wang, Zhenzhen Qin, Guangzhao Qin, [Atomic-level engineering thermal transport anisotropy in C<sub>24</sub> monolayers for directional heat spreading](https://doi.org/10.70401/tx.2026.0032), Thermo-X, **3**, 202626 (2027)
 
-## 2026 (37)
+## 2026 (38)
+
+* Yuanwen Feng, Lin Xie, Seiko Ohira-Kawamura, Ji Qi, Dehong Yu, Dan Huang, Haoyu Wang, Kirrily C. Rule, Bingqi Linghu, Jie Zhu, Dawei Tang, Yanxu Wang, Jiaqing He, Bing Li, [Coexisting Liquid-, Glassy-, and Crystal-like Phonons in a Crystalline Solid](https://doi.org/10.1021/jacs.6c17837), Journal of the American Chemical Society, (2026)
 
 * Xinyuan Ma, Peng-Hu Du, Chenxin Zhang, Qing Zhang, Qian Wang, Puru Jena, [Curvature-Enhanced and Chirality-Modulated Anomalous Thermal Transport in Pentagonal Covalent Organic Framework Nanotubes](https://doi.org/10.1021/jacs.6c10614), Journal of the American Chemical Society, (2026)
 
