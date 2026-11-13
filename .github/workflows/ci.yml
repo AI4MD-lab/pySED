@@ -87,4 +87,6 @@ jobs:
           "$RUNNER_TEMP/pysed-smoke/bin/pySED" -h
           "$RUNNER_TEMP/pysed-smoke/bin/pysed" -h
           "$RUNNER_TEMP/pysed-smoke/bin/PYSED" -h
-          "$RUNNER_TEMP/pysed-smoke/bin/python" -c "import importlib.metadata as m; assert m.version('pySED') == '3.0.0'"
+          "$RUNNER_TEMP/pysed-smoke/bin/python" -c "import importlib.metadata as m; assert m.version('pysed-phonon') == '3.0.0'"
+          "$RUNNER_TEMP/pysed-smoke/bin/pysed" init
+          test -s input_SED.in

@@ -16,37 +16,52 @@
 
 ## Installation instructions
 
-1)  Download by git or from [source code](https://github.com/AI4MD-lab/pySED). **Installing from source is highly recommended, as it is frequently maintained**.
+The current source requires **Python 3.10 or newer**. Use a separate virtual or Conda environment.
+The PyPI package name is **`pysed-phonon`**; the command to run the program is **`pysed`**.
+
+### Install from GitHub
+
+Install the latest development code with the command below. Git must be installed.
+
 ```bash
-git clone --branch codex/pysed-3.0-architecture https://github.com/AI4MD-lab/pySED.git
+python -m pip install "git+https://github.com/AI4MD-lab/pySED.git"
 ```
-2) Install
+
+### Install from PyPI
+
+Install or upgrade the [published package](https://pypi.org/project/pysed-phonon/):
+
 ```bash
+python -m pip install --upgrade pysed-phonon
+```
+
+**The latest development features are not yet published on PyPI. Use the GitHub installation above to try them.**
+
+### Install from a local checkout
+
+Use this option if you want to edit the source code. Source changes take effect without reinstalling.
+
+```bash
+git clone https://github.com/AI4MD-lab/pySED.git
 cd pySED
-pip install .
-```
-  or one can use:
-```bash
-python setup.py install --user --prefix=
+python -m pip install -e .
 ```
 
-For convenience, you may want to copy (or link) the files inside scripts folder to a location included in $PATH environment variable.
+### Verify installation
 
-3) If one prefers a one-line installation without cloning manually:
-```bash
-pip install git+https://github.com/AI4MD-lab/pySED.git@codex/pysed-3.0-architecture
-```
-
-4) Verify installation
-```bash
-pySED -h
-```
-  or
 ```bash
 pysed -h
 ```
-This means that `pySED` or `pysed` can be run directly from the command line.
-Use `pysed -h` for a short overview and the online manual link.
+
+The help banner shows the installed version. The `pySED` and `PYSED` commands are also supported;
+no manual copying of scripts is needed.
+
+**GPU support (optional):** CPU computation, fitting, and plotting work with the standard installation.
+For GPU computation, install [CuPy for your CUDA version](https://docs.cupy.dev/en/stable/install.html)
+and set `device = gpu` in the input file. Fitting and plotting use the CPU.
+
+**Legacy version:** the previous input format and workflow remain available on
+the [legacy/2.4 branch](https://github.com/AI4MD-lab/pySED/tree/legacy/2.4).
 
 ## Citations
 
@@ -77,22 +92,24 @@ For the complete list, please visit the [publications page](https://github.com/A
 
 ## Usage
 
-The [example files](https://github.com/AI4MD-lab/pySED/tree/main/example) have so many case provided to show how to use **pySED**.
-If you can successfully reproduce these cases, you are ready to apply `pySED` to your own research systems.  
-
-Create a basic `input_SED.in` with setup comments in the current directory:
+In your calculation directory, create a basic input file:
 
 ```bash
 pysed init
 ```
 
-Edit the generated file for your trajectory, structure, and MD sampling, then
-run `pysed`. If `input_SED.in` already exists, `pysed init` preserves it and
-returns an error. Use `pysed init -h` to see command help without creating a file.
+Edit `input_SED.in` for your trajectory, structure, and MD sampling, then run:
 
-Use the template comments to prepare your input and consult the online manual
-for detailed parameter descriptions. `pysed -h` shows a short overview and
-the manual link.
+```bash
+pysed input_SED.in
+```
+
+Running `pysed` without arguments also reads `input_SED.in` from the current directory.
+`pysed init` never overwrites an existing input file.
+
+See the [online manual](https://pysed.readthedocs.io/en/latest/) for input parameters
+and fitting workflows, and the [examples](https://github.com/AI4MD-lab/pySED/tree/main/example)
+for sample systems.
 
 We also strongly encourage readers to browse through the [pySED paper](https://doi.org/10.1063/5.0278798), 
 as it contains a wealth of details that can greatly aid in understanding both the theoretical foundations 

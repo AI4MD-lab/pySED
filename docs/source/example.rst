@@ -33,7 +33,7 @@ Carbon Nanotube
    Learn how to set up and analyze SED for a one-dimensional material.
 
 **Folder**
-   `example/CNT <https://github.com/AI4MD-lab/pySED/tree/codex/pysed-3.0-architecture/example/CNT>`_
+   `example/CNT <https://github.com/AI4MD-lab/pySED/tree/main/example/CNT>`_
 
 **Workflow**
 
@@ -76,7 +76,7 @@ In-Plane Graphene
    compare the result with lattice dynamics.
 
 **Folder**
-   `example/In_plane_graphene_gpumd <https://github.com/AI4MD-lab/pySED/tree/codex/pysed-3.0-architecture/example/In_plane_graphene_gpumd>`_
+   `example/In_plane_graphene_gpumd <https://github.com/AI4MD-lab/pySED/tree/main/example/In_plane_graphene_gpumd>`_
 
 **Workflow**
 
@@ -122,7 +122,7 @@ MoS\ :sub:`2` Out-of-Plane Modes
    two-dimensional material.
 
 **Folder**
-   `example/MoS2_gpumd <https://github.com/AI4MD-lab/pySED/tree/codex/pysed-3.0-architecture/example/MoS2_gpumd>`_
+   `example/MoS2_gpumd <https://github.com/AI4MD-lab/pySED/tree/main/example/MoS2_gpumd>`_
 
 **Workflow**
 
@@ -174,7 +174,7 @@ Bulk Silicon
    material and compare the result with lattice dynamics.
 
 **Folder**
-   `example/Silicon_primitive_gpumd <https://github.com/AI4MD-lab/pySED/tree/codex/pysed-3.0-architecture/example/Silicon_primitive_gpumd>`_
+   `example/Silicon_primitive_gpumd <https://github.com/AI4MD-lab/pySED/tree/main/example/Silicon_primitive_gpumd>`_
 
 **Workflow**
 
@@ -325,7 +325,7 @@ More Examples
 -------------
 
 Additional examples and older LAMMPS workflows are available in the
-`pySED example library <https://github.com/AI4MD-lab/pySED/tree/codex/pysed-3.0-architecture/example>`_.
+`pySED example library <https://github.com/AI4MD-lab/pySED/tree/main/example>`_.
 
 pySED 3.0 additions
 -------------------

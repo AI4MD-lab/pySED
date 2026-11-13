@@ -1,70 +1,66 @@
 Installation
 ============
 
-Installing **pySED** from source is **highly recommended**, as it is actively
-maintained. Use Python 3.10 or newer for pySED 3.0.
-The PyPI project named ``pysed`` is a different text-processing utility;
-do not use ``pip install pysed`` to install this SED package.
+The current source requires **Python 3.10 or newer**. Use a separate virtual
+or Conda environment. The installation package is ``pysed-phonon``; the command
+to run the program is ``pysed``.
 
-Download the Source Code
----------------------------
+Install from GitHub
+-------------------
 
-You can download the source code from GitHub:
+Install the latest development code with the command below. Git must be installed.
+
+.. code-block:: bash
+
+    python -m pip install "git+https://github.com/AI4MD-lab/pySED.git"
+
+Install from PyPI
+-----------------
+
+Install or upgrade the published package:
+
+.. code-block:: bash
+
+    python -m pip install --upgrade pysed-phonon
+
+.. note::
+
+    The latest development features are not yet published on PyPI. Use the
+    GitHub installation above to try them. The PyPI project named ``pysed``
+    is a different text-processing utility.
+
+Install from a local checkout
+-----------------------------
+
+Use this option to edit the source code. Changes take effect without reinstalling.
 
 .. code-block:: bash
 
     git clone https://github.com/AI4MD-lab/pySED.git
     cd pySED
-    git switch codex/pysed-3.0-architecture
+    python -m pip install -e .
 
-Alternatively, you may download the package directly from the
-`pySED 3.0 development branch <https://github.com/AI4MD-lab/pySED/tree/codex/pysed-3.0-architecture>`_.
-The ``main`` branch currently contains the 2.4.x release.
-
-Install pySED
-----------------
-
-Navigate to the downloaded directory and install using one of the following methods:
-
-**Recommended method (via pip):**
-
-.. code-block:: bash
-
-    pip install .
-
-**Alternative method (via setup script):**
-
-.. code-block:: bash
-
-    python setup.py install --user --prefix=
-
-Add Scripts to PATH
------------------------
-
-For convenience, you may want to copy or link the files inside the `scripts` folder
-to a location included in your **$PATH** environment variable.
-
-.. note::
-
-    Depending on your operating system or environment configuration, if you are using conda environment this step may be done automatically.
-
-Verify Installation
-----------------------
-
-To confirm that pySED is installed correctly, run:
-
-.. code-block:: bash
-
-    pySED -h
-
-or
+Verify installation
+--------------------
 
 .. code-block:: bash
 
     pysed -h
 
-This will display the help message, including usage instructions and descriptions of input parameters.
+The help banner shows the installed version. The ``pySED`` and ``PYSED``
+commands are also supported; no manual copying of scripts is needed.
+Run ``pysed init`` in your calculation directory to create a basic input file.
 
-.. tip::
+GPU support (optional)
+-----------------------
 
-    You can always use the `-h` flag to explore available options and understand how to prepare input files for pySED.
+CPU computation, fitting, and plotting work with the standard installation.
+For GPU computation, install
+`CuPy for your CUDA version <https://docs.cupy.dev/en/stable/install.html>`_
+and set ``device = gpu``. Fitting and plotting use the CPU.
+
+Legacy version
+---------------
+
+The previous input format and workflow remain available on the
+`legacy/2.4 branch <https://github.com/AI4MD-lab/pySED/tree/legacy/2.4>`_.

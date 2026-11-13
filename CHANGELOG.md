@@ -1,6 +1,13 @@
 # Changelog
 
-## v3.0.0 - 2026-08-11
+## v3.0.0 - Unreleased
+
+### Release preparation
+
+- Use `pysed-phonon` as the distribution name, retaining the `pySED` Python
+  package and the `pysed`, `pySED`, and `PYSED` commands.
+- Keep the previous release on `legacy/2.4` and document installation from
+  GitHub and PyPI separately.
 
 ### Breaking interface changes
 
@@ -26,6 +33,10 @@
   partial SED, and consistent eV/THz output.
 - Preserved exact fractional q-path input and short-decimal normalization.
 - Added local-group q-grid construction through `dump_group_supercell`.
+- Added fixed-lattice SED references, random-vacancy mappings, and disconnected
+  q paths.
+- Added Phonopy eigenvector projection with CPU/GPU support and mode-resolved
+  spectra checked against the unprojected total.
 
 ### Fitting, documentation, and quality
 
@@ -36,7 +47,11 @@
 - Added significance-based peak detection, Lorentz and velocity-DHO line
   shapes, AICc automatic model selection, small-amplitude-safe fitting, and
   combined lifetime outputs.
-- Added a complete flat 45-parameter manual, workflow/output/unit chapters,
+- Added reference-guided mode fitting with an adjustable frequency search
+  window, CPU parallel fitting, batch mode plotting, and combined mode lifetimes.
+- Use `1/(4*pi*HWHM_THz)` for projected spectra and preserve
+  `1/(2*pi*HWHM_THz)` for ordinary SED; document the interpretation of both.
+- Added a parameter manual, workflow/output/unit chapters,
   migrated examples, a deterministic synthetic example, and a v2.4 migration
   guide.
 - Added cross-platform tests, warnings-as-errors documentation builds, package

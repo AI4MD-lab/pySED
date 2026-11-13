@@ -150,7 +150,7 @@ html_context = {
     'display_github': True,  # Enable the display of the GitHub link
     'github_user': 'AI4MD-lab',  # Replace with your GitHub username
     'github_repo': 'pySED',  # Replace with your repository name
-    'github_version': 'codex/pysed-3.0-architecture',  # Match this documentation branch.
+    'github_version': 'main',
     'conf_py_path': '/docs/source/',  # Path to your conf.py file
 }
 

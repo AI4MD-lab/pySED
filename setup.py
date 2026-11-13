@@ -26,7 +26,7 @@ exec((ROOT / "pySED" / "version.py").read_text(encoding="utf-8"), VERSION)
 
 
 setup(
-    name="pySED",
+    name="pysed-phonon",
     version=VERSION["__version__"],
     description=(
         "pySED is a tool for calculating Phonon Spectral Energy Density and phonon lifetimes from MD simulation trajectories"
