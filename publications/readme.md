@@ -14,7 +14,9 @@
 
 * Qikun Tian, Ruyi Li, Hongkai Zhang, Enbo Zhang, Xiong Zheng, Huimin Wang, Zhenzhen Qin, Guangzhao Qin, [Atomic-level engineering thermal transport anisotropy in C<sub>24</sub> monolayers for directional heat spreading](https://doi.org/10.70401/tx.2026.0032), Thermo-X, **3**, 202626 (2027)
 
-## 2026 (38)
+## 2026 (39)
+
+* Jian Luo, Yinglong Hu, Xinran Zhang, Kan Tao, Chenxuan Liu, Yanguang Zhou, Qi Wang, Hao Ma, [Interpretable Machine Learning Reveals Design Rules for Thermal-Mechanical Decoupling in Covalent Organic Frameworks](https://doi.org/10.1002/adfm.79649), Advanced Functional Materials, e79649 (2026)
 
 * Yuanwen Feng, Lin Xie, Seiko Ohira-Kawamura, Ji Qi, Dehong Yu, Dan Huang, Haoyu Wang, Kirrily C. Rule, Bingqi Linghu, Jie Zhu, Dawei Tang, Yanxu Wang, Jiaqing He, Bing Li, [Coexisting Liquid-, Glassy-, and Crystal-like Phonons in a Crystalline Solid](https://doi.org/10.1021/jacs.6c17837), Journal of the American Chemical Society, (2026)
 
