@@ -8,17 +8,19 @@ peak_min_significance
    peak_min_significance = 4.0
 
 **Meaning**
-   Sets how far a peak must rise above nearby noise during automatic peak
-   detection. Raise it if noise is picked up as peaks. Lower it if a
-   visible peak is missed. At ``4.0`` the required prominence on the smoothed
-   log spectrum is four times the estimated local noise.
+   Controls which peaks pySED picks when searching a spectrum for all peaks.
+   At ``4.0``, a peak must stand out by at least four times pySED's estimate
+   of the nearby noise. Lower values let weaker peaks through.
 
 **Default**
    ``4.0``.
 
-With :doc:`fit_reference_peak` enabled for an individual phonon mode, pySED
-selects the highest local peak in the reference window. The threshold can
-still affect where its fitting interval ends.
+**Example**
+   Start with ``4.0`` and inspect the fit figure for one q point. Suppose
+   you see a strong peak at 2 THz and a weaker peak at 3 THz.
+
+   - If pySED misses the weaker peak, try ``3.0`` and refit that q point.
+   - If pySED also fits small ripples that look like noise, try ``6.0``.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

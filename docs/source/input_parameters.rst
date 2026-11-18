@@ -335,9 +335,9 @@ Peak fitting and lifetimes
    * - :doc:`fitting_function <input_parameters/fitting_function>`
      - Fit a Lorentzian, a damped harmonic oscillator, or choose automatically.
    * - :doc:`fit_reference_peak <input_parameters/fit_reference_peak>`
-     - Fit the highest local peak near the reference frequency for this mode and q point.
+     - For individual modes calculated with eigenvectors, fit the highest local peak near the expected mode frequency.
    * - :doc:`fit_reference_window <input_parameters/fit_reference_window>`
-     - Set how far to search on either side of the reference frequency, in THz.
+     - For eigenvector modes with ``fit_reference_peak = 1``, set how far to search on either side of the expected frequency (THz).
    * - :doc:`peak_min_significance <input_parameters/peak_min_significance>`
      - Adjust how strongly a peak must stand out from nearby noise.
    * - :doc:`lorentz_fit_freq_min <input_parameters/lorentz_fit_freq_min>`

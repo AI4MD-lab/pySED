@@ -72,11 +72,10 @@ The reference frequency is saved in each mode's SED header as
 ``reference_frequencies_THz``. You do not need the original ``band.yaml``
 again when fitting saved mode spectra.
 
-**The search window selects the peak only.** Its frequency and width are
-fitted using the original SED over the complete local peak interval, which
-can extend outside the search window. The reference frequency is not fixed
-as the fitted center. ``peak_min_significance`` can still affect the interval
-boundaries used by the fit.
+Once pySED selects a peak, it uses the original spectrum to fit its frequency
+and width. Data on either side of the peak can extend beyond the search
+window. When pySED detects a neighboring peak, it uses the dip between the
+two to separate them for fitting.
 
 If there is no local peak in the window, pySED reports this and writes no
 lifetime for that mode/q point. Inspect the spectrum and adjust the window
