@@ -8,45 +8,18 @@ output_data_stride
    output_data_stride = 50
 
 **Meaning**
-   Number of MD simulation steps between two saved trajectory frames. This is
-   the same output interval used in the MD run, so it controls how often pySED
-   receives atomic positions and velocities.
+   Number of MD steps between saved frames. Match the output interval used
+   in your MD run. For example, ``dump_xyz 50 dump.xyz velocity`` in GPUMD
+   requires ``output_data_stride = 50`` in pySED.
 
 **Default**
-   ``0``. This must be set.
+   ``0`` (set a positive integer for SED calculations).
 
-**Example**
-   If GPUMD uses ``dump_exyz 50 1``, set ``output_data_stride = 50``.
-
-   With ``time_step = 1`` fs and ``output_data_stride = 50``, pySED samples the
-   trajectory every 50 fs. The Nyquist frequency is therefore 10 THz.
-
-**Notes**
-   ``output_data_stride`` is a sampling parameter. During the production run,
-   atomic velocities and positions are saved every ``output_data_stride`` MD
-   steps. According to the Shannon sampling theorem, the maximum frequency that
-   can be resolved by SED is
-
-   .. math::
-
-      f_{\max}(\mathrm{THz})
-      =
-      \frac{500}
-      {\mathrm{time\_step(fs)} \times \mathrm{output\_data\_stride}}.
-
-   This is the usual Nyquist limit,
-   ``f_max = 1 / (2 * time_step * output_data_stride)``. The factor ``500``
-   comes only from unit conversion: when ``time_step`` is given in fs, ``1/fs``
-   equals ``1000`` THz, and the Nyquist factor ``1/2`` gives ``1000 / 2 = 500``.
-
-   For example, if ``time_step = 1`` fs and ``output_data_stride = 50``, the
-   maximum resolvable frequency is ``10`` THz. Modes above this frequency
-   cannot be recovered from the saved trajectory.
-
-   A longer production trajectory gives more saved frames and improves the
-   frequency resolution of the SED map. The trade-off is memory and file size:
-   saving frames more often or running longer gives better spectral information,
-   but requires more storage and memory during analysis.
+**Choosing an interval**
+   With :doc:`time_step` in fs, the highest frequency you can measure in
+   THz is ``500 / (time_step * output_data_stride)``. For a 1 fs time
+   step and one frame every 50 steps, the limit is 10 THz. To measure
+   higher frequencies, save frames more often during the MD run.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

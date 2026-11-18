@@ -8,49 +8,20 @@ trajectory_read_mode
    trajectory_read_mode = cache
 
 **Meaning**
-   Selects how a GPUMD XYZ or combined LAMMPS text dump is supplied to SED
-   computation. LAMMPS positions and velocities must be in the same file
-   in both modes; this parameter does not enable separate-file input.
+   Choose how to read a GPUMD XYZ or LAMMPS text trajectory.
 
-   - ``cache`` converts the text once to
-     ``<basename>.pysed.nc`` in the directory containing the pySED input
-     file and reuses that binary cache. ``basename`` is the final path
-     component of ``out_files_name``; ``results/SrTiO3`` gives
-     ``SrTiO3.pysed.nc`` beside the input file. Keep ``trajectory_file``
-     pointing to the text source so pySED can check whether the cache needs
-     rebuilding.
-   - ``direct`` parses the requested text frames sequentially during SED
-     computation and creates no intermediate NetCDF file.
+   - ``cache`` converts the text to a ``.pysed.nc`` file beside ``input_SED.in``
+     and reuses it on later runs. Choose this if you plan to try different
+     q paths with the same trajectory. Keep :doc:`trajectory_file` pointing
+     to the original text file.
+   - ``direct`` reads the text during the calculation. Choose this for a
+     single run or when disk space is limited.
 
-   In direct mode, pySED reads the trajectory once from start to finish,
-   even when you divide it into several averaging blocks.
-
-   If ``trajectory_file`` names an existing compatible NetCDF trajectory
-   (including a previously generated pySED cache), it is read directly.
-   No text conversion or additional cache is created, and this parameter
-   has no effect.
+   If :doc:`trajectory_file` points to a NetCDF file, pySED reads it directly
+   with either setting.
 
 **Default**
    ``cache``.
-
-**Choosing a mode**
-   ``direct`` avoids conversion time and cache storage for a one-off
-   calculation. ``cache`` is usually better when the same trajectory will be
-   recomputed with different Q paths or settings. To retain a cache without
-   compression overhead, combine ``cache`` with
-   ``netcdf_compression_level = 0``.
-
-**Disk space and memory**
-   A cache avoids repeated text parsing. It is an additional file: pySED
-   retains the original text trajectory. Compression can reduce the cache
-   file size on disk.
-
-   Both modes supply one SED time block at a time rather than requiring the
-   whole trajectory in memory. Peak RAM use depends on frames per SED block
-   (controlled by ``num_blocks``), atom count, prefetch, and computation
-   buffers. Cache compression does not reduce the size of the decoded arrays
-   used by the SED calculation. ``netcdf_batch_size`` controls temporary text
-   parsing batches, not the SED block length.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 
