@@ -17,10 +17,12 @@ peak_min_significance
 
 **How peaks are picked**
 
-1. **Smooth the spectrum.** pySED takes the natural logarithm of the SED.
-   At each frequency it averages seven consecutive log values, with weights
-   ``[0, 1, 3, 4, 3, 1, 0] / 12`` (a Hann window). The middle point carries
-   the most weight. Peak fitting still uses the original SED.
+1. **Smooth the spectrum.** pySED takes the natural logarithm of the SED
+   and slides a seven-point Hann window along the frequency axis. At each
+   step, the smoothed value at the center is the weighted average of the
+   seven log values, with weights ``[0, 1, 3, 4, 3, 1, 0] / 12`` from left
+   to right. This reduces small ripples when locating peaks. pySED then
+   fits each peak to the original SED.
 2. **Find the baseline for each peak.** Starting at the peak on the smoothed
    curve, look left and right as far as a higher peak or the edge of the
    spectrum. Find the lowest point on each side. The higher of those two
