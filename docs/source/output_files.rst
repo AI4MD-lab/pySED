@@ -20,7 +20,7 @@ Numerical and plotting outputs
      - Ordinary-frequency grid in THz, including zero frequency.
    * - ``<prefix>.Q_distances_and_labels``
      - Cumulative path distances, high-symmetry labels, and sampled segment
-       column ranges (``# q_path_ranges``, zero-based, stop exclusive).
+       ranges, shown as the first and last q-point indices for each segment.
    * - ``<prefix>-SED.png``
      - Total SED dispersion heatmap.
    * - ``SED-<q-index>-qpoint.png``
@@ -35,18 +35,31 @@ SED calculation. For example, ``plot_partial_SED = Sr+Ti x+z`` produces
 ``SED_Sr+Ti_x+z.png`` in the same directory and, with the default
 ``save_partial_SED = 1``, exports ``<basename>.SED_Sr+Ti_x+z``. These derived
 files contain the full linear-intensity matrix and share the original axis
-metadata. They do not replace the basic components or the total ``.SED``.
+files. They do not replace the basic components or the total ``.SED``.
 See :doc:`input_parameters/plot_partial_SED` for selection syntax.
 
 Total and partial outputs use the same :doc:`legacy_unit
-<input_parameters/legacy_unit>` setting. Saved scale metadata determines
+<input_parameters/legacy_unit>` setting. Units recorded in the file header determine
 labels when reloading for plotting or fitting; see :doc:`sed_units`.
 
-Saved segment ranges prevent interpolation across disconnected q paths when
-replotting total or partial SED. Older files without these ranges remain
-readable, but contain no explicit connectivity metadata. Recompute after
-changing ``q_path_name`` or adding ``|``; changing the plot input alone does
-not change a saved spectrum's path.
+The segment table tells plotting where each calculated part of the path
+begins and ends. For example:
+
+.. code-block:: text
+
+   # Q-path segments (zero-based q-point indices, both endpoints included):
+   # Segment  First q-point  Last q-point
+   #       1              0            10
+   #       2             11            21
+
+Here, segment 1 uses q-point indices 0 through 10, including both ends.
+These indices refer to the rows in ``.Qpts`` and columns in ``.SED``.
+The numbers depend on your supercell and path. pySED writes this table
+automatically so that replotting keeps path breaks such as ``U|K``;
+you do not need to edit it.
+
+Recompute after changing ``q_path_name`` or adding ``|``. Changing the
+plot input alone does not change a saved spectrum's path.
 
 Fitting outputs
 ---------------

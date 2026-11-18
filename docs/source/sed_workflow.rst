@@ -27,7 +27,7 @@ from atomic velocities:
 
 Recommended order:
 
-1. Validate sampling metadata and the atom-to-basis mapping.
+1. Check the MD time step, output interval, frame count and ``basis.in`` atom mapping.
 2. Compute with ``action = compute``.
 3. Plot the dispersion and representative single-Q spectra.
 4. Tune peak detection and fitting on selected Q points.
@@ -76,7 +76,8 @@ For GPUMD text output, request velocities and unwrapped positions
 
    dump_xyz 10 dump.xyz velocity unwrapped_position
 
-The reader uses the first frame's standard GPUMD ``Properties=`` schema.
+The reader uses the ``Properties=`` description in the first GPUMD frame
+to identify its columns; keep the same column order throughout the trajectory.
 pySED prefers explicit unwrapped coordinates in both formats; without them,
 it uses ordinary coordinates unchanged. No additional pySED parameter or
 unwrapping step is needed. See :doc:`input_parameters/trajectory_file` for
@@ -103,9 +104,9 @@ containing the pySED input file, then reuses the cache on later runs.
 ``basename`` is the final path component of ``out_files_name``. For example,
 ``out_files_name = results/SrTiO3`` creates ``SrTiO3.pysed.nc`` beside the
 input file; the ``results/`` directory still applies to the SED outputs.
-The cache fingerprint includes source identity and conversion-affecting
-settings. ``trajectory_read_mode = direct`` consumes text sequentially
-without an intermediate file.
+Before reusing the cache, pySED checks whether the source trajectory or
+conversion settings have changed. ``trajectory_read_mode = direct`` reads
+the text without creating a cache file.
 
 The cache is an additional file; the original text trajectory is retained.
 Compression can reduce its disk size. Both text and NetCDF paths read time

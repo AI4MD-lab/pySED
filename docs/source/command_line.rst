@@ -40,7 +40,7 @@ descriptions, workflow examples, and theory notes.
 Input file selection
 --------------------
 
-``pySED`` is the canonical spelling. When no path is supplied, pySED reads
+``pysed``, ``pySED`` and ``PYSED`` run the same program. When no path is supplied, pySED reads
 ``input_SED.in`` in the current directory. To use another file name, pass it
 explicitly, for example ``pysed input.in``. If ``input_SED.in`` is missing,
 running without a path reports an error; it does not select another file.

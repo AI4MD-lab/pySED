@@ -9,9 +9,9 @@ netcdf_batch_size
 
 **Meaning**
    Number of text-trajectory frames parsed at a time while converting a GPUMD
-   XYZ or LAMMPS dump to NetCDF, or while supplying direct text input to the
-   common block interface. It is not the NetCDF/HDF5 on-disk chunk size and it
-   does not change the SED averaging block length.
+   XYZ or LAMMPS dump to NetCDF, or while reading text directly for SED.
+   It controls temporary reading batches, not the time blocks used to
+   average spectra. Use ``num_blocks`` for spectral averaging.
 
 **Default**
    ``64``.

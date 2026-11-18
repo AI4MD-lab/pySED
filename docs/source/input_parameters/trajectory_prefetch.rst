@@ -8,11 +8,11 @@ trajectory_prefetch
    trajectory_prefetch = 1
 
 **Meaning**
-   This is a Boolean switch and accepts only ``0`` or ``1``. ``0`` disables
-   prefetch. When set to ``1``, one background thread prepares the next
+   Use ``1`` to enable or ``0`` to disable reading ahead. ``True`` and
+   ``False`` are also accepted. When enabled, one background thread prepares the next
    trajectory block while the current block is used for SED computation.
-   Exactly one block is prefetched at most; the value is not a configurable
-   prefetch depth, and block order is unchanged.
+   At most one additional block is held in memory; values above 1 are not
+   accepted. Blocks are still processed in their original order.
 
    The same prefetch layer is used by direct GPUMD/LAMMPS text, converted
    NetCDF caches, and native NetCDF trajectories. It can be most helpful when

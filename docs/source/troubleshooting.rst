@@ -35,8 +35,8 @@ Frame/block mismatch
 
 The requested frame count is
 ``total_num_steps / output_data_stride``. It must be divisible by
-``num_blocks``. Correct the metadata or select another block count; do not
-silently discard frames.
+``num_blocks``. Check ``total_num_steps`` and ``output_data_stride`` against
+your MD run, or select a block count that divides the requested frame count.
 
 Plot or fit reports missing files
 ---------------------------------
@@ -48,14 +48,15 @@ individual modes, also keep the spectra under ``mode-resoved-SED/``.
 Cache appears stale
 -------------------
 
-pySED fingerprints the trajectory and conversion settings, including
-``lammps_unit``. If a cache was copied or manually renamed, remove the
-``.pysed.nc`` file and let pySED recreate it.
+pySED checks whether the trajectory or conversion settings have changed,
+including ``lammps_unit``, before reusing a cache. If a copied or renamed
+cache is stale, remove only the generated ``.pysed.nc`` file and rerun with
+``trajectory_file`` pointing to the original text trajectory.
 
-GPU backend fails
------------------
+GPU calculation fails
+---------------------
 
-Confirm that the installed CuPy wheel matches the CUDA Toolkit and driver.
+Confirm that the installed CuPy package matches the CUDA version and driver.
 Switch to ``device = cpu`` to distinguish an input/data problem from a
 CUDA installation problem.
 

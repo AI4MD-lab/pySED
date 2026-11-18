@@ -8,17 +8,16 @@ max_cores
    max_cores = 4
 
 **Meaning**
-   CPU parallelism budget for SED computation and spectral fitting.
-   For SED computation, pySED uses a fixed rule to set
-   processes and native BLAS/OpenMP threads per process, keeping their product
-   at or below ``max_cores``. The budget is also capped by the process's
-   CPU affinity where available. It is a compute-thread budget, not CPU pinning
-   or a request to a cluster scheduler.
+   Maximum CPU parallelism for SED computation and spectral fitting.
+   Start with the number of CPU cores you want to use. On a cluster, do not
+   exceed the CPUs allocated to your job. Set ``1`` for serial work.
+   The actual number used may be lower because of available CPUs, memory
+   or the number of q points/modes. The console reports the allocation.
 
 **Default**
    ``4``.
 
-**Fixed allocation**
+**CPU allocation for SED computation**
    Each process uses ``min(4, CPU budget)`` native threads. The process count
    starts at ``CPU budget // threads per process`` and is limited by the number
    of q points. The first full trajectory block supplies the memory estimate;
@@ -40,7 +39,7 @@ max_cores
    ``Device : CPU (max_cores = 8)``. Before computing the first block, the backend
    prints the actual allocation, for example
    ``CPU allocation : 2 processes × 4 threads``. It can be lower than the request
-   because of CPU affinity, q count or available memory.
+   because of the CPUs available to the program, q-point count or memory.
 
 **Memory**
    The worker count is checked against the full trajectory block. The budget
@@ -61,8 +60,8 @@ max_cores
    With ``fit_all_modes = 1``, up to ``max_cores`` modes are fitted concurrently;
    q points within each mode remain sequential. For one spectrum with
    ``lorentz_fit_all_qpoint = 1``, q points are fitted concurrently instead.
-   These two levels of parallelism are never nested. One selected q point
-   runs serially, and ``max_cores = 1`` keeps all fitting serial.
+   These two levels of parallelism are never nested. Fitting one q point
+   of one mode runs serially, and ``max_cores = 1`` keeps all fitting serial.
 
    The actual process count is limited by CPU affinity and the number of tasks.
    Each worker uses one native numerical-library thread. Fitting uses the CPU

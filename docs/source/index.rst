@@ -8,7 +8,7 @@ Welcome to pySED's documentation!
 
 **pySED** is a Python package for calculating kinetic-energy-weighted phonon
 spectral energy density (SED) from molecular dynamics trajectories. It can read
-trajectories from GPUMD and LAMMPS, construct commensurate q-points, plot SED
+trajectories from GPUMD and LAMMPS, select q points allowed by the MD supercell, plot SED
 maps, and fit spectral peaks to estimate phonon lifetimes. Phonopy eigenvectors
 can be used to analyze individual phonon modes.
 
