@@ -69,19 +69,14 @@ Set ``lammps_unit = metal`` for velocities in Angstrom/ps or ``real`` for
 Angstrom/fs. The unit style is part of cache identity, so changing it invalidates
 a previously converted cache.
 
-For GPUMD text output, request velocities and unwrapped positions
-(requires a GPUMD version supporting ``unwrapped_position``):
+For GPUMD, write positions and velocities every 10 MD steps with:
 
 .. code-block:: text
 
-   dump_xyz 10 dump.xyz velocity unwrapped_position
+   dump_xyz 10 dump.xyz velocity
 
-The reader uses the ``Properties=`` description in the first GPUMD frame
-to identify its columns; keep the same column order throughout the trajectory.
-pySED prefers explicit unwrapped coordinates in both formats; without them,
-it uses ordinary coordinates unchanged. No additional pySED parameter or
-unwrapping step is needed. See :doc:`input_parameters/trajectory_file` for
-NetCDF support and coordinate-selection details.
+Set ``output_data_stride = 10`` for this example. For unwrapped coordinates
+or NetCDF output, see :doc:`input_parameters/trajectory_file`.
 
 Cache, direct reading, and NetCDF
 ---------------------------------

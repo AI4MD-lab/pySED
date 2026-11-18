@@ -174,41 +174,9 @@ mode at all q points instead, use:
    lorentz_fit_all_qpoint = 1
    max_cores = 4
 
-This fits one mode at every q point. By default, the highest local peak near
-each eigenvector reference frequency is selected; ``fit_reference_peak = 0``
-uses automatic all-peak detection instead. Set ``fit_all_modes = 1`` to loop over every
-saved mode; ``lorentz_fit_all_qpoint`` still controls whether one or all q
-points are fitted. ``fit_all_modes`` defaults to 0.
-
-.. list-table:: How ``max_cores`` is used during fitting
-   :header-rows: 1
-   :widths: 45 55
-
-   * - Selected task
-     - Parallel work
-   * - All modes, one or all q points
-     - Up to ``max_cores`` modes at once; q points within each mode run sequentially.
-   * - One mode, all q points
-     - Up to ``max_cores`` q points at once.
-   * - One mode, one q point
-     - One process.
-   * - Any task with ``max_cores = 1``
-     - Serial fitting.
-
-The process count is capped by the available CPUs and task count. Each worker
-uses one numerical-library thread; the two levels of parallel work are not combined.
-Fitting runs on the CPU even when ``device = gpu``. When multiple processes
-are used, the console adds one line, for example:
-
-.. code-block:: text
-
-   Fitting workers                : 4 CPU processes
-
-Progress is shown while fitting. Detailed results appear in mode or q-point
-order as the next task in that order becomes available; an earlier slow task
-can delay later details. Summaries are generated after the contributing
-fits finish. Fitting settings, text formats and figure styles are the same
-as in serial execution. See :doc:`max_cores` for the CPU budget details.
+:doc:`max_cores` sets the CPU limit. When fitting all modes, pySED fits
+several modes at once. For one mode and all q points, it fits several
+q points at once. One mode at one q point uses a single core.
 
 Mode fit outputs are separated beneath
 ``mode-resoved-SED/Ba_Ga_Ge_mode_4/``, using the existing ``Fitting-Qpoint``
@@ -295,19 +263,9 @@ For mode 27 and q index 23, a successful update writes these files:
 name. The all-mode lifetime figure is saved beside the total SED data; the
 all-mode text table stays inside ``mode-resoved-SED/``.
 
-All q-point lifetime files for the selected mode must be present to rebuild
-its summary. The cross-mode update additionally requires an existing
-``Fitting-All-Modes-All-Qpoints.Fre_lifetime`` and all single-q fit files
-for every saved mode. A header-only file with no detected peaks counts as
-present. Missing files are reported; an incomplete combined table is not
-written. The selected q-point fit is still saved. With no existing all-mode
-table, this single-q workflow updates only the selected mode's summary.
-The all-mode figure is drawn when the combined data contain nonnegative
-finite frequencies and positive finite lifetimes.
-
-With ``re_output_total_freq_lifetime = 0``, single-q fitting updates only
-that q point's fit data and fit figure. Other q points' individual results,
-other modes' individual results, and all saved SED spectra remain unchanged.
+Keep the individual fit files for every mode and q point to update the
+all-mode summary. With ``re_output_total_freq_lifetime = 0``, only the
+selected q point's fit data and figure are updated.
 
 .. _workflow-reference-matching:
 
