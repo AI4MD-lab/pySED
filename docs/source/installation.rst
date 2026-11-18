@@ -15,18 +15,17 @@ Choose one of the installation methods below. The package name is
 Install from GitHub
 -------------------
 
-We recommend installing directly from the ``main`` branch on GitHub for the
-features described in this manual. This requires Git.
+For a fresh installation, we recommend using the ZIP archive of GitHub's ``main`` branch.
 
 .. code-block:: bash
 
-    python -m pip install --upgrade "git+https://github.com/AI4MD-lab/pySED.git@main"
+    python -m pip install --upgrade "https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip"
     pysed -h
 
 Install from PyPI
 -----------------
 
-Install or upgrade ``pysed-phonon`` from `PyPI <https://pypi.org/project/pysed-phonon/>`_.
+Install the latest release of ``pysed-phonon`` from `PyPI <https://pypi.org/project/pysed-phonon/>`_.
 The name ``pysed`` on PyPI belongs to another project.
 
 .. code-block:: bash
