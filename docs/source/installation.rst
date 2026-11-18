@@ -25,8 +25,11 @@ We recommend installing directly from the ``main`` branch on GitHub. This requir
     pysed -h
 
 Without Git, `download the source ZIP <https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip>`_
-and extract it. Open a terminal in the extracted ``pySED-main`` folder and run
-``python -m pip install .``.
+and extract it. Open a terminal in the extracted ``pySED-main`` folder.
+
+.. code-block:: bash
+
+    python -m pip install .
 
 Install from PyPI
 -----------------
