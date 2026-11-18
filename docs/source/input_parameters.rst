@@ -1,84 +1,17 @@
 Input Parameters
 ================
 
-pySED reads a plain-text control file. The default file name is
-``input_SED.in``, but another file name can be passed on the command line. Each
-active line has the form
+Write one setting per line in ``input_SED.in``. For example, ``device = cpu``
+selects the CPU. Use ``#`` for comments. For on/off settings, use ``1`` or
+``0``, or write ``True`` or ``False`` (case-insensitive).
 
-.. code-block:: text
+Run ``pysed`` to read this file, or use ``pysed custom.in`` for another
+filename. Choose a group below or select a parameter in the sidebar to see
+its syntax, default and use.
 
-   parameter_name = value
-
-Blank lines and text after ``#`` are ignored. If no input file is passed on the
-command line, pySED reads ``input_SED.in`` in the current directory:
-
-.. code-block:: bash
-
-   pysed
-   pysed input_SED.in
-   pySED custom.in
-
-Boolean parameters accept ``True``/``False`` (case-insensitive) or ``1``/``0``.
-
-The table below lists the parameters accepted by the pySED input file. Each
-parameter links to its page or section, with syntax,
-meaning, defaults, examples, practical notes, and related parameters.
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-   :caption: Input file parameters
-
-   input_parameters/action
-   input_parameters/device
-   input_parameters/trajectory_file
-   input_parameters/trajectory_read_mode
-   input_parameters/trajectory_prefetch
-   input_parameters/netcdf_batch_size
-   input_parameters/netcdf_compression_level
-   input_parameters/num_blocks
-   input_parameters/dump_group_supercell
-   input_parameters/fitting_function
-   input_parameters/peak_min_significance
-   input_parameters/lorentz_fit_freq_min
-   input_parameters/lorentz_fit_freq_max
-   input_parameters/num_atoms
-   input_parameters/total_num_steps
-   input_parameters/time_step
-   input_parameters/output_data_stride
-   input_parameters/out_files_name
-   input_parameters/legacy_unit
-   input_parameters/basis_lattice_file
-   input_parameters/eigenvector_file
-   input_parameters/defect_index_file
-   input_parameters/lammps_unit
-   input_parameters/output_partial
-   input_parameters/max_cores
-   input_parameters/prim_unitcell
-   input_parameters/prim_axis
-   input_parameters/supercell_dim
-   input_parameters/rescale_prim
-   input_parameters/num_qpaths
-   input_parameters/q_path_name
-   input_parameters/q_path
-   input_parameters/plot_cutoff_freq
-   input_parameters/plot_interval
-   input_parameters/plot_color
-   input_parameters/colorbar_min
-   input_parameters/colorbar_max
-   input_parameters/use_contourf
-   input_parameters/qpoint_slice_index
-   input_parameters/plot_slice
-   input_parameters/plot_partial_SED
-   input_parameters/save_partial_SED
-   input_parameters/if_show_figures
-   input_parameters/initial_guess_hwhm
-   input_parameters/peak_max_hwhm
-   input_parameters/modulate_factor
-   input_parameters/lorentz_fit_all_qpoint
-   input_parameters/re_output_total_freq_lifetime
-   input_parameters/fit_reference_peak
-   input_parameters/fit_reference_window
+.. contents:: Find a parameter
+   :local:
+   :depth: 1
 
 .. raw:: html
 
@@ -158,176 +91,266 @@ meaning, defaults, examples, practical notes, and related parameters.
    }());
    </script>
 
-.. rubric:: Parameter pages
+Workflow and computing resources
+--------------------------------
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/action
+   input_parameters/device
+   input_parameters/max_cores
+   input_parameters/out_files_name
+   input_parameters/legacy_unit
 
 .. rst-class:: parameter-index
 
 .. list-table::
    :header-rows: 1
-   :widths: 24 24 52
+   :widths: 34 66
 
    * - Parameter
-     - Group
      - Purpose
-   * - `action <input_parameters/action.html>`_
-     - Workflow
+   * - :doc:`action <input_parameters/action>`
      - Let pySED choose the next step, or request computation, plotting or fitting.
-   * - `num_atoms <input_parameters/num_atoms.html>`_
-     - MD simulation
-     - Number of atoms in the MD trajectory.
-   * - `total_num_steps <input_parameters/total_num_steps.html>`_
-     - MD simulation
-     - Number of MD steps used for the production trajectory.
-   * - `time_step <input_parameters/time_step.html>`_
-     - MD simulation
-     - MD time step in fs.
-   * - `output_data_stride <input_parameters/output_data_stride.html>`_
-     - MD simulation
-     - Trajectory output interval; controls the maximum resolvable frequency.
-   * - `out_files_name <input_parameters/out_files_name.html>`_
-     - Files
-     - Prefix for pySED output files.
-   * - `legacy_unit <input_parameters/legacy_unit.html>`_
-     - Output scale
-     - Temporarily use the pySED 2.x intensity scale for historical comparisons.
-   * - `basis_lattice_file <input_parameters/basis_lattice_file.html>`_
-     - Files
-     - Path to ``basis.in``.
-   * - `defect_index_file <input_parameters/defect_index_file.html>`_
-     - Files
-     - Identify vacant sites and the remaining atoms in the trajectory.
-   * - `eigenvector_file <input_parameters/eigenvector_file.html>`_
-     - Files
-     - Read Phonopy eigenvectors to calculate individual phonon mode spectra.
-   * - `mode_index <input_parameters/eigenvector_file.html#plotting-and-fitting>`_
-     - Plotting and fitting
-     - Omit for total SED; specify a positive, one-based mode number to select one mode.
-   * - `plot_all_modes <input_parameters/eigenvector_file.html#plot-every-saved-mode>`_
-     - Plotting
-     - Plot every saved mode separately; optionally plot each at the selected q point.
-   * - `reference_structure_file <input_parameters/eigenvector_file.html#reference-matching>`_
-     - Files
-     - Generating primitive POSCAR or extended XYZ; required for mode projection.
-   * - `fit_all_modes <input_parameters/eigenvector_file.html#multi-core-fitting>`_
-     - Fitting
-     - Fit every saved mode at the selected q point or all q points.
-   * - `lammps_unit <input_parameters/lammps_unit.html>`_
-     - Files
-     - LAMMPS unit style for velocity conversion.
-   * - `output_partial <input_parameters/output_partial.html>`_
-     - Files
-     - Write element and direction-resolved SED files.
-   * - `trajectory_file <input_parameters/trajectory_file.html>`_
-     - Files
-     - Name a GPUMD extxyz, combined LAMMPS dump, or NetCDF trajectory.
-   * - `trajectory_read_mode <input_parameters/trajectory_read_mode.html>`_
-     - Files
-     - Choose converted NetCDF caching or direct text reading.
-   * - `trajectory_prefetch <input_parameters/trajectory_prefetch.html>`_
-     - Files
-     - Prepare one trajectory block ahead in a background thread.
-   * - `netcdf_batch_size <input_parameters/netcdf_batch_size.html>`_
-     - Files
-     - Set frames parsed per text-to-NetCDF batch.
-   * - `netcdf_compression_level <input_parameters/netcdf_compression_level.html>`_
-     - Files
-     - Set zlib compression for generated NetCDF caches.
-   * - `max_cores <input_parameters/max_cores.html>`_
-     - Parallelization
-     - CPU parallelism budget for SED computation and spectral fitting.
-   * - `device <input_parameters/device.html>`_
-     - Parallelization
+   * - :doc:`device <input_parameters/device>`
      - Select CPU or GPU computation.
-   * - `prim_unitcell <input_parameters/prim_unitcell.html>`_
-     - Crystal structure
-     - Primitive lattice vectors.
-   * - `prim_axis <input_parameters/prim_axis.html>`_
-     - Crystal structure
-     - Primitive-axis transformation.
-   * - `supercell_dim <input_parameters/supercell_dim.html>`_
-     - Crystal structure
-     - Supercell repeats; controls q-point resolution.
-   * - `rescale_prim <input_parameters/rescale_prim.html>`_
-     - Crystal structure
-     - Reconstruct the primitive cell from the trajectory cell.
-   * - `dump_group_supercell <input_parameters/dump_group_supercell.html>`_
-     - Crystal structure
-     - Set the periodic cell represented by a locally dumped group.
-   * - `num_qpaths <input_parameters/num_qpaths.html>`_
-     - Q-path
-     - Number of high-symmetry path segments.
-   * - `q_path_name <input_parameters/q_path_name.html>`_
-     - Q-path
-     - Labels for high-symmetry points.
-   * - `q_path <input_parameters/q_path.html>`_
-     - Q-path
-     - High-symmetry q-points in reduced coordinates.
-   * - `plot_cutoff_freq <input_parameters/plot_cutoff_freq.html>`_
-     - Plotting
-     - Maximum plotted frequency in THz.
-   * - `plot_interval <input_parameters/plot_interval.html>`_
-     - Plotting
-     - Frequency tick interval.
-   * - `plot_color <input_parameters/plot_color.html>`_
-     - Plotting
-     - Matplotlib colormap.
-   * - `colorbar_min <input_parameters/colorbar_min.html>`_
-     - Plotting
-     - Lower log-scale colorbar limit.
-   * - `colorbar_max <input_parameters/colorbar_max.html>`_
-     - Plotting
-     - Upper log-scale colorbar limit.
-   * - `use_contourf <input_parameters/use_contourf.html>`_
-     - Plotting
-     - Use contour-style SED plotting.
-   * - `qpoint_slice_index <input_parameters/qpoint_slice_index.html>`_
-     - Plotting
-     - Zero-based q-point index for slice plots and fitting.
-   * - `plot_slice <input_parameters/plot_slice.html>`_
-     - Plotting
-     - Plot one q-point spectrum.
-   * - `plot_partial_SED <input_parameters/plot_partial_SED.html>`_
-     - Plotting
-     - Select elements and directions with + for partial SED plotting or fitting.
-   * - `save_partial_SED <input_parameters/save_partial_SED.html>`_
-     - Postprocessing
-     - Save the selected partial SED sum (default: 1).
-   * - `if_show_figures <input_parameters/if_show_figures.html>`_
-     - Plotting
-     - Show figures interactively.
-   * - `initial_guess_hwhm <input_parameters/initial_guess_hwhm.html>`_
-     - Lorentzian fitting
-     - Initial HWHM guess.
-   * - `peak_max_hwhm <input_parameters/peak_max_hwhm.html>`_
-     - Lorentzian fitting
-     - Maximum fitted HWHM.
-   * - `modulate_factor <input_parameters/modulate_factor.html>`_
-     - Lorentzian fitting
-     - Shrink fitting windows around detected peaks.
-   * - `lorentz_fit_all_qpoint <input_parameters/lorentz_fit_all_qpoint.html>`_
-     - Lorentzian fitting
-     - Fit peaks at all q-points.
-   * - `re_output_total_freq_lifetime <input_parameters/re_output_total_freq_lifetime.html>`_
-     - Lorentzian fitting
-     - Rebuild total frequency-lifetime output after refitting.
-   * - `lorentz_fit_freq_min <input_parameters/lorentz_fit_freq_min.html>`_
-     - Peak fitting
-     - Set minimum fitted frequency in THz.
-   * - `lorentz_fit_freq_max <input_parameters/lorentz_fit_freq_max.html>`_
-     - Peak fitting
-     - Set maximum fitted frequency in THz.
-   * - `fitting_function <input_parameters/fitting_function.html>`_
-     - Peak fitting
-     - Fit a Lorentzian, a damped harmonic oscillator, or choose automatically.
-   * - `fit_reference_peak <input_parameters/fit_reference_peak.html>`_
-     - Mode fitting
-     - Select one reference-frequency peak per mode and q point (default: 1).
-   * - `fit_reference_window <input_parameters/fit_reference_window.html>`_
-     - Mode fitting
-     - Reference-frequency search half-window in THz (default: 0.5).
-   * - `peak_min_significance <input_parameters/peak_min_significance.html>`_
-     - Peak fitting
-     - Adjust how strongly a peak must stand out from nearby noise.
-   * - `num_blocks <input_parameters/num_blocks.html>`_
-     - Averaging
+   * - :doc:`max_cores <input_parameters/max_cores>`
+     - Set the maximum number of CPU cores for SED calculations and peak fitting.
+   * - :doc:`out_files_name <input_parameters/out_files_name>`
+     - Prefix for pySED output files.
+   * - :doc:`legacy_unit <input_parameters/legacy_unit>`
+     - Temporarily use the pySED 2.x intensity scale for historical comparisons.
+
+Trajectory and sampling
+-----------------------
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/trajectory_file
+   input_parameters/num_atoms
+   input_parameters/total_num_steps
+   input_parameters/time_step
+   input_parameters/output_data_stride
+   input_parameters/num_blocks
+   input_parameters/lammps_unit
+   input_parameters/trajectory_read_mode
+   input_parameters/trajectory_prefetch
+   input_parameters/netcdf_batch_size
+   input_parameters/netcdf_compression_level
+
+.. rst-class:: parameter-index
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Parameter
+     - Purpose
+   * - :doc:`trajectory_file <input_parameters/trajectory_file>`
+     - Name a GPUMD extxyz, combined LAMMPS dump, or NetCDF trajectory.
+   * - :doc:`num_atoms <input_parameters/num_atoms>`
+     - Number of atoms in the MD trajectory.
+   * - :doc:`total_num_steps <input_parameters/total_num_steps>`
+     - Number of MD steps used for the production trajectory.
+   * - :doc:`time_step <input_parameters/time_step>`
+     - MD time step in fs.
+   * - :doc:`output_data_stride <input_parameters/output_data_stride>`
+     - Trajectory output interval; controls the maximum resolvable frequency.
+   * - :doc:`num_blocks <input_parameters/num_blocks>`
      - Set equal trajectory blocks used for spectral averaging.
+   * - :doc:`lammps_unit <input_parameters/lammps_unit>`
+     - LAMMPS unit style for velocity conversion.
+   * - :doc:`trajectory_read_mode <input_parameters/trajectory_read_mode>`
+     - Read text directly or convert it once to a reusable NetCDF file.
+   * - :doc:`trajectory_prefetch <input_parameters/trajectory_prefetch>`
+     - Prepare one trajectory block ahead in a background thread.
+   * - :doc:`netcdf_batch_size <input_parameters/netcdf_batch_size>`
+     - Set how many trajectory frames to read from text at a time.
+   * - :doc:`netcdf_compression_level <input_parameters/netcdf_compression_level>`
+     - Set the compression level for the converted NetCDF trajectory.
+
+Crystal structure and q path
+----------------------------
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/basis_lattice_file
+   input_parameters/prim_unitcell
+   input_parameters/prim_axis
+   input_parameters/supercell_dim
+   input_parameters/rescale_prim
+   input_parameters/dump_group_supercell
+   input_parameters/defect_index_file
+   input_parameters/num_qpaths
+   input_parameters/q_path_name
+   input_parameters/q_path
+
+.. rst-class:: parameter-index
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Parameter
+     - Purpose
+   * - :doc:`basis_lattice_file <input_parameters/basis_lattice_file>`
+     - Path to ``basis.in``.
+   * - :doc:`prim_unitcell <input_parameters/prim_unitcell>`
+     - Primitive lattice vectors.
+   * - :doc:`prim_axis <input_parameters/prim_axis>`
+     - Primitive-axis transformation.
+   * - :doc:`supercell_dim <input_parameters/supercell_dim>`
+     - Supercell repeats; controls q-point resolution.
+   * - :doc:`rescale_prim <input_parameters/rescale_prim>`
+     - Reconstruct the primitive cell from the trajectory cell.
+   * - :doc:`dump_group_supercell <input_parameters/dump_group_supercell>`
+     - Set the periodic cell represented by a locally dumped group.
+   * - :doc:`defect_index_file <input_parameters/defect_index_file>`
+     - Identify vacant sites and the remaining atoms in the trajectory.
+   * - :doc:`num_qpaths <input_parameters/num_qpaths>`
+     - Count the connected segments in the requested path.
+   * - :doc:`q_path_name <input_parameters/q_path_name>`
+     - Labels for high-symmetry points.
+   * - :doc:`q_path <input_parameters/q_path>`
+     - High-symmetry q-points in reduced coordinates.
+
+Elements and phonon modes
+-------------------------
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/output_partial
+   input_parameters/plot_partial_SED
+   input_parameters/save_partial_SED
+   input_parameters/eigenvector_file
+   input_parameters/reference_structure_file
+   input_parameters/mode_index
+   input_parameters/plot_all_modes
+   input_parameters/fit_all_modes
+
+.. rst-class:: parameter-index
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Parameter
+     - Purpose
+   * - :doc:`output_partial <input_parameters/output_partial>`
+     - Write element and direction-resolved SED files.
+   * - :doc:`plot_partial_SED <input_parameters/plot_partial_SED>`
+     - Select elements and directions with + for partial SED plotting or fitting.
+   * - :doc:`save_partial_SED <input_parameters/save_partial_SED>`
+     - Write the selected combination of elements and directions to a file.
+   * - :doc:`eigenvector_file <input_parameters/eigenvector_file>`
+     - Read Phonopy eigenvectors to calculate individual phonon mode spectra.
+   * - :doc:`reference_structure_file <input_parameters/reference_structure_file>`
+     - Give the primitive POSCAR or extended XYZ used to build the MD structure.
+   * - :doc:`mode_index <input_parameters/mode_index>`
+     - Choose a saved phonon mode by number, starting at 1.
+   * - :doc:`plot_all_modes <input_parameters/plot_all_modes>`
+     - Plot each saved phonon mode in a separate figure.
+   * - :doc:`fit_all_modes <input_parameters/fit_all_modes>`
+     - Fit every saved mode at the selected q point or all q points.
+
+Plot settings
+-------------
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/plot_slice
+   input_parameters/qpoint_slice_index
+   input_parameters/plot_cutoff_freq
+   input_parameters/plot_interval
+   input_parameters/plot_color
+   input_parameters/colorbar_min
+   input_parameters/colorbar_max
+   input_parameters/use_contourf
+   input_parameters/if_show_figures
+
+.. rst-class:: parameter-index
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Parameter
+     - Purpose
+   * - :doc:`plot_slice <input_parameters/plot_slice>`
+     - Plot one q-point spectrum.
+   * - :doc:`qpoint_slice_index <input_parameters/qpoint_slice_index>`
+     - Zero-based q-point index for slice plots and fitting.
+   * - :doc:`plot_cutoff_freq <input_parameters/plot_cutoff_freq>`
+     - Maximum plotted frequency in THz.
+   * - :doc:`plot_interval <input_parameters/plot_interval>`
+     - Frequency tick interval.
+   * - :doc:`plot_color <input_parameters/plot_color>`
+     - Matplotlib colormap.
+   * - :doc:`colorbar_min <input_parameters/colorbar_min>`
+     - Lower log-scale colorbar limit.
+   * - :doc:`colorbar_max <input_parameters/colorbar_max>`
+     - Upper log-scale colorbar limit.
+   * - :doc:`use_contourf <input_parameters/use_contourf>`
+     - Use contour-style SED plotting.
+   * - :doc:`if_show_figures <input_parameters/if_show_figures>`
+     - Show figures interactively.
+
+Peak fitting and lifetimes
+--------------------------
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/fitting_function
+   input_parameters/fit_reference_peak
+   input_parameters/fit_reference_window
+   input_parameters/peak_min_significance
+   input_parameters/lorentz_fit_freq_min
+   input_parameters/lorentz_fit_freq_max
+   input_parameters/initial_guess_hwhm
+   input_parameters/peak_max_hwhm
+   input_parameters/modulate_factor
+   input_parameters/lorentz_fit_all_qpoint
+   input_parameters/re_output_total_freq_lifetime
+
+.. rst-class:: parameter-index
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Parameter
+     - Purpose
+   * - :doc:`fitting_function <input_parameters/fitting_function>`
+     - Fit a Lorentzian, a damped harmonic oscillator, or choose automatically.
+   * - :doc:`fit_reference_peak <input_parameters/fit_reference_peak>`
+     - Fit the highest local peak near the reference frequency for this mode and q point.
+   * - :doc:`fit_reference_window <input_parameters/fit_reference_window>`
+     - Set how far to search on either side of the reference frequency, in THz.
+   * - :doc:`peak_min_significance <input_parameters/peak_min_significance>`
+     - Adjust how strongly a peak must stand out from nearby noise.
+   * - :doc:`lorentz_fit_freq_min <input_parameters/lorentz_fit_freq_min>`
+     - Set minimum fitted frequency in THz.
+   * - :doc:`lorentz_fit_freq_max <input_parameters/lorentz_fit_freq_max>`
+     - Set maximum fitted frequency in THz.
+   * - :doc:`initial_guess_hwhm <input_parameters/initial_guess_hwhm>`
+     - Give the starting estimate of a peak’s half-width at half maximum (THz).
+   * - :doc:`peak_max_hwhm <input_parameters/peak_max_hwhm>`
+     - Set the largest allowed peak half-width at half maximum (THz).
+   * - :doc:`modulate_factor <input_parameters/modulate_factor>`
+     - Shrink fitting windows around detected peaks.
+   * - :doc:`lorentz_fit_all_qpoint <input_parameters/lorentz_fit_all_qpoint>`
+     - Fit all saved q points or only the one selected by qpoint_slice_index.
+   * - :doc:`re_output_total_freq_lifetime <input_parameters/re_output_total_freq_lifetime>`
+     - Rebuild total frequency-lifetime output after refitting.

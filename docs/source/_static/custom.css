@@ -43,6 +43,7 @@
 }
 
 .rst-content table.parameter-index {
+    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     border: 1px solid #e1d4ca;
@@ -53,6 +54,11 @@
 .rst-content table.parameter-index th {
     background: #2c2c2c;
     color: #ffffff;
+}
+
+.rst-content table.parameter-index td {
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .rst-content table.parameter-index td:first-child a {

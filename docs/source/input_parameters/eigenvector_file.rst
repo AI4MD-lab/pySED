@@ -85,6 +85,8 @@ Mode numbers follow YAML band order at each q point; pySED does not perform
 additional branch tracking through crossings or choose a unique basis within
 a degenerate subspace.
 
+.. _workflow-plotting-and-fitting:
+
 Plotting and fitting
 --------------------
 
@@ -102,6 +104,8 @@ zero-based. A selected mode cannot be combined with ``plot_partial_SED``.
 No explicit ``0`` or ``None`` is needed in the input file. Without mode
 selection, the partial-SED plotting and fitting settings also remain
 available for calculations without eigenvector projection.
+
+.. _workflow-plot-every-saved-mode:
 
 Plot every saved mode
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -144,6 +148,8 @@ Each mode has its own figure; the spectra are not overlaid in one plot.
 The q-slice figures are written only when ``plot_slice = 1``. This reads
 saved spectra without fitting or recomputing SED. ``max_cores`` controls
 fitting parallelism, not this plotting loop.
+
+.. _workflow-multi-core-fitting:
 
 Multi-core fitting
 ~~~~~~~~~~~~~~~~~~
@@ -302,6 +308,8 @@ finite frequencies and positive finite lifetimes.
 With ``re_output_total_freq_lifetime = 0``, single-q fitting updates only
 that q point's fit data and fit figure. Other q points' individual results,
 other modes' individual results, and all saved SED spectra remain unchanged.
+
+.. _workflow-reference-matching:
 
 Reference matching
 ------------------

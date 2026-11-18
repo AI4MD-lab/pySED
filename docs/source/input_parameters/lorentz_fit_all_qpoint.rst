@@ -8,8 +8,9 @@ lorentz_fit_all_qpoint
    lorentz_fit_all_qpoint = 1
 
 **Meaning**
-   Fits the spectral peaks at every generated q-point using
-   ``fitting_function = auto | lorentz | dho``. Per-q-point fitting figures are
+   Set to ``1`` to fit all saved q points. Leave it at ``0`` to fit only
+   :doc:`qpoint_slice_index`. Choose a line shape with :doc:`fitting_function`.
+   For ordinary total SED, the fitting figures are
    written to ``Fitting-Qpoint/``. Per-q-point and combined frequency-lifetime
    data are written to ``Lifetime/``. After all q-points are complete, pySED
    also writes ``Fitting-Frequency-Lifetime.png`` beside the main SED figure,

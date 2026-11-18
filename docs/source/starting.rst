@@ -1,11 +1,10 @@
 Quick Start
 ===========
 
-The pySED workflow is a post-processing workflow. First run molecular dynamics
-to produce a trajectory with coordinates and velocities, then run pySED to
-prepare the trajectory, select q points allowed by the MD supercell, calculate SED, plot
-the result, and optionally fit peaks to estimate lifetimes. Start without
-eigenvectors; add them when you need individual phonon mode spectra.
+Start with an MD trajectory containing positions and velocities. pySED uses
+the velocities to calculate SED along your chosen q path. Plot the result
+to see where the phonon branches lie, then fit peaks if you need lifetimes.
+For spectra of individual phonon modes, also supply Phonopy eigenvectors.
 
 Recommended Workflow
 --------------------

@@ -8,11 +8,11 @@ modulate_factor
    modulate_factor = 2
 
 **Meaning**
-   Removes this many samples from each end of a peak's local valley-bounded
-   fitting range before the independent Lorentz/DHO fit. That range is the
-   complete basin between the smoothed valleys separating neighboring
-   detected peaks. The upper boundary
-   itself is excluded by the legacy NumPy slice convention.
+   Trim this many frequency samples from each end of the interval used to
+   fit one peak. pySED finds the valleys around the peak and uses samples
+   up to, but excluding, the right boundary. With the default of 0 it
+   keeps this interval. Increasing the value leaves fewer data points
+   to determine the peak width.
 
 **Default**
    ``0``.

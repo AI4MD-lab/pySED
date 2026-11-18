@@ -1,53 +1,29 @@
 Command Line
 ============
 
-Invocation
-----------
+Run the following commands in the directory for your calculation.
+``pysed``, ``pySED`` and ``PYSED`` all start the same program.
 
-.. code-block:: bash
+.. list-table::
+   :header-rows: 1
+   :widths: 36 64
 
-   pySED [input-file]
-   pySED -h
-   pysed [input-file]
-   PYSED [input-file]
+   * - Command
+     - What it does
+   * - ``pysed -h`` or ``pysed --help``
+     - Show the version, usage and manual link. The aliases ``help``, ``h`` and ``-help`` also display help.
+   * - ``pysed init``
+     - Create a starter ``input_SED.in``. If that file exists, pySED reports it and keeps the file.
+   * - ``pysed init -h`` or ``pysed init --help``
+     - Show help for creating the starter file.
+   * - ``pysed``
+     - Read ``input_SED.in`` in the current directory.
+   * - ``pysed custom.in``
+     - Read the file you name. For an example that provides ``input.in``, run ``pysed input.in``.
 
-Create an input file
---------------------
-
-Run ``pysed init`` in your calculation directory to create a basic
-``input_SED.in`` template with setup comments:
-
-.. code-block:: bash
-
-   pysed init
-
-Edit the generated file for your trajectory, structure, and MD sampling, then
-run ``pysed`` to start the calculation. If ``input_SED.in`` already exists,
-the command preserves it and returns an error.
-
-``pysed init -h`` explains the command without creating a file.
-
-Help and manual
----------------
-
-``pysed -h`` prints the program introduction, references, online manual link,
-and the command for creating an input template.
-
-Use the template comments for initial setup. The
-`online manual <https://pysed.readthedocs.io/>`_ provides detailed parameter
-descriptions, workflow examples, and theory notes.
-
-Input file selection
---------------------
-
-``pysed``, ``pySED`` and ``PYSED`` run the same program. When no path is supplied, pySED reads
-``input_SED.in`` in the current directory. To use another file name, pass it
-explicitly, for example ``pysed input.in``. If ``input_SED.in`` is missing,
-running without a path reports an error; it does not select another file.
-Except for help requests and the ``init`` command, a single argument is an
-input-file path, even if it is named like a parameter. For example,
-``pysed action`` reads a file named ``action``; it does not select the workflow
-stage. To read an input file literally named ``init``, use ``pysed ./init``.
+Edit the input file to match your trajectory and structure before running a
+calculation. Set ``action`` inside that file to choose what pySED does.
+To run an input file literally named ``init``, use ``pysed ./init``.
 
 Workflow actions
 ----------------
@@ -71,14 +47,13 @@ The ``action`` parameter controls work performed by one invocation:
      - Read existing SED files, detect peaks, fit line shapes, and write
        lifetime data.
 
-Automatic mode does not prove that old outputs were generated with the current
-input file. Use an explicit action when reproducibility matters, and archive or
-remove stale outputs before recalculating.
+After changing the trajectory or q path, choose ``action = compute``.
+Automatic mode checks which outputs already exist, so it can reuse spectra
+from an earlier calculation.
 
 Exit status
 -----------
 
-Successful work exits with status zero. Invalid parameters, missing input
-files, unreadable trajectories, missing plot/fit prerequisites, and numerical
-fit-stage failures produce an error and a nonzero status. This makes the CLI
-safe to use in batch schedulers and shell pipelines.
+For shell scripts and batch jobs, an exit status of 0 means the requested
+action finished successfully. If pySED reports an error, it returns a nonzero
+status. Check the error message before starting the next step.

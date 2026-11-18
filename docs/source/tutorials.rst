@@ -17,9 +17,9 @@ Then choose the analysis you need:
 * **Paths with a break:** use ``|`` in :doc:`input_parameters/q_path_name`,
   for example ``GXU|KGL``. See :doc:`input_parameters/q_path` for the
   coordinates and segment count.
-* **A periodic group from a larger simulation:** use a matching ``basis.in``
-  and :doc:`input_parameters/dump_group_supercell` to specify that group's
-  cell. This does not select atoms from a full trajectory for you.
+* **Part of a larger simulation:** if your trajectory contains only one
+  periodic group of atoms, supply that group's ``basis.in`` and specify its
+  cell with :doc:`input_parameters/dump_group_supercell`.
 
 The MoS\ :sub:`2` notebook provides a step-by-step example. The
 :doc:`example` gallery shows representative SED figures.

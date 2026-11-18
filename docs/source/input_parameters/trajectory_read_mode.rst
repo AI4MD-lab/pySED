@@ -22,8 +22,8 @@ trajectory_read_mode
    - ``direct`` parses the requested text frames sequentially during SED
      computation and creates no intermediate NetCDF file.
 
-   Direct text reading uses one common block interface for GPUMD and LAMMPS
-   and never restarts the text scan at each averaging block.
+   In direct mode, pySED reads the trajectory once from start to finish,
+   even when you divide it into several averaging blocks.
 
    If ``trajectory_file`` names an existing compatible NetCDF trajectory
    (including a previously generated pySED cache), it is read directly.

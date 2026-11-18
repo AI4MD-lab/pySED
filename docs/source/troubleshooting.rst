@@ -13,22 +13,20 @@ parameter names, or start with a new template from ``pysed init``.
 Trajectory cannot be read
 -------------------------
 
-For LAMMPS text, verify that every frame has box bounds and
-``id type xu yu zu vx vy vz`` (or ``x y z``), and that IDs are stable. The GPUMD XYZ reader
-accepts fixed-cell NVT/NVE output only. Its first frame must contain
-``Lattice="..."`` and an unquoted ``Properties=species:S:1:pos:R:3``
-declaration, followed only by numeric ``R``/``I`` properties. Include
-``vel:R:3`` for SED. Additional GPUMD numeric fields such as mass, forces,
-and groups are allowed; generic XYZ layouts and extra string fields are
-rejected without a fallback.
+For a LAMMPS text dump, check that each frame has box bounds, atom IDs and
+types, positions (``xu yu zu`` or ``x y z``), and velocities (``vx vy vz``).
+Each atom must keep its ID throughout the trajectory.
 
-If supplied, ``unwrapped_position:R:3`` (GPUMD) or the complete ``xu yu zu``
-set (LAMMPS) takes precedence over ordinary coordinates.
+For GPUMD extended XYZ, use a fixed cell and write velocities. Check the
+first frame for ``Lattice="..."`` and an unquoted header beginning with
+``Properties=species:S:1:pos:R:3``. Include ``vel:R:3``. Extra columns
+after the positions must be numeric. Keep the species order, cell and
+column layout the same in every frame. See :doc:`input_parameters/trajectory_file`
+for the dump commands and supported coordinates.
 
-The first frame's column map, cell, and element mapping are reused. Later
-comment lines are skipped, so the column layout and cell must stay fixed;
-atom count and species order are checked. Confirm that ``num_atoms`` agrees
-with both the trajectory and ``basis.in``.
+Set ``num_atoms`` to the number of atoms in a trajectory frame. For a
+crystal with vacancies, ``basis.in`` describes the complete crystal and
+:doc:`input_parameters/defect_index_file` identifies the occupied sites.
 
 Frame/block mismatch
 --------------------
@@ -98,5 +96,5 @@ Further help
 
 Report reproducible issues at
 `GitHub <https://github.com/AI4MD-lab/pySED/issues>`_ and include the
-input file, pySED version, Python version, traceback, and a minimal trajectory
-when sharing is permitted.
+input file, pySED and Python versions, and the full error message. If the
+problem depends on the trajectory, include a small sample you can share.

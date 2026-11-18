@@ -13,7 +13,7 @@ times while tuning plotting and Lorentzian fitting parameters.
 
 The older silicon example contains a simple script:
 `run_SED.sh <https://github.com/AI4MD-lab/pySED/blob/main/example/For_old_version_example/Silicon/SED/run_SED.sh>`_.
-The idea is:
+Use the same input file for these steps:
 
 1. set ``action = compute`` and run pySED once to compute ``.SED``, ``.Qpts``, and
    ``.THz`` files;
@@ -21,7 +21,7 @@ The idea is:
 3. use ``action = fit`` while tuning ``peak_min_significance``,
    ``lorentz_fit_freq_max``, and related parameters.
 
-A more robust Bash version is:
+This Bash script changes the value on the line beginning with ``action``:
 
 .. code-block:: bash
 
