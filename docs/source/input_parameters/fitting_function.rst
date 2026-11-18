@@ -8,37 +8,47 @@ fitting_function
    fitting_function = auto
 
 **Meaning**
-   Choose one of three values:
+   Choose the line shape used to fit each SED peak. Start with ``auto``
+   (the default), or set ``lorentz`` or ``dho`` to use one model for every peak.
 
-   - ``auto`` fits both line shapes and chooses between them. Use this as
-     a starting point, then inspect the fit figure.
-   - ``lorentz`` fits a Lorentzian peak.
-   - ``dho`` fits a damped harmonic oscillator (DHO) velocity spectrum.
+**Automatic selection** (``auto``)
+   pySED fits both models to the same peak and compares their corrected
+   Akaike information criterion (AICc) scores. The lower score is preferred.
+   If only one fit succeeds, pySED uses it.
 
-   Both models report HWHM, half of the full width at half maximum (FWHM).
-   See :doc:`../peak_fitting` for the formulas and lifetime definitions.
+   When both fits succeed, pySED chooses Lorentz if the scores differ by
+   at most 2 or the DHO fit is weakly damped (:math:`h/f_0 < 0.05`).
 
-**Default**
-   ``auto``.
+Line shapes
+-----------
 
-**Automatic choice**
-   Both models use the same local peak interval. pySED compares AICc, a
-   statistical score for the fitted models. If the scores differ by no
-   more than two, or the DHO approaches a narrow Lorentzian peak
-   (``hwhm / center < 0.05``), pySED selects Lorentz.
+In both formulas, :math:`f` is ordinary frequency, :math:`f_0` is the fitted
+peak frequency, and :math:`A` is the peak height. The reported :math:`h` is
+half the full width at half maximum (HWHM). Frequencies and widths are in THz.
 
-**DHO interpretation**
-   Overdamped DHO values are retained in the SED lifetime data for qualitative
-   comparison, but a linewidth-derived ``tau_SED`` is not a strict phonon
-   lifetime in that regime. A peak is marked incomplete in the terminal when both fitted
-   half-maximum points are not contained in its actual fitting range. Its
-   reported HWHM is still the width of the
-   complete analytic model, estimated by extrapolating the fitted line shape
-   beyond the available side of the peak; it is not a complete FWHM directly
-   measured from two observed half-maximum crossings. Its linewidth-derived
-   lifetime should therefore be compared qualitatively only. In strongly
-   anharmonic systems, do not interpret an overdamped result as a strict phonon
-   lifetime.
+**Lorentzian** (``lorentz``). The peak is symmetric about :math:`f_0`.
+
+.. math::
+
+   \Phi_{\mathrm{L}}(f) = \frac{A}{1+\left[(f-f_0)/h\right]^2}.
+
+**Damped harmonic oscillator** (``dho``). pySED fits the velocity spectrum.
+Its two half-height points can lie at different distances from :math:`f_0`.
+
+.. math::
+
+   \Phi_{\mathrm{DHO}}(f) =
+   \frac{A(2h)^2 f^2}{(f^2-f_0^2)^2+(2h)^2 f^2}.
+
+Reading the fit
+---------------
+
+- **Incomplete peak:** the fitting range misses at least one half-height point.
+  Part of the width comes from extrapolating the fitted curve.
+- **Strongly damped DHO:** when :math:`h \ge f_0`, use the reported lifetime
+  as a qualitative estimate.
+
+See :doc:`../peak_fitting` for the linewidth-to-lifetime formulas.
 
 **Related parameters**
 

@@ -49,19 +49,26 @@ defect_index_file
    percentages, which can differ slightly from the requested generation
    fraction because the number of removed atoms must be an integer.
 
-   A trajectory index is the atom's position in the stored list, starting at 1:
-   GPUMD XYZ uses file row order; LAMMPS text uses increasing atom ID order.
-   It is not a possibly discontinuous LAMMPS atom ID. For external NetCDF,
-   use its stored atom order. Keep this order consistent across frames;
-   update the mapping if your MD preparation reorders atoms. Verify species
-   and site identities when supplying your own mapping.
+**Trajectory order**
+   Number the atoms starting at 1, in the order pySED reads them:
 
+   - **GPUMD XYZ:** follow the row order in the file.
+   - **LAMMPS text:** sort by atom ID, then number the sorted rows consecutively.
+   - **NetCDF:** follow the atom order stored in the file.
+
+   Keep the order consistent across frames. If your MD preparation reorders
+   atoms, update the mapping and verify each atom's species and site.
+
+**Vacancies**
    The q points and SED normalization use the complete crystal's reference
    cell count, including cells containing vacancies. Only the remaining
-   atoms contribute velocities. This supports static random vacancies:
-   the remaining atoms must retain their original lattice-site identities
+   atoms contribute velocities.
+
+   This mapping supports static random vacancies. The remaining atoms must
+   retain their original lattice-site identities
    throughout the trajectory. pySED does not track atoms hopping between
    sites or use this file to change atomic masses for substitutions.
+
    See :doc:`../structure_generation` to generate the structure and both
    mapping files together.
 
