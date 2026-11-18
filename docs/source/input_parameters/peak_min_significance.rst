@@ -8,19 +8,28 @@ peak_min_significance
    peak_min_significance = 4.0
 
 **Meaning**
-   Controls which peaks pySED picks when searching a spectrum for all peaks.
-   At ``4.0``, a peak must stand out by at least four times pySED's estimate
-   of the nearby noise. Lower values let weaker peaks through.
+   Sets how clearly a peak must stand out from nearby noise to be picked.
+   Start with ``4.0``. Lower it if you miss a visible peak, or raise it if
+   small ripples are picked as peaks.
 
 **Default**
    ``4.0``.
 
-**Example**
-   Start with ``4.0`` and inspect the fit figure for one q point. Suppose
-   you see a strong peak at 2 THz and a weaker peak at 3 THz.
+**How peaks are picked**
+   On a smoothed log spectrum, pySED measures how far each peak rises above
+   its surrounding baseline (its *prominence*). It estimates the local noise
+   from the typical difference between the original and smoothed log spectra
+   over up to 31 nearby frequency samples. The peak score is its prominence
+   divided by this noise estimate. pySED picks peaks whose score reaches or
+   exceeds your setting.
 
-   - If pySED misses the weaker peak, try ``3.0`` and refit that q point.
-   - If pySED also fits small ripples that look like noise, try ``6.0``.
+.. figure:: ../_static/peak-significance.png
+   :alt: Example spectrum with peak scores of 15.1 near 2 THz and 3.64 near 3 THz.
+
+   In this synthetic spectrum, the dashed line shows the weaker peak's
+   prominence (0.190). Dividing by its local noise estimate (0.0522) gives
+   a score of 3.64. With the default ``4.0``, only the peak near 2 THz is
+   picked. With ``3.0``, both are picked.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 
