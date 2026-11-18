@@ -9,8 +9,8 @@ peak_min_significance
 
 **Meaning**
    Sets how clearly a peak must stand out from nearby noise to be picked.
-   Start with ``4.0``. Lower it if you miss a visible peak, or raise it if
-   small ripples are picked as peaks.
+   If pySED misses a weak peak, lower ``peak_min_significance`` slightly.
+   Raise it if small ripples are picked as peaks.
 
 **Default**
    ``4.0``.
@@ -27,10 +27,11 @@ peak_min_significance
    curve, look left and right as far as a higher peak or the edge of the
    spectrum. Find the lowest point on each side. The higher of those two
    levels is the baseline. The peak top minus this baseline is its *prominence*.
-3. **Compare the rise with the noise.** pySED estimates noise from the spread
-   of the differences between the original and smoothed log spectra over up
-   to 31 nearby samples. Divide the prominence by this noise estimate. A
-   peak is picked when its score reaches or exceeds your setting.
+3. **Compare the rise with the noise.** pySED uses up to 31 nearby frequency
+   points to estimate local noise from the differences between the original
+   and smoothed log spectra. A peak can be narrower or wider than this window.
+   Divide the prominence by the noise estimate. A peak is picked when its
+   score reaches or exceeds your setting.
 
 .. figure:: ../_static/hann-peak-significance.png
    :alt: Seven log SED values weighted by a Hann window give 0.4186 at 2.00 THz. The two peaks score 15.1 and 3.64 against a threshold of 4.0.
