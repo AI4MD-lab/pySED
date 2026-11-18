@@ -32,11 +32,12 @@ peak_min_significance
    to 31 nearby samples. Divide the prominence by this noise estimate. A
    peak is picked when its score reaches or exceeds your setting.
 
-.. figure:: ../_static/peak-significance.png
-   :alt: Two peaks on a smoothed log spectrum. The baseline is -0.0578 for the peak near 2 THz and -0.0444 for the peak near 3 THz.
+.. figure:: ../_static/hann-peak-significance.png
+   :alt: Seven log SED values weighted by a Hann window give 0.4186 at 2.00 THz. The two peaks score 15.1 and 3.64 against a threshold of 4.0.
 
-   In this synthetic example the horizontal dashes mark each peak's baseline.
-   The vertical dotted lines show how far the peaks rise above those baselines.
+   In this synthetic spectrum, the top panel shows one step of Hann smoothing
+   at 2.00 THz. Below, each dotted line shows how far the smoothed peak rises
+   above its dashed baseline.
 
 .. list-table:: Scores for the two peaks in the figure (rounded)
    :header-rows: 1
