@@ -22,7 +22,7 @@ pySED requires **Python 3.10 or newer**. The standard installation runs on the C
 
 **1. Install from GitHub (recommended)**
 
-Install from the `main` branch with Git and pip.
+We recommend installing directly from the `main` branch on GitHub. This requires Git.
 
 ```bash
 python -m pip install --upgrade "git+https://github.com/AI4MD-lab/pySED.git@main"

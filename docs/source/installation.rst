@@ -17,7 +17,7 @@ Choose one of the installation methods below. The package name is
 Install from GitHub (recommended)
 ---------------------------------
 
-Install from the ``main`` branch with Git and pip.
+We recommend installing directly from the ``main`` branch on GitHub. This requires Git.
 
 .. code-block:: bash
 
