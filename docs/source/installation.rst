@@ -26,10 +26,8 @@ features described in this manual. This requires Git.
 Install from PyPI
 -----------------
 
-This installs the release currently listed on
-`PyPI <https://pypi.org/project/pysed-phonon/>`_. Check its version if you
-need the 3.0 workflow. If the published release is older, use GitHub above.
-Look for ``pysed-phonon`` on PyPI. The name ``pysed`` belongs to another project.
+Install or upgrade ``pysed-phonon`` from `PyPI <https://pypi.org/project/pysed-phonon/>`_.
+The name ``pysed`` on PyPI belongs to another project.
 
 .. code-block:: bash
 
