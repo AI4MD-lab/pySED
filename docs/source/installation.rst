@@ -15,14 +15,12 @@ Choose one of the installation methods below. The package name is
 Install from GitHub
 -------------------
 
-We recommend this method for the features described in this manual. With Git installed,
-download the source and install it in your active Python environment:
+We recommend installing directly from the ``main`` branch on GitHub for the
+features described in this manual. This requires Git.
 
 .. code-block:: bash
 
-    git clone https://github.com/AI4MD-lab/pySED.git
-    cd pySED
-    python -m pip install .
+    python -m pip install --upgrade "git+https://github.com/AI4MD-lab/pySED.git@main"
     pysed -h
 
 Install from PyPI
@@ -41,12 +39,13 @@ Look for ``pysed-phonon`` on PyPI. The name ``pysed`` belongs to another project
 Editing the source (optional)
 ------------------------------
 
-If you plan to edit pySED, run the following in the cloned ``pySED`` directory
-in place of ``python -m pip install .``. Edits to Python files then take
-effect the next time you run pySED.
+If you plan to edit pySED, clone the repository and install it in editable
+mode. Edits to Python files then take effect the next time you run pySED.
 
 .. code-block:: bash
 
+    git clone https://github.com/AI4MD-lab/pySED.git
+    cd pySED
     python -m pip install -e .
 
 Verify installation
