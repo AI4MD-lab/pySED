@@ -18,12 +18,11 @@
 
 ## Installation
 
-pySED requires **Python 3.10 or newer**. Installing from source is recommended:
+pySED requires **Python 3.10 or newer**. We recommend installing directly from
+the `main` branch on GitHub. This requires Git.
 
 ```bash
-git clone https://github.com/AI4MD-lab/pySED.git
-cd pySED
-python -m pip install .
+python -m pip install --upgrade "git+https://github.com/AI4MD-lab/pySED.git@main"
 pysed -h
 ```
 
@@ -47,7 +46,7 @@ device = gpu
 Fitting and plotting use the CPU. Use `device = cpu` for CPU-only computation.
 
 The PyPI package name is **`pysed-phonon`**, while the command is **`pysed`**.
-Alternatively, install or upgrade from PyPI:
+To install the release currently available on PyPI, run:
 
 ```bash
 python -m pip install --upgrade pysed-phonon
