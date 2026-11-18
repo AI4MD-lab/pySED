@@ -15,12 +15,16 @@ Choose one of the installation methods below. The package name is
 Install from GitHub
 -------------------
 
-For a fresh installation, we recommend using the ZIP archive of GitHub's ``main`` branch.
+We recommend installing from the ``main`` branch with Git and pip.
 
 .. code-block:: bash
 
-    python -m pip install --upgrade "https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip"
+    python -m pip install --upgrade "git+https://github.com/AI4MD-lab/pySED.git@main"
     pysed -h
+
+Without Git, `download the source ZIP <https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip>`_
+and extract it. Open a terminal in the extracted ``pySED-main`` folder and run
+``python -m pip install .``.
 
 Install from PyPI
 -----------------
