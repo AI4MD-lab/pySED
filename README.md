@@ -18,13 +18,21 @@
 
 ## Installation
 
-pySED requires **Python 3.10 or newer**. For a fresh installation, we recommend
-using the ZIP archive of GitHub's `main` branch.
+pySED requires **Python 3.10 or newer**.
+
+**1. Install from GitHub (recommended)**
+
+Install from the `main` branch with Git and pip.
 
 ```bash
-python -m pip install --upgrade "https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip"
+python -m pip install --upgrade "git+https://github.com/AI4MD-lab/pySED.git@main"
 pysed -h
 ```
+
+Without Git, [download the source ZIP](https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip)
+and extract it. Open a terminal in the extracted `pySED-main` folder and run `python -m pip install .`.
+
+**2. Install from PyPI**
 
 To install the latest release from PyPI, use the package name `pysed-phonon`.
 
