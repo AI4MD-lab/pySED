@@ -26,7 +26,12 @@ trajectory_file
 
    .. code-block:: text
 
-      dump_netcdf 20 trajectory.nc velocity
+      dump_netcdf 20 trajectory.nc velocity compression deflate 1
+
+   Level ``1`` gives fast, lossless compression. For smaller files, try a
+   higher level (up to ``9``) and allow more time for writing. See the
+   `GPUMD NetCDF installation guide <https://gpumd.org/installation.html#netcdf-setup>`_
+   to enable NetCDF4/HDF5 and zlib support.
 
    Both commands write wrapped positions by default. Add ``unwrapped_position``
    to save both wrapped and unwrapped positions. pySED uses the unwrapped
