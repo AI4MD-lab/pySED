@@ -12,10 +12,12 @@ where you plan to use pySED. For example, to create a new Conda environment:
 Choose one of the installation methods below. The package name is
 ``pysed-phonon`` and the command you run after installation is ``pysed``.
 
-Install from GitHub
--------------------
+.. _install-from-github:
 
-We recommend installing from the ``main`` branch with Git and pip.
+Install from GitHub (recommended)
+---------------------------------
+
+Install from the ``main`` branch with Git and pip.
 
 .. code-block:: bash
 
