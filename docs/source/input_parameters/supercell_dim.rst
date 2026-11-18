@@ -15,12 +15,11 @@ supercell_dim
 **Default**
    ``1 1 1``.
 
-**Notes**
-   This is one of the most important parameters in the current input file because it
-   determines the repetition matrix used for commensurate q-point selection.
-   pySED does not use a separate ``num_qpoints`` parameter; the available
-   q-points are determined by ``supercell_dim``, the primitive cell, the
-   trajectory cell, and ``q_path``.
+**Choosing the q-point grid**
+   pySED determines which q points lie on :doc:`q_path` from the primitive
+   cell and its repeats in the trajectory. To sample a path more densely,
+   increase the supercell repeats along the relevant lattice directions when
+   preparing the MD run.
 
    When :doc:`dump_group_supercell <dump_group_supercell>` is supplied, it replaces the
    trajectory cell for this commensurability calculation and permits a
@@ -28,15 +27,18 @@ supercell_dim
    the local Q grid; pySED obtains the repetition matrix directly from
    local cell and ``prim_unitcell``.
 
+**Supported cell shapes**
    Fixed-reference SED supports diagonal and upper/lower triangular repetition
    matrices with positive diagonal entries. Their diagonal sets the generator's
    ``i, j, k`` ranges, with ``k`` changing fastest in ``basis.in``. For local
    groups these ranges come from the inferred matrix, not ``supercell_dim``.
+
    The full matrix is used to recover primitive vectors for triangular repeats;
    see :doc:`dump_group_supercell <dump_group_supercell>` for an example.
    Triclinic boxes are supported. Other matrix shapes remain supported by the
    q-path helper, but are rejected by this numbered-reference SED workflow.
 
+**Example along one reciprocal direction**
    For a simple diagonal supercell with repetition matrix
    :math:`P=\mathrm{diag}(N_x,N_y,N_z)`, a path from Gamma to the zone boundary
    along one reduced reciprocal direction, for example
@@ -50,16 +52,15 @@ supercell_dim
    reduced coordinates. What matters is the integer repetition matrix
    :math:`P` satisfying ``supercell = P @ primitive``.
 
+**Other path directions**
    For a non-diagonal or transformed supercell, the number of q-points depends
    on the selected path direction. pySED keeps only fractional positions
    :math:`f` on the line
    :math:`q(f)=q_{\mathrm{start}}+f(q_{\mathrm{end}}-q_{\mathrm{start}})`
-   that satisfy :math:`q(f)P^T \in \mathbb{Z}^3`. In this case, inspect the
-   printed ``Number of q-points generated`` message or the output ``.Qpts``
-   file. **Increase the supercell repeats in the lattice directions that
-   project onto the desired q-path to improve resolution.** If the calculation
-   can still fit in memory, use as large a supercell as practical; a larger
-   supercell gives denser q-point sampling.
+   that satisfy :math:`q(f)P^T \in \mathbb{Z}^3`.
+
+   The terminal reports the number of q points generated. The ``.Qpts``
+   file lists their coordinates.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

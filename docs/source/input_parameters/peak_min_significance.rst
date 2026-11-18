@@ -59,11 +59,14 @@ peak_min_significance
      - **3.64**
 
 For the 2 THz peak, the left and right minima are -0.0670 and -0.0578, so
-the baseline is -0.0578. The nearby differences have a median absolute
+the baseline is -0.0578.
+
+The nearby differences have a median absolute
 deviation of 0.0213, giving a noise estimate of
 :math:`1.4826 \times 0.0213 \approx 0.0316`. The score is therefore
-:math:`[0.4186 - (-0.0578)] / 0.0316 \approx 15.1`. With the default
-``4.0``, only this peak is picked. At ``3.0``, both are picked.
+:math:`[0.4186 - (-0.0578)] / 0.0316 \approx 15.1`.
+
+With the default ``4.0``, only this peak is picked. At ``3.0``, both are picked.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

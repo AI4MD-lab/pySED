@@ -10,15 +10,18 @@ Syntax and default
    reference_structure_file = ../structure/POSCAR
    output_partial = 0
 
-Omitted by default. Supplying a Phonopy ``band.yaml`` containing eigenvectors
-enables mode-resolved SED and defines total SED as the sum of all modes.
-Element/direction partial SED is currently unsupported with eigenvectors.
-``output_partial = 1`` or ``plot_partial_SED`` together with ``eigenvector_file``
-raises an input error. Leave ``output_partial`` at its default of 0.
-The path is relative to the input file. No force constants or Phonopy runtime
-are needed; PyYAML reads the reference. Computing mode spectra also requires
-``reference_structure_file``. Ordinary SED and plotting/fitting saved spectra
-do not require a reference structure.
+To compute a spectrum for each phonon mode, supply a Phonopy ``band.yaml``
+containing eigenvectors and the matching ``reference_structure_file``.
+The YAML path is relative to the pySED input file. Omit ``eigenvector_file``
+for ordinary SED (the default).
+
+With eigenvectors, the total SED is the sum of all mode spectra. Leave
+``output_partial = 0`` and omit ``plot_partial_SED``. Element- and
+direction-resolved partial SED uses the calculation without eigenvectors.
+
+pySED reads the YAML directly. You can compute mode spectra without force
+constants or a Phonopy installation. The reference structure is only needed
+when computing the mode spectra.
 
 Computing individual modes
 --------------------------
@@ -56,14 +59,12 @@ columns, sharing the existing ``.THz``, ``.Qpts`` and path-label files.
 Headers record units, the one-based mode number and reference frequencies in
 q order. The total output path does not change.
 
-With eigenvector projection, ``Ba_Ga_Ge.SED`` contains the sum of all projected
-mode spectra. Its header records ``spectrum_source: sum_of_projected_modes``.
-Default plotting and fitting read this total; ``mode_index`` selects one mode.
-The console explicitly identifies eigenvector-projected SED as the default
-plot/fit source and the ordinary spectrum as reference only. The total file's
-header also records ``mode_sum_max_error_over_reference_peak``.
-No partial files are generated. Without eigenvectors, total and partial SED retain their
-existing definitions and ``output_partial = 1`` remains supported.
+With eigenvector projection, ``Ba_Ga_Ge.SED`` contains the sum of all mode
+spectra. Its header records ``spectrum_source: sum_of_projected_modes`` and
+the comparison with the ordinary total (``mode_sum_max_error_over_reference_peak``).
+
+Plotting and fitting read the projected total by default. Set ``mode_index``
+to select one mode. The console shows which spectrum is in use.
 
 The independently accumulated ordinary total is written to a separate directory:
 
@@ -97,13 +98,11 @@ Plotting and fitting
    plot_slice = 1
    qpoint_slice_index = 1
 
-Omit ``mode_index`` to plot or fit the total SED, which is the sum of all modes
-when eigenvector projection is enabled. Uncomment ``mode_index = 4`` to select
-the fourth saved mode instead. Mode numbers are one-based; q indices remain
-zero-based. A selected mode cannot be combined with ``plot_partial_SED``.
-No explicit ``0`` or ``None`` is needed in the input file. Without mode
-selection, the partial-SED plotting and fitting settings also remain
-available for calculations without eigenvector projection.
+- To plot or fit the total SED, omit ``mode_index``.
+- To select the fourth saved mode, set ``mode_index = 4``. Mode numbers
+  start at 1 and q-point indices start at 0.
+- To select an element or direction with ``plot_partial_SED``, use data
+  calculated without eigenvectors and omit ``mode_index``.
 
 .. _workflow-plot-every-saved-mode:
 
@@ -124,13 +123,13 @@ To also plot every mode at one selected q point, add:
    plot_slice = 1
    qpoint_slice_index = 23
 
-``plot_all_modes`` defaults to 0. When enabled, it overrides ``mode_index``
-for plotting and saves a separate dispersion figure for each mode under
-``mode-resoved-SED/``. With ``plot_slice = 1``, it also saves each mode's
-spectrum at ``qpoint_slice_index``. Existing plot styles and filenames are
-preserved. Batch plotting saves figures without opening interactive windows.
-Saved mode spectra are required; ``plot_partial_SED`` cannot be combined with
-this option. Fitting settings are unaffected.
+Set ``plot_all_modes = 1`` to save a separate dispersion figure for each mode
+under ``mode-resoved-SED/``. This overrides ``mode_index``. With
+``plot_slice = 1``, each mode also gets a spectrum at ``qpoint_slice_index``.
+
+Batch plotting reads the saved mode spectra and writes figures without
+opening interactive windows. Leave ``plot_partial_SED`` unset. The default
+for ``plot_all_modes`` is 0.
 
 For ``out_files_name = Ba_Ga_Ge``, the figures are named:
 
@@ -183,18 +182,19 @@ Mode fit outputs are separated beneath
 and ``Lifetime`` layout. Mode lifetime text contains frequency, lifetime,
 HWHM, q index and mode number. Frequency and lifetime use the same column names,
 units and numerical formatting as ordinary SED lifetime files. A header-only
-file records no fitted peak. By default, ``fit_reference_peak = 1`` selects
+file records no fitted peak.
+
+By default, ``fit_reference_peak = 1`` selects
 one peak within ``fit_reference_window = 0.5`` THz of each saved reference.
 Set ``fit_reference_peak = 0`` to retain separate fits for all detected peaks.
+
 Projected lifetimes use ``tau_SED = 1/(4*pi*HWHM_THz)`` in either case;
 ordinary SED retains ``1/(2*pi*HWHM_THz)``. The formula is written in each
 lifetime file header. See :doc:`../peak_fitting` for selection details.
-Resolved, weakly damped mode peaks can provide energy-lifetime estimates for
-BTE comparisons. Without eigenvectors, total/partial peaks may contain
-overlapping modes and are not used by default for mode-by-mode BTE comparison.
-The ordinary lifetime convention is retained to preserve established results,
-not because overlap requires a different factor. See
-:ref:`bte-lifetime-comparison` for the distinction and comparison conditions.
+
+For comparison with BTE scattering lifetimes, use resolved, weakly damped
+mode peaks. Peaks in total or partial SED can include several modes.
+See :ref:`bte-lifetime-comparison` for the conventions and conditions.
 
 With ``fit_all_modes = 1`` and ``lorentz_fit_all_qpoint = 1``, completion also
 writes:
@@ -202,14 +202,13 @@ writes:
 * ``mode-resoved-SED/Fitting-All-Modes-All-Qpoints.Fre_lifetime``
 * ``Fitting-All-Modes-Frequency-Lifetime.png``, beside the total SED data.
 
-The combined text uses the same five columns and lifetime formula as each
-mode's file. It collects every fitted peak in mode, q-index and frequency
-order; it does not sum frequencies or lifetimes. All saved modes must have
-single-q fit files for all saved q points, including header-only files for
-q points with no detected peaks. Missing files prevent a complete summary
-and are reported. Saved files with a different lifetime formula also prevent
-the update: refit them with the same definition before combining. Existing
-numerical results are never automatically converted.
+The combined table lists one row per fitted peak, sorted by mode, q-point
+index and frequency. It uses the same five columns and lifetime formula as
+each mode's file.
+
+Keep a single-q fit file for every mode and q point. A header-only file
+counts as a completed fit when no peak was found. If a file is missing or
+uses a different lifetime formula, refit that spectrum before combining.
 
 .. _mode-refitting-workflow:
 
@@ -237,8 +236,8 @@ single-q task uses one process regardless of ``max_cores``.
 
 Only the selected spectrum is refitted. The all-mode summary is rebuilt from
 saved single-q files; other modes are not refitted. Refitting all q points of
-one mode also refreshes an existing all-mode summary. Ordinary SED fitting
-and the per-mode output locations are unchanged.
+one mode also refreshes an existing all-mode summary.
+
 If another mode still has old or invalid lifetime results, pySED keeps the
 previous all-mode table and figure and prints a warning. The selected mode's
 own results and summary are still produced normally.
@@ -281,16 +280,21 @@ must be handled before exporting YAML.
 ``basis.in``: a VASP 5-style POSCAR (Direct or Cartesian coordinates, without
 Selective dynamics), or extended XYZ (``.xyz`` / ``.extxyz``) with ``Lattice``
 and ``Properties`` specifying species and positions. Paths are relative to the
-input file. Supply the primitive cell, not the replicated MD supercell, and
+input file.
+
+Supply the primitive cell used to build the MD model and
 keep its original atom order: row b defines basis b. Do not independently
 reorder or translate this structure after generating the MD model.
 
 Reference elements and periodic positions determine a one-to-one match to YAML
-atoms, including integer image corrections. The first trajectory frame then
+atoms, including integer image corrections.
+
+The first trajectory frame then
 checks that each basis site's spatial mean is within 0.35 Angstrom of its
 fixed generating-structure position, after undoing whole-supercell wrapping.
 This check never reassigns sites or changes the image corrections. It checks
 spatial means, not the displacement of every individual atom.
+
 The actual projection uses fixed reference coordinates from YAML and retains
 pySED's numbered cell origins. Site matches must be within 0.35 Angstrom with
 a 0.1 Angstrom separation from alternative matches. Ambiguous or incompatible
@@ -319,14 +323,20 @@ For Phonopy eigenvectors :math:`e^P` and aligned reference fractional positions
    W_{b\alpha\nu}(q)=e^P_{b\alpha\nu}(q)\exp(2\pi i q\cdot s_b).
 
 These weights already are the conjugate of the corresponding positive-sign
-basis. Do not conjugate them again. Each basis atom's spatial velocity sum
+basis. Do not conjugate them again.
+
+Each basis atom's spatial velocity sum
 is Fourier transformed in time, multiplied by :math:`\sqrt{m_b}W`, and added
 to a complex mode amplitude. Power is taken only after summing all basis atoms
 and directions. Existing block normalization, frequency folding and unit
-conversion then apply. Total SED is the sum of all mode spectra. The original
+conversion then apply.
+
+Total SED is the sum of all mode spectra. The original
 velocity-SED total is also accumulated from the shared Fourier transforms and
 saved separately for comparison. This does not require another trajectory pass
-or a second set of Fourier transforms. After averaging and frequency folding,
+or a second set of Fourier transforms.
+
+After averaging and frequency folding,
 pySED checks the sum of modes against this ordinary reference:
 
 .. math::
@@ -337,6 +347,7 @@ pySED checks the sum of modes against this ordinary reference:
 The denominator is the global peak of the ordinary, unprojected reference SED,
 not a separate denominator at each q/f point. The check passes at
 ``epsilon <= 1e-6``; larger or nonfinite errors stop computation before output.
+
 Two zero spectra pass with zero error. A nonzero mode sum against a zero
 reference fails. This is a numerical completeness check, not a measure of
 the physical accuracy of the reference eigenvectors.

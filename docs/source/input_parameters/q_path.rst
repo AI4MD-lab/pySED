@@ -16,14 +16,17 @@ q_path
    No useful default. Set it explicitly.
 
 **Notes**
-   Provide one triple per label in ``q_path_name``, in the same order.
-   Write numbers only: ``|`` belongs in ``q_path_name``, not here. This is
-   ``num_qpaths + 1`` triples for a continuous path, or
-   ``num_qpaths + number_of_groups`` for disconnected paths.
+   Give one coordinate triple per label in ``q_path_name``, in the same order.
+   Put the break symbol ``|`` in ``q_path_name``.
+
+   - Continuous path: supply ``num_qpaths + 1`` triples.
+   - Disconnected path: supply ``num_qpaths + number_of_groups`` triples.
+
    Explicit fractions such as ``1/3`` or
    ``7/15`` are preserved exactly and are preferred for rational endpoints.
    Decimal inputs within ``1e-5`` of a fraction with denominator at most 12
    are normalized to that fraction; for example, ``0.33333`` becomes ``1/3``.
+
    Other decimal input is retained exactly as written. To preserve a value
    near a simple fraction without normalization, write it explicitly as a
    fraction, for example ``33333/100000``.

@@ -34,7 +34,8 @@ basis_lattice_file
    ``j``, then ``k``. Within a cell, list basis indices consecutively from 1.
    The fixed reference positions are constructed from these cell numbers,
    the repeat counts, and the production box; no atom coordinates are used.
-   For repeats ``2 1 1`` and a box ``diag(8, 4, 4)`` Angstrom, atoms 1 and 2
+
+   For example, with repeats ``2 1 1`` and a box ``diag(8, 4, 4)`` Angstrom, atoms 1 and 2
    use cell origin ``(0, 0, 0)``, while atoms 3 and 4 use ``(4, 0, 0)``.
 
    Generate the structure and this file together, preserving the atom
@@ -45,9 +46,10 @@ basis_lattice_file
    Diagonal and upper/lower triangular repetition matrices with positive
    diagonal entries are supported. For triangular matrices, their diagonal
    gives the ``i, j, k`` ranges; number cells in the same order even when the
-   structure generator wraps positions into the box. The complete matrix,
-   rather than just its diagonal, is used to recover the primitive vectors.
-   No additional columns or mapping files are needed.
+   structure generator wraps positions into the box.
+
+   pySED uses the full repetition matrix to recover the primitive vectors.
+   The same four-column format works for these cells.
 
    **Static vacancies:** keep this file for the complete reference lattice,
    including missing sites, and supply :doc:`defect_index_file` to identify

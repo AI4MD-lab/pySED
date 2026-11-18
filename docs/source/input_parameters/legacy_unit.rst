@@ -34,12 +34,12 @@ legacy_unit
    remains in THz and linewidth-derived lifetime remains in ps in both modes.
    The odd-frame and single-q-point fixes remain active in legacy mode.
 
-   Total and partial SED files record their output scale. Plotting and fitting
-   use that stored scale even if the current input has a different
-   ``legacy_unit`` value; loading a result does not rescale its numbers.
-   For an old file without scale metadata, set ``legacy_unit = True`` when
-   plotting or fitting 2.x data. Files from earlier 3.0 runs with an
-   ``eV/THz`` header are recognized automatically.
+**Reading saved spectra**
+   Plotting and fitting use the scale recorded in the total or partial SED
+   file. pySED recognizes earlier 3.0 files with an ``eV/THz`` header.
+
+   For a 2.x file without a recorded scale, set ``legacy_unit = True`` when
+   plotting or fitting.
 
    To change the scale of a calculated result, rerun ``action = compute``.
    Changing this parameter alone does not invalidate existing results in

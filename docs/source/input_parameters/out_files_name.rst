@@ -25,11 +25,12 @@ out_files_name
    file. The fitting directories ``Fitting-Qpoint/`` and ``Lifetime/`` are
    likewise created in the current working directory.
 
-   For text input with ``trajectory_read_mode = cache``, the cache uses only
-   the final path component of this prefix and is stored beside the pySED
-   input file. For example, ``out_files_name = results/bulk_MoS2`` creates
-   ``bulk_MoS2.pysed.nc`` in the input-file directory, while the numerical
-   SED outputs use ``results/bulk_MoS2`` relative to the working directory.
+   With ``out_files_name = results/bulk_MoS2``, the two locations are:
+
+   - **SED output:** ``results/bulk_MoS2.SED`` under the working directory.
+   - **Text trajectory cache** (``trajectory_read_mode = cache``):
+     ``bulk_MoS2.pysed.nc`` beside the pySED input file.
+
    Native NetCDF and direct text reading do not create this cache.
 
 :doc:`Back to Parameter Index <../input_parameters>`
