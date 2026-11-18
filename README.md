@@ -30,7 +30,11 @@ pysed -h
 ```
 
 Without Git, [download the source ZIP](https://github.com/AI4MD-lab/pySED/archive/refs/heads/main.zip)
-and extract it. Open a terminal in the extracted `pySED-main` folder and run `python -m pip install .`.
+and extract it. Open a terminal in the extracted `pySED-main` folder.
+
+```bash
+python -m pip install .
+```
 
 **2. Install from PyPI**
 
