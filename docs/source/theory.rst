@@ -174,12 +174,24 @@ arbitrary local SED extraction for user-defined spatial bins.
 Allowed Wave Vectors
 --------------------
 
-In periodic systems, only wave vectors commensurate with the MD supercell are
-allowed. pySED constructs these points with a GCD/Bézout integer-lattice
-solver in ``pySED/sed/construct_BZ.py``. Earlier versions referenced the
-dynasor lattice helper [Dynasor2025]_; the current path solver uses the
-joint integer construction described below.
-For a one-dimensional direction, the Born-von Karman boundary condition gives
+Imagine following a vibration across one edge of a periodic MD box. It must
+return with the same phase at the equivalent point in the next box. Only
+waves that repeat this way along *each* supercell vector can appear as
+distinct q points. Your input ``q_path`` sets the route through reciprocal
+space. The size and shape of your MD supercell determine which points on
+that route pySED can sample. Their reduced coordinates are written to
+``<out_files_name>.Qpts``.
+
+For example, take a supercell with ten primitive repeats along one axis and
+no shear. On a path from Gamma to reduced coordinate 0.5 along that axis,
+the allowed coordinates are 0, 0.1, 0.2, 0.3, 0.4 and 0.5. With nine
+repeats the last sampled coordinate is 4/9. The plot still labels the
+requested endpoint at 0.5. Increasing the trajectory duration improves
+frequency resolution for a fixed number of averaging blocks. To sample more
+q points along this direction, use a longer supercell.
+
+In one dimension, a wave advances by an integer number of cycles over the box
+length (the Born-von Karman boundary condition). Its wave vector therefore obeys
 
 .. math::
 
@@ -223,6 +235,12 @@ and keeps only values of :math:`f` satisfying
 .. math::
 
    \mathbf{q}(f)\mathbf{P}^{T} \in \mathbb{Z}^{3}.
+
+Finding the allowed points on a general path
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The integer construction below also applies to tilted supercells. For related
+work on sampling periodic MD trajectories, see [Dynasor2025]_.
 
 Set :math:`\mathbf{a}=\mathbf{q}_{\mathrm{start}}\mathbf{P}^{T}` and
 :math:`\mathbf{b}=(\mathbf{q}_{\mathrm{end}}-\mathbf{q}_{\mathrm{start}})

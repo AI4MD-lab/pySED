@@ -1,14 +1,11 @@
 Introduction
 ============
 
-The **Spectral Energy Density (SED)** technique employed by **pySED** is a method that can directly
-predict phonon dispersion relations and their corresponding lifetimes from atomic velocities
-obtained in large-scale molecular dynamics (MD) simulations.
-SED represents the intensity of the kinetic energy distribution of a system across different phonon modes,
-effectively providing a dispersion weighted by the kinetic energy carried by each phonon.
-
-**pySED** can read and process large-scale simulation trajectories from both `LAMMPS <https://www.lammps.org/#gsc.tab=0>`_ and `GPUMD <https://gpumd.org/>`_,
-enhancing its versatility and applicability in various research scenarios.
+pySED uses atomic velocities from a molecular dynamics (MD) trajectory to
+calculate the phonon spectral energy density (SED). At each wave vector,
+the SED shows how vibrational kinetic energy is distributed over frequency.
+Following the peaks across wave vectors reveals the phonon dispersion.
+For a well-resolved peak, its width can also be used to estimate a lifetime.
 
 Main Features
 -------------
@@ -17,8 +14,8 @@ Main Features
 - SED analysis of crystals with random vacancies.
 - Analysis of individual phonon modes using
   `Phonopy <https://phonopy.github.io/phonopy/>`_ eigenvectors.
-- Accurate peak detection and fast spectral fitting.
-- Lorentzian and damped harmonic oscillator peak fitting.
+- Automatic peak detection and parallel fitting with Lorentzian or damped
+  harmonic oscillator line shapes.
 - Support for GPUMD and LAMMPS trajectories.
 
 Choosing an analysis
@@ -33,5 +30,5 @@ reference structure to calculate the spectrum of each phonon mode in a
 complete periodic crystal. See :doc:`input_parameters/eigenvector_file`.
 
 Both workflows can fit spectral peaks. Their lifetime definitions and the
-conditions for comparison with BTE are explained in
+conditions for comparison with phonon lifetimes from the Boltzmann transport equation are explained in
 :ref:`bte-lifetime-comparison`.

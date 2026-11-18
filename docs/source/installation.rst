@@ -1,14 +1,22 @@
 Installation
 ============
 
-pySED requires **Python 3.10 or newer**. Use a separate virtual
-or Conda environment. The installation package is ``pysed-phonon``; the command
-to run the program is ``pysed``.
+Use Python 3.10 or newer. Run the installation commands in the environment
+where you plan to use pySED. For example, to create a new Conda environment:
+
+.. code-block:: bash
+
+    conda create -n pysed python=3.12
+    conda activate pysed
+
+Choose one of the installation methods below. The package name is
+``pysed-phonon`` and the command you run after installation is ``pysed``.
 
 Install from GitHub
 -------------------
 
-Installing from source is recommended. Git must be installed.
+We recommend this method for the features described in this manual. With Git installed,
+download the source and install it in your active Python environment:
 
 .. code-block:: bash
 
@@ -20,23 +28,22 @@ Installing from source is recommended. Git must be installed.
 Install from PyPI
 -----------------
 
-Install or upgrade the published package:
+This installs the release currently listed on
+`PyPI <https://pypi.org/project/pysed-phonon/>`_. Check its version if you
+need the 3.0 workflow. If the published release is older, use GitHub above.
+Look for ``pysed-phonon`` on PyPI. The name ``pysed`` belongs to another project.
 
 .. code-block:: bash
 
     python -m pip install --upgrade pysed-phonon
     pysed -h
 
-.. note::
-
-    This manual describes pySED 3.0. If your installed version is older,
-    use the source installation above. The PyPI project named ``pysed``
-    is a different package; install ``pysed-phonon``.
-
 Editing the source (optional)
 ------------------------------
 
-Use this option to edit the source code. Changes take effect without reinstalling.
+If you plan to edit pySED, run the following in the cloned ``pySED`` directory
+in place of ``python -m pip install .``. Edits to Python files then take
+effect the next time you run pySED.
 
 .. code-block:: bash
 
@@ -45,31 +52,37 @@ Use this option to edit the source code. Changes take effect without reinstallin
 Verify installation
 --------------------
 
+After installation, ``pysed -h`` should show the pySED version and usage.
+If you see an older version, check which package your active Python
+environment contains:
+
 .. code-block:: bash
 
-    pysed -h
+    python -m pip show pysed-phonon
 
-The help banner shows the installed version. The ``pySED`` and ``PYSED``
-commands are also supported; no manual copying of scripts is needed.
-Run ``pysed init`` in your calculation directory to create a basic input file.
+Continue to :doc:`starting` to create your input file and run a calculation.
 
 GPU support (optional)
 -----------------------
 
 CPU computation, fitting, and plotting work with the standard installation.
 For GPU computation, install one
-`CuPy package matching your CUDA version <https://docs.cupy.dev/en/stable/install.html>`_:
+`CuPy package matching your CUDA version <https://docs.cupy.dev/en/stable/install.html>`_.
+
+For CUDA 12.x:
 
 .. code-block:: bash
 
-    # CUDA 12.x
     python -m pip install cupy-cuda12x
 
-    # For CUDA 13.x, use this instead (do not install both):
+For CUDA 13.x:
+
+.. code-block:: bash
+
     python -m pip install cupy-cuda13x
 
-Then set ``device = gpu`` in ``input_SED.in``. Fitting and plotting use the CPU;
-``max_cores`` controls parallel fitting. CPU users do not need CuPy or CUDA.
+Set ``device = gpu`` in ``input_SED.in`` to calculate SED on the GPU.
+Fitting and plotting run on the CPU. Use ``max_cores`` to control parallel fitting.
 
 Legacy version
 ---------------

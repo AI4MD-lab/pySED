@@ -8,16 +8,16 @@ peak_min_significance
    peak_min_significance = 4.0
 
 **Meaning**
-   Minimum dimensionless local-noise significance used for adaptive SED peak
-   detection. A value of ``4.0`` requires a candidate's prominence on the
-   Hann-smoothed log SED to be at least four times the local robust noise
-   estimate. See :doc:`the illustrated automatic-detection guide
-   <../peak_fitting>` for the complete workflow and tuning examples.
+   Controls how clearly a peak must stand out from nearby noise to be
+   detected. Raise the value if too many small peaks are picked up. Lower
+   it if a visible peak is missed. At the default of 4, a peak on the
+   smoothed log spectrum must rise above its surroundings by at least
+   four times the local noise estimate.
 
    This threshold applies to automatic all-peak detection. For an eigenvector
    mode with ``fit_reference_peak = 1``, pySED instead selects the highest
    raw local peak inside the reference window without using this threshold
-   to reject it. The original detector still uses this setting to identify
+   to reject it. pySED still uses this setting to identify
    neighboring peaks when determining the complete local fitting interval.
 
 **Default**

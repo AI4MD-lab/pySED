@@ -8,7 +8,7 @@ peak_max_hwhm
    peak_max_hwhm = 0.1
 
 **Meaning**
-   Hard maximum for the fitted HWHM in THz.
+   Largest allowed peak half-width at half maximum (HWHM), in THz.
 
 **Default**
    ``1e6``.

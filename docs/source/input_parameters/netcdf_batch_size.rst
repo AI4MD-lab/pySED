@@ -17,9 +17,8 @@ netcdf_batch_size
    ``64``.
 
 **Notes**
-   Smaller values reduce temporary parser memory. Larger values may reduce
-   Python batching overhead, but do not guarantee faster trajectory reads.
-   Native NetCDF input is unaffected.
+   Lower this value if reading the text trajectory uses too much memory.
+   A larger value may speed up reading. This setting applies to text input.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

@@ -30,11 +30,6 @@ max_cores
    spare capacity: for example, ``6`` uses 1 x 4 and ``10`` uses 2 x 4.
    Reducing the worker count does not increase threads per process.
 
-   There are no timing probes or trial calculations. This predictable default
-   avoids tuning overhead; it does not guarantee the fastest configuration on
-   every machine. Native thread limits are handled internally, so users need
-   only set ``max_cores``.
-
    The startup summary shows the requested budget, for example
    ``Device : CPU (max_cores = 8)``. Before computing the first block, the backend
    prints the actual allocation, for example
@@ -63,15 +58,14 @@ max_cores
    These two levels of parallelism are never nested. Fitting one q point
    of one mode runs serially, and ``max_cores = 1`` keeps all fitting serial.
 
-   The actual process count is limited by CPU affinity and the number of tasks.
+   The process count is limited by the CPUs available to your job and the number of fits.
    Each worker uses one native numerical-library thread. Fitting uses the CPU
    even when ``device = gpu``. The console reports, for example,
    ``Fitting workers : 4 CPU processes``. Detailed output is printed in mode
    or q-point order as the next task in that order becomes available. A slow
    earlier task can delay later details; progress is shown while fitting.
    Parallel workers save figures without opening interactive windows.
-   Fit calculations, text formats and plotting styles are unchanged; summaries
-   are written after their contributing tasks finish successfully.
+   The summary is written when the fits it needs have finished.
 
 **Clusters and library use**
    Set ``max_cores`` no higher than the CPU count allocated to this pySED process
