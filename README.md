@@ -18,7 +18,7 @@
 
 ## Installation
 
-pySED requires **Python 3.10 or newer**.
+pySED requires **Python 3.10 or newer**. The standard installation runs on the CPU (`device = cpu`).
 
 **1. Install from GitHub (recommended)**
 
@@ -41,27 +41,21 @@ python -m pip install --upgrade pysed-phonon
 pysed -h
 ```
 
-The default CPU backend does not require CUDA. For GPU SED computation, install
-one [CuPy package](https://docs.cupy.dev/en/stable/install.html) matching your installed CUDA major version:
-
-```bash
-# CUDA 12.x
-python -m pip install cupy-cuda12x
-
-# For CUDA 13.x, use this instead (do not install both):
-python -m pip install cupy-cuda13x
-```
-
-Then set this in `input_SED.in`:
-
-```ini
-device = gpu
-```
-
-Fitting and plotting use the CPU. Use `device = cpu` for CPU-only computation.
-
 The previous input format and workflow remain available on the
 [legacy/2.4 branch](https://github.com/AI4MD-lab/pySED/tree/legacy/2.4).
+
+### For GPU users
+
+Install [CuPy](https://docs.cupy.dev/en/stable/install.html) in the same Python environment as pySED.
+Choose the command for your CUDA Toolkit version.
+
+| CUDA Toolkit | Installation command |
+| --- | --- |
+| 12.x | `python -m pip install cupy-cuda12x` |
+| 13.x | `python -m pip install cupy-cuda13x` |
+
+Set `device = gpu` in `input_SED.in` to calculate SED on an NVIDIA GPU.
+Peak fitting and plotting run on the CPU.
 
 ## Quick start
 
