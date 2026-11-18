@@ -44,13 +44,15 @@ removed in a future major release.
 Q-path construction
 -------------------
 
-The current GCD/Bézout solver keeps only supercell-compatible points and uses
-consistent rational endpoints for selection and output. It also checks
-zero-length paths and rejects non-integer cell transformations using an
-absolute tolerance. The input syntax is unchanged; explicit fractions such
-as ``1/3`` and ``7/15`` retain their exact values. See
-:doc:`input_parameters/q_path` for decimal normalization and :doc:`theory`
-for the periodicity condition.
+pySED selects only q points allowed by the periodic MD supercell. Fractions
+such as ``1/3`` and ``7/15`` retain their exact values; short decimal
+approximations near simple fractions are still supported. A requested
+high-symmetry endpoint may not be allowed for every supercell size.
+
+Use ``|`` in ``q_path_name`` for a break, such as ``GXU|KGL``. Only the
+connected segments count toward ``num_qpaths``; this example has four.
+See :doc:`input_parameters/q_path` for complete input examples and
+:doc:`theory` for the periodicity condition.
 
 LAMMPS migration
 ----------------

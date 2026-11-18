@@ -8,15 +8,24 @@ fitting_function
    fitting_function = auto
 
 **Meaning**
-   Selects the spectral peak line shape. ``lorentz`` uses a Lorentzian with
-   fitted HWHM. ``dho`` uses the velocity-spectrum damped harmonic oscillator
-   and reports half of its FWHM as the equivalent HWHM. ``auto`` fits both
-   candidates on the same local valley-bounded peak range and compares AICc.
-   If candidates are within two AICc units, or if the fitted DHO is in
-   the weak-damping limit ``hwhm / center < 0.05``, it selects Lorentz.
+   Choose one of three values:
+
+   - ``auto`` fits both line shapes and chooses between them. Use this as
+     a starting point, then inspect the fit figure.
+   - ``lorentz`` fits a Lorentzian peak.
+   - ``dho`` fits a damped harmonic oscillator (DHO) velocity spectrum.
+
+   Both models report HWHM, half of the full width at half maximum (FWHM).
+   See :doc:`../peak_fitting` for the formulas and lifetime definitions.
 
 **Default**
    ``auto``.
+
+**Automatic choice**
+   Both models use the same local peak interval. pySED compares AICc, a
+   statistical score for the fitted models. If the scores differ by no
+   more than two, or the DHO approaches a narrow Lorentzian peak
+   (``hwhm / center < 0.05``), pySED selects Lorentz.
 
 **DHO interpretation**
    Overdamped DHO values are retained in the SED lifetime data for qualitative

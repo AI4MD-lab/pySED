@@ -9,24 +9,44 @@ q_path_name
 
 **Meaning**
    Single-character labels for the high-symmetry points used on the SED plot.
-   Use ``|`` to separate disconnected path groups. Each label corresponds to
-   one coordinate triple in ``q_path``; ``|`` has no coordinate triple.
+   Use ``|`` to break the path: the point before it is not connected to the
+   point after it. Each label corresponds to three coordinates in ``q_path``;
+   ``|`` has no coordinates of its own.
 
 **Default**
    ``GA``.
 
 **Notes**
-   Use ``G`` for Gamma. Quotes are optional. Each path group must contain at
-   least two labels. The number of labels, excluding ``|``, must be
-   ``num_qpaths + number_of_groups``.
+   Use ``G`` for Gamma. Quotes around the whole value are optional:
+   ``GXU|KGL`` and ``'GXU|KGL'`` mean the same thing. Write the labels and
+   separators without spaces or hyphens. Each part between separators must
+   contain at least two labels. Do not start or end with ``|``, or use ``||``.
 
-   For example, ``GXU|KGL`` with ``num_qpaths = 4`` computes Gamma-X, X-U,
-   K-Gamma, and Gamma-L. No U-K segment is sampled. Plotting preserves the
-   break, labels the boundary ``U|K``, and does not interpolate across it.
-   A break does not assert degeneracy or symmetry equivalence of its endpoints.
-   Without ``|``, adjacent labels remain connected as before.
+Example: two separate parts
+---------------------------
 
-   See :doc:`q_path <q_path>` for the complete silicon input.
+.. code-block:: ini
+
+   num_qpaths = 4
+   q_path_name = GXU|KGL
+
+Read this as **Gamma to X to U, then K to Gamma to L**:
+
+.. code-block:: text
+
+   G --- X --- U     K --- G --- L
+                   no U-K segment
+
+The four calculated segments are G-X, X-U, K-G and G-L. The break does not
+count as a segment. In ``q_path``, supply six coordinate triples in the order
+G, X, U, K, G, L, including Gamma twice. Put ``|`` only in
+``q_path_name``, never in the coordinate list.
+
+The plot labels the boundary ``U|K`` and does not draw a connecting band
+between U and K. Without ``|``, ``GXUKGL`` also calculates U-K, so it needs
+``num_qpaths = 5``. The same six coordinate triples are used.
+
+See :doc:`q_path <q_path>` for the complete silicon input.
 
 :doc:`Back to Parameter Index <../input_parameters>`
 

@@ -3,7 +3,7 @@ Quick Start
 
 The pySED workflow is a post-processing workflow. First run molecular dynamics
 to produce a trajectory with coordinates and velocities, then run pySED to
-prepare the trajectory, construct commensurate q-points, calculate SED, plot
+prepare the trajectory, select q points allowed by the MD supercell, calculate SED, plot
 the result, and optionally fit peaks to estimate lifetimes. Start without
 eigenvectors; add them when you need individual phonon mode spectra.
 
@@ -138,6 +138,29 @@ expansion order, with ``k`` changing fastest; its four columns are unchanged.
 See :doc:`sed_workflow` for the numbering rule and a reference-position example.
 Unwrapped coordinates alone do not make fixed-lattice SED appropriate for
 diffusive motion.
+
+Choosing a q path
+-----------------
+
+Write the point labels in ``q_path_name`` and their coordinates in
+``q_path``. ``num_qpaths`` counts the segments you want to calculate.
+For a path that stops at U and resumes at K, use:
+
+.. code-block:: ini
+
+   num_qpaths = 4
+   q_path_name = GXU|KGL
+   q_path = 0 0 0  1/2 0 1/2  5/8 1/4 5/8  3/8 3/8 3/4  0 0 0  1/2 1/2 1/2
+
+This silicon example calculates G-X, X-U, K-G and G-L, **not U-K**.
+Use ``G`` for Gamma. Put ``|`` only in ``q_path_name``; the coordinates
+still contain one triple for every label, including both G entries.
+Use coordinates appropriate to your own primitive cell. See
+:doc:`input_parameters/q_path` for the label-to-coordinate table and
+:doc:`input_parameters/q_path_name` for the separator rules.
+
+Changing the path requires ``action = compute``. ``action = plot`` uses the
+path saved with the existing SED data.
 
 What to Check Before Running pySED
 ----------------------------------

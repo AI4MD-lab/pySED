@@ -171,7 +171,7 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Purpose
    * - `action <input_parameters/action.html>`_
      - Workflow
-     - Select automatic dispatch, compute, plot, or fit.
+     - Let pySED choose the next step, or request computation, plotting or fitting.
    * - `num_atoms <input_parameters/num_atoms.html>`_
      - MD simulation
      - Number of atoms in the MD trajectory.
@@ -195,10 +195,10 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Path to ``basis.in``.
    * - `defect_index_file <input_parameters/defect_index_file.html>`_
      - Files
-     - Optional reference-to-trajectory mapping for static vacancies.
+     - Identify vacant sites and the remaining atoms in the trajectory.
    * - `eigenvector_file <input_parameters/eigenvector_file.html>`_
      - Files
-     - Phonopy band.yaml for mode-resolved SED in mode-resoved-SED/.
+     - Read Phonopy eigenvectors to calculate individual phonon mode spectra.
    * - `mode_index <input_parameters/eigenvector_file.html#plotting-and-fitting>`_
      - Plotting and fitting
      - Omit for total SED; specify a positive, one-based mode number to select one mode.
@@ -318,7 +318,7 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Set maximum fitted frequency in THz.
    * - `fitting_function <input_parameters/fitting_function.html>`_
      - Peak fitting
-     - Select Lorentz, velocity-DHO, or automatic AICc choice.
+     - Fit a Lorentzian, a damped harmonic oscillator, or choose automatically.
    * - `fit_reference_peak <input_parameters/fit_reference_peak.html>`_
      - Mode fitting
      - Select one reference-frequency peak per mode and q point (default: 1).
@@ -327,7 +327,7 @@ meaning, defaults, examples, practical notes, and related parameters.
      - Reference-frequency search half-window in THz (default: 0.5).
    * - `peak_min_significance <input_parameters/peak_min_significance.html>`_
      - Peak fitting
-     - Set the robust local peak-significance threshold.
+     - Adjust how strongly a peak must stand out from nearby noise.
    * - `num_blocks <input_parameters/num_blocks.html>`_
      - Averaging
      - Set equal trajectory blocks used for spectral averaging.

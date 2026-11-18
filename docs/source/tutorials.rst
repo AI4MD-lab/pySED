@@ -14,6 +14,12 @@ Then choose the analysis you need:
   :doc:`input_parameters/plot_partial_SED` for plotting and fitting.
 * **Random vacancies:** follow :doc:`structure_generation` to generate the
   structure and vacancy mapping, then calculate SED without eigenvectors.
+* **Paths with a break:** use ``|`` in :doc:`input_parameters/q_path_name`,
+  for example ``GXU|KGL``. See :doc:`input_parameters/q_path` for the
+  coordinates and segment count.
+* **A periodic group from a larger simulation:** use a matching ``basis.in``
+  and :doc:`input_parameters/dump_group_supercell` to specify that group's
+  cell. This does not select atoms from a full trajectory for you.
 
 The MoS\ :sub:`2` notebook provides a step-by-step example. The
 :doc:`example` gallery shows representative SED figures.
