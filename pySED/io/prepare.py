@@ -69,6 +69,7 @@ def prepare_trajectory(
     lammps_unit: str = "metal",
     text_mode: str = "cache",
     force: bool = False,
+    validate_headers: bool = False,
 ) -> tuple[Path, str]:
     """Return (readable_path, source_format) for the selected trajectory mode.
 
@@ -77,11 +78,16 @@ def prepare_trajectory(
     source metadata or conversion settings differ. force bypasses reuse only
     for text-to-NetCDF conversion. storage_dtype controls both text parsing
     and cache precision; this function does not choose the SED intensity scale.
+    validate_headers checks each GPUMD frame's cell and property layout during
+    conversion. A matching cache must carry that guarantee when requested.
+    Native NetCDF is passed through; obsolete/incomplete conversions are rejected.
     """
 
     source = Path(source).expanduser()
     source_format = detect_trajectory(source)
     if is_netcdf(source):
+        with NetCDFReader(source) as trajectory:
+            trajectory.require_current_cache(validate_headers=validate_headers)
         return source, source_format
     if text_mode == "direct":
         return source, source_format
@@ -105,6 +111,7 @@ def prepare_trajectory(
         storage_dtype=storage_dtype,
         lammps_unit=lammps_unit,
         source_format=source_format,
+        validate_headers=validate_headers,
     ):
         convert_text_trajectory(
             source=source,
@@ -114,5 +121,6 @@ def prepare_trajectory(
             compression_level=compression_level,
             storage_dtype=storage_dtype,
             lammps_unit=lammps_unit,
+            validate_headers=validate_headers,
         )
     return output, source_format
