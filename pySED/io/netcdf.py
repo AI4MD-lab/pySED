@@ -76,9 +76,10 @@ def _first_variable(variables, names) -> str | None:
 
 def _require_current_cache(dataset, validate_headers=False):
     """Check conversion semantics only; native NetCDF needs no cache markers."""
+    attributes = dataset.ncattrs()
     for prefix, version in (("pysed", _SCHEMA_VERSION), ("mdtrace", 3)):
         saved_version = getattr(dataset, prefix + "_schema_version", None)
-        if not any(name.startswith(prefix + "_") for name in dataset.ncattrs()):
+        if not any(name.startswith(prefix + "_") for name in attributes):
             continue
         if (saved_version is None or int(saved_version) != version
                 or int(getattr(dataset, prefix + "_conversion_complete", 0)) != 1):

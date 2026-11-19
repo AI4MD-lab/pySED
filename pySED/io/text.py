@@ -217,6 +217,7 @@ def iter_gpumd_xyz(
     pending = []
     batch_start = 0
     expected_atoms = None
+    previous_comment = None
     with Path(path).open("r", encoding="utf-8") as stream:
         while True:
             header = stream.readline()
@@ -262,7 +263,7 @@ def iter_gpumd_xyz(
                 frame_columns, _ = _gpumd_columns(comment, allow_position_only=True)
                 if frame_columns != columns:
                     raise ValueError("GPUMD XYZ Properties changed between frames")
-            if validate_headers:
+            if validate_headers and comment != previous_comment:
                 if not np.isfinite(cell).all():
                     raise ValueError("GPUMD Lattice must be finite")
                 previous_comment = comment

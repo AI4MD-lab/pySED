@@ -33,12 +33,13 @@ def default_converted_path(source: Path) -> Path:
     return path.with_name(f"{path.name}.pysed.nc")
 
 
-def detect_trajectory(source: Path) -> str:
+def detect_trajectory(source: Path, *, validate_headers: bool = False) -> str:
     """Identify text or NetCDF format from the file contents and metadata.
 
     NetCDF conversion metadata takes precedence over the producing program
     name. Text files are distinguished by their first header. Missing files
-    raise FileNotFoundError; filenames alone do not select a parser.
+    raise FileNotFoundError; filenames alone do not select a parser. Converted
+    NetCDF files are checked using the same open handle as format detection.
     """
 
     source = Path(source).expanduser()
@@ -49,6 +50,7 @@ def detect_trajectory(source: Path) -> str:
         return detect_text_format(source)
 
     with NetCDFReader(source) as trajectory:
+        trajectory.require_current_cache(validate_headers=validate_headers)
         if trajectory.info.source_format:
             return trajectory.info.source_format
         program = (trajectory.info.source_program or "").lower()
@@ -84,10 +86,8 @@ def prepare_trajectory(
     """
 
     source = Path(source).expanduser()
-    source_format = detect_trajectory(source)
+    source_format = detect_trajectory(source, validate_headers=validate_headers)
     if is_netcdf(source):
-        with NetCDFReader(source) as trajectory:
-            trajectory.require_current_cache(validate_headers=validate_headers)
         return source, source_format
     if text_mode == "direct":
         return source, source_format
