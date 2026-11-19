@@ -103,46 +103,6 @@ but skips coordinate columns during parsing.
 Text-to-NetCDF conversion retains all coordinates for other analyses, without
 changing the cache format or invalidating existing caches.
 
-Public trajectory I/O
----------------------
-
-Other packages can use ``pySED.io`` without invoking the SED workflow:
-
-.. code-block:: python
-
-   from pySED.io import prepare_trajectory, NetCDFReader, POSITIONS
-
-   path, source_format = prepare_trajectory(
-       "dump.xyz", validate_headers=True, compression_level=1)
-   with NetCDFReader(path) as reader:
-       reader.require_current_cache(validate_headers=True)
-       positions = reader.read(POSITIONS, slice(0, 32))
-
-The public exports also include ``TrajectoryInfo``, ``TrajectoryBatch``,
-``is_netcdf`` and the canonical field constants. Positions and row-wise cells
-use Angstrom, velocities m/s, and optional times ps. ``position_field`` names
-the selected NetCDF variable; ``position_source`` records original coordinate
-columns when available. Explicit unwrapped coordinates take priority; readers
-do not unwrap coordinates or reorder native NetCDF atoms.
-
-The default ``validate_headers=False`` preserves the SED fixed-cell fast path.
-With ``True``, GPUMD conversion reads actual per-frame cells and verifies a
-constant property layout. Identical consecutive headers reuse their parsed
-values; atom rows use the same optimized parser in either mode. Declared numeric
-properties may follow species in any order, provided pos:R:3 is present. The
-checked mode also accepts position-only rows without Properties.
-
-Checked conversions record their guarantee in cache metadata. Given the original
-text, ``prepare_trajectory`` rebuilds an unchecked GPUMD cache when a caller
-requests checked headers; SED may reuse a checked cache. Native NetCDF is passed
-through, while incomplete or obsolete conversions raise a regeneration error.
-Completed legacy MDtrace v3 caches are readable; they retain their original
-coordinate semantics. A text-driven conversion replaces them with pySED metadata.
-
-Chunk sizing, zlib/shuffle compression, precision and atomic cache replacement
-are shared unchanged. The SED block/prefetch helpers remain internal: their
-velocity-only blocks are unsuitable for analyses that need positions.
-
 The numerical core
 ------------------
 

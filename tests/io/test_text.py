@@ -185,6 +185,7 @@ class GPUMDPropertiesTests(unittest.TestCase):
             'Properties=species:S:1:pos:R:3:vel:I:3',
             'Properties=species:S:1:pos:R:3:pos:R:3',
             'Properties=species:S:1:pos:R:3:group:I:0',
+            'Properties="species:S:1:pos:R:3"',
         )
         for declaration in declarations:
             with self.subTest(declaration=declaration), self.assertRaises(ValueError):

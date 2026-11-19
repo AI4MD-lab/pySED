@@ -74,25 +74,6 @@ def _first_variable(variables, names) -> str | None:
     return next((name for name in names if name in variables), None)
 
 
-def _require_current_cache(dataset, validate_headers=False):
-    """Check conversion semantics only; native NetCDF needs no cache markers."""
-    attributes = dataset.ncattrs()
-    for prefix, version in (("pysed", _SCHEMA_VERSION), ("mdtrace", 3)):
-        saved_version = getattr(dataset, prefix + "_schema_version", None)
-        if not any(name.startswith(prefix + "_") for name in attributes):
-            continue
-        if (saved_version is None or int(saved_version) != version
-                or int(getattr(dataset, prefix + "_conversion_complete", 0)) != 1):
-            raise ValueError("outdated or incomplete trajectory cache; select the original text trajectory to regenerate it")
-        if prefix == "pysed":
-            source_format = getattr(dataset, "pysed_source_format", None)
-            if source_format == "lammps_dump" and getattr(dataset, "pysed_lammps_integer_ids", 0) != 1:
-                raise ValueError("outdated atom-ID cache; select the original text trajectory to regenerate it")
-            if (validate_headers and source_format == "gpumd_xyz"
-                    and getattr(dataset, "pysed_headers_validated", 0) != 1):
-                raise ValueError("GPUMD cache lacks per-frame header validation; select the original text trajectory to regenerate it")
-
-
 def _unit(value: Any) -> str | None:
     """Normalize a unit attribute for lookup in conversion tables."""
     if value is None:
@@ -244,8 +225,7 @@ class NetCDFReader:
             fields.add(CELLS)
 
         source_program = getattr(self._dataset, "program", None)
-        source_format = getattr(self._dataset, "pysed_source_format",
-                                getattr(self._dataset, "mdtrace_source_format", None))
+        source_format = getattr(self._dataset, "pysed_source_format", None)
         self._info = TrajectoryInfo(
             path=self.path,
             n_frames=int(shape[0]),
@@ -264,21 +244,6 @@ class NetCDFReader:
     def position_field(self) -> str:
         """Name the coordinate variable actually selected for reading."""
         return self._variables[POSITIONS]
-
-    @property
-    def position_source(self) -> str:
-        """Original text coordinate columns, or the selected NetCDF variable."""
-        return str(getattr(self._dataset, "pysed_position_source", self.position_field))
-
-    def require_current_cache(self, *, validate_headers=False) -> None:
-        """Reject incomplete/obsolete conversions, allowing native NetCDF.
-
-        validate_headers additionally requires checked per-frame GPUMD headers.
-        This checks stored conversion guarantees, not whether an external source
-        still exists. prepare_trajectory checks source freshness when given text.
-        Legacy MDtrace v3 caches retain their original per-frame cell semantics.
-        """
-        _require_current_cache(self._dataset, validate_headers)
 
     def require(self, *fields: str) -> None:
         """Raise KeyError if any requested trajectory field is unavailable."""
@@ -424,8 +389,6 @@ class NetCDFWriter:
         compression_level: int = 1,
         storage_dtype: str = "float32",
         lammps_unit: str = "metal",
-        validate_headers: bool = False,
-        position_source: str | None = None,
     ) -> None:
         """Validate storage options and prepare an unopened trajectory writer."""
         if not 0 <= compression_level <= 9:
@@ -438,8 +401,6 @@ class NetCDFWriter:
         self.compression_level = compression_level
         self.storage_dtype = storage_dtype
         self.lammps_unit = lammps_unit
-        self.validate_headers = validate_headers
-        self.position_source = position_source
         self._dataset = None
         self._variables: dict[str, Any] = {}
         self._next_frame = 0
@@ -493,9 +454,6 @@ class NetCDFWriter:
         dataset.pysed_compression_level = self.compression_level
         dataset.pysed_storage_dtype = self.storage_dtype
         dataset.pysed_lammps_unit = self.lammps_unit
-        dataset.pysed_headers_validated = int(self.validate_headers)
-        if self.position_source is not None:
-            dataset.pysed_position_source = self.position_source
         stat = self.source.resolve().stat()
         dataset.pysed_source_path = str(self.source.resolve())
         if self.source_format:
@@ -617,7 +575,6 @@ def converted_file_is_current(
     storage_dtype: str = "float32",
     lammps_unit: str = "metal",
     source_format: str | None = None,
-    validate_headers: bool = False,
 ) -> bool:
     """Return whether a completed cache matches its source and conversion options.
 
@@ -633,9 +590,10 @@ def converted_file_is_current(
     stat = Path(source).resolve().stat()
     try:
         with _netcdf4().Dataset(str(output), "r") as dataset:
-            _require_current_cache(dataset, validate_headers)
             return (
-                hasattr(dataset, "pysed_schema_version")
+                int(getattr(dataset, "pysed_conversion_complete", 0)) == 1
+                and int(getattr(dataset, "pysed_schema_version", -1))
+                == _SCHEMA_VERSION
                 and getattr(dataset, "pysed_source_path", None)
                 == expected_path
                 and int(getattr(dataset, "pysed_source_size", -1))
@@ -648,6 +606,11 @@ def converted_file_is_current(
                 == storage_dtype
                 and getattr(dataset, "pysed_lammps_unit", None)
                 == lammps_unit
+                # Older LAMMPS caches may contain atom IDs rounded through floats.
+                and (
+                    getattr(dataset, "pysed_source_format", None) != "lammps_dump"
+                    or getattr(dataset, "pysed_lammps_integer_ids", 0) == 1
+                )
                 and (
                     source_format is None
                     or getattr(dataset, "pysed_source_format", None)

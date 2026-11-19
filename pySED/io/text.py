@@ -111,16 +111,14 @@ def _lattice_from_comment(comment: str) -> np.ndarray | None:
     return values.reshape(3, 3)
 
 
-def _gpumd_columns(comment, allow_position_only=False):
+def _gpumd_columns(comment):
     """Validate the first GPUMD header and map its numeric property columns."""
-    match = re.search(r'\bproperties\s*=\s*"?([^"\s]+)', comment, re.IGNORECASE)
-    if match is None and allow_position_only:
-        return {"pos": slice(0, 3)}, 3
+    match = re.search(r"\bProperties=(\S+)", comment)
     tokens = match.group(1).split(":") if match else []
-    if len(tokens) % 3 or tokens[:3] != ["species", "S", "1"]:
+    if len(tokens) % 3 or tokens[:6] != ["species", "S", "1", "pos", "R", "3"]:
         raise ValueError(
-            "GPUMD XYZ requires Properties starting with species:S:1 "
-            "followed by numeric R/I properties including pos:R:3"
+            "standard GPUMD XYZ requires Properties=species:S:1:pos:R:3 "
+            "followed only by numeric R/I properties; generic XYZ is not supported"
         )
     columns = {}
     offset = 0
@@ -133,8 +131,6 @@ def _gpumd_columns(comment, allow_position_only=False):
             raise ValueError(f"GPUMD XYZ requires {name}:R:3")
         columns[name] = slice(offset, offset + count)
         offset += count
-    if "pos" not in columns:
-        raise ValueError("GPUMD XYZ requires pos:R:3")
     return columns, offset
 
 
@@ -150,12 +146,12 @@ def _lammps_position_columns(columns):
     return names
 
 
-def read_text_position_field(path: Path, source_format: str, *, allow_position_only=False) -> str:
+def read_text_position_field(path: Path, source_format: str) -> str:
     """Identify the selected coordinates from the first header, without reading atoms."""
     with Path(path).open("r", encoding="utf-8") as stream:
         if source_format == GPUMD_XYZ:
             stream.readline()
-            columns, _ = _gpumd_columns(stream.readline(), allow_position_only=allow_position_only)
+            columns, _ = _gpumd_columns(stream.readline())
             return "unwrapped_position" if "unwrapped_position" in columns else "pos"
         if source_format == LAMMPS_DUMP:
             # The standard dump header has nine lines, including three box bounds.
@@ -190,17 +186,13 @@ def iter_gpumd_xyz(
     dtype=np.float32,
     progress: ProgressCallback | None = None,
     read_positions: bool = True,
-    validate_headers: bool = False,
 ) -> Iterator[TrajectoryBatch]:
-    """Read GPUMD XYZ in bounded batches with a reusable column layout.
+    """Read fixed-cell GPUMD XYZ with a schema determined by the first frame.
 
-    Require species:S:1 followed by numeric R/I properties including pos:R:3.
-    Positions and optional velocities have three components. Column layout and
-    atom order/species must stay fixed. The default assumes a fixed cell (NVT/NVE).
-    By default subsequent comments are skipped, preserving the SED fast path.
-    validate_headers=True reads each frame's actual cell and checks the column
-    layout. Identical consecutive headers reuse the parsed values. This mode
-    also accepts position-only rows without Properties (exactly three numbers).
+    Require species:S:1:pos:R:3 followed only by numeric R/I properties.
+    Positions and optional velocities have three components. Column layout,
+    atom order/species and the first Lattice must remain fixed (NVT/NVE).
+    Subsequent comments are skipped; there is no generic-XYZ fallback.
     Positions/cells use Angstrom and velocities convert from Angstrom/fs
     to m/s. Numeric fields use dtype; the cached cell uses float64.
     Prefer unwrapped_position over pos when supplied; do not unwrap coordinates.
@@ -217,7 +209,6 @@ def iter_gpumd_xyz(
     pending = []
     batch_start = 0
     expected_atoms = None
-    previous_comment = None
     with Path(path).open("r", encoding="utf-8") as stream:
         while True:
             header = stream.readline()
@@ -238,7 +229,7 @@ def iter_gpumd_xyz(
                 raise EOFError("truncated GPUMD XYZ comment line")
             first = expected_atoms is None
             if first:
-                columns, width = _gpumd_columns(comment, allow_position_only=validate_headers)
+                columns, width = _gpumd_columns(comment)
                 position_columns = columns.get("unwrapped_position", columns["pos"])
                 cell = _lattice_from_comment(comment)
                 if cell is None:
@@ -256,17 +247,6 @@ def iter_gpumd_xyz(
                     ])
                 atom_ids = np.arange(1, n_atoms + 1, dtype=np.int64)
                 expected_atoms = n_atoms
-            elif validate_headers and comment != previous_comment:
-                cell = _lattice_from_comment(comment)
-                if cell is None:
-                    raise ValueError("validated GPUMD XYZ requires Lattice in every frame")
-                frame_columns, _ = _gpumd_columns(comment, allow_position_only=True)
-                if frame_columns != columns:
-                    raise ValueError("GPUMD XYZ Properties changed between frames")
-            if validate_headers and comment != previous_comment:
-                if not np.isfinite(cell).all():
-                    raise ValueError("GPUMD Lattice must be finite")
-                previous_comment = comment
 
             # readline keeps tell() available for the progress callback.
             lines = list(islice(iter(stream.readline, ""), n_atoms))
@@ -498,7 +478,6 @@ def convert_text_trajectory(
     compression_level: int = 1,
     storage_dtype: str = "float32",
     lammps_unit: str = "metal",
-    validate_headers: bool = False,
 ) -> Path:
     """Convert a supported text trajectory to NetCDF without loading it all.
 
@@ -534,7 +513,6 @@ def convert_text_trajectory(
             batch_size=batch_size,
             dtype=np.dtype(storage_dtype),
             progress=progress,
-            validate_headers=validate_headers,
         )
     elif source_format == LAMMPS_DUMP:
         batches = iter_lammps_dump(
@@ -559,9 +537,6 @@ def convert_text_trajectory(
         compression_level=compression_level,
         storage_dtype=storage_dtype,
         lammps_unit=lammps_unit,
-        validate_headers=validate_headers,
-        position_source=read_text_position_field(
-            source, source_format, allow_position_only=validate_headers),
     )
     try:
         for batch in batches:
