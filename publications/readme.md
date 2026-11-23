@@ -1,6 +1,8 @@
 # Publications using pySED
 
-## Preprints (3)
+## Preprints (4)
+
+* Wenwu Jiang, Hekai Bu, [Axial Thermal Transport in Transition Metal Chalcogenide Nanowires from Machine-Learning Molecular Dynamics Simulations](https://arxiv.org/abs/2611.27103)
 
 * Jianmin Yang, Lin Xie, [Lattice-mediated Geometric Frustration Drives Fast Ionic Transport](https://arxiv.org/abs/2606.22345)
 
