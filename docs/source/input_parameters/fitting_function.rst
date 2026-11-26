@@ -8,8 +8,11 @@ fitting_function
    fitting_function = auto
 
 **Meaning**
-   Choose the line shape used to fit each SED peak. Start with ``auto``
-   (the default), or set ``lorentz`` or ``dho`` to use one model for every peak.
+   Choose the line shape used to fit each SED peak: ``auto``, ``lorentz``, or
+   ``dho``.
+
+**Default**
+   ``auto``.
 
 **Automatic selection** (``auto``)
    pySED fits both models to the same peak and compares their corrected
@@ -50,10 +53,11 @@ Reading the fit
 
 See :doc:`../peak_fitting` for the linewidth-to-lifetime formulas.
 
-**Related parameters**
+:doc:`Back to Parameter Index <../input_parameters>`
+
+Related parameters
+------------------
 
 - :doc:`initial_guess_hwhm <initial_guess_hwhm>`
 - :doc:`peak_max_hwhm <peak_max_hwhm>`
 - :doc:`peak_min_significance <peak_min_significance>`
-
-:doc:`Back to Peak Detection and Line-Shape Fitting <../peak_fitting>`

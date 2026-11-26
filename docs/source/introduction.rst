@@ -27,7 +27,7 @@ with random vacancies. See :doc:`starting` and :doc:`structure_generation`.
 
 **With eigenvectors**, supply a Phonopy ``band.yaml`` and the primitive
 reference structure to calculate the spectrum of each phonon mode in a
-complete periodic crystal. See :doc:`input_parameters/eigenvector_file`.
+complete periodic crystal. See :doc:`mode_resolved_sed`.
 
 Both workflows can fit spectral peaks. Their lifetime definitions and the
 conditions for comparison with phonon lifetimes from the Boltzmann transport equation are explained in

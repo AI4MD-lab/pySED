@@ -35,7 +35,7 @@ Recommended order:
 
 To resolve individual phonon modes, also supply a Phonopy eigenvector file
 and primitive reference structure. This produces one spectrum per mode and
-their total. Follow :doc:`input_parameters/eigenvector_file` for the required
+their total. Follow :doc:`mode_resolved_sed` for the required
 inputs, plotting and fitting settings. Element/direction partial SED and
 vacancy calculations use the workflow without eigenvectors.
 

@@ -76,11 +76,5 @@ you only want to tune figure or fitting parameters.
 Further reading
 ---------------
 
-Users upgrading from 2.4.1 can follow the migration guide. The code
-architecture page is for readers who want implementation details.
-
-.. toctree::
-   :maxdepth: 1
-
-   migration_v3
-   code_architecture
+Users upgrading from 2.4.1 can follow :doc:`migration_v3`. Readers who want
+implementation details can see :doc:`code_architecture`.

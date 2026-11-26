@@ -12,7 +12,8 @@ first.
 
 > The illustrations retain the original pySED 2.4 results. Recompute the SED
 > and fits with pySED 3.0 before comparing intensities or lifetimes. The
-> original numerical results remain in [the 2.4 archive](legacy/pySED-2.4/).
+> original 2.4 release and numerical results remain on the
+> [`legacy/2.4` branch](https://github.com/AI4MD-lab/pySED/tree/legacy/2.4).
 
 ---
 

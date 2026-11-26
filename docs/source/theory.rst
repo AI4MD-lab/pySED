@@ -85,16 +85,16 @@ The eigenvector-based SED is then
    \exp\left(i\mathbf{q}\cdot\mathbf{r}_0(l)-i\omega t\right)dt
    \right|^2 .
 
-This expression resolves individual branches through the eigenvectors, but it
-requires a lattice-dynamics calculation and can be expensive for complex
-systems.
+This expression resolves individual branches through the phonon eigenvectors,
+which is especially useful for separating overlapping or nearly degenerate
+modes.
 
-Eigenvector-Free SED Used by pySED
-----------------------------------
+Eigenvector-Free SED
+--------------------
 
-pySED currently implements the eigenvector-free SED expression derived by
-Thomas et al. [Thomas2010]_. This expression sums over the basis atoms and Cartesian
-directions without explicitly projecting onto phonon eigenvectors:
+Without eigenvectors, pySED implements the eigenvector-free SED expression
+derived by Thomas et al. [Thomas2010]_. This expression sums over the basis
+atoms and Cartesian directions without projecting onto phonon eigenvectors:
 
 .. math::
 
@@ -122,10 +122,54 @@ follows from the eigenvector orthonormality condition
    =
    \delta_{\alpha\beta}.
 
-In practice, :math:`\Phi'(\mathbf{q},\omega)` is usually sufficient for
-obtaining a kinetic-energy-weighted phonon dispersion from MD trajectories. A
-branch-resolved eigenvector projection can help separate nearly degenerate
-modes, but that is not the current production workflow in pySED.
+In practice, :math:`\Phi'(\mathbf{q},\omega)` is fast, requires no lattice
+dynamics input, and is usually sufficient for obtaining a
+kinetic-energy-weighted phonon dispersion (as well as element- and
+direction-resolved partial SED) from MD trajectories.
+
+Mode-Resolved SED (Eigenvector Projection)
+------------------------------------------
+
+When Phonopy eigenvectors are provided through
+:doc:`input_parameters/eigenvector_file` and
+:doc:`input_parameters/reference_structure_file`, pySED calculates the spectrum
+:math:`S_\nu(\mathbf{q}, f)` of each individual phonon branch :math:`\nu` in a
+complete periodic crystal.
+
+For Phonopy eigenvectors :math:`e^P_{b\alpha\nu}(\mathbf{q})` and aligned
+reference fractional positions :math:`\mathbf{s}_b`, the projection weights
+matching pySED's positive spatial Fourier sign convention are
+
+.. math::
+
+   W_{b\alpha\nu}(\mathbf{q})
+   =
+   e^P_{b\alpha\nu}(\mathbf{q})
+   \exp\left(2\pi i\,\mathbf{q}\cdot\mathbf{s}_b\right).
+
+These weights already include the required complex conjugation for pySED's
+positive-sign spatial convention and are not conjugated again. Each basis
+atom's spatial velocity sum is Fourier transformed in time, multiplied by
+:math:`\sqrt{m_b}\,W_{b\alpha\nu}(\mathbf{q})`, and summed over all basis atoms
+and Cartesian directions before taking the squared modulus.
+
+Because the eigenvectors form a complete orthonormal basis at each wave vector,
+the sum of all projected mode spectra equals the unprojected velocity-SED
+reference :math:`S_{\mathrm{ref}}(\mathbf{q}, f)`. After block averaging and
+frequency folding, pySED verifies this numerical completeness condition:
+
+.. math::
+
+   \epsilon
+   =
+   \frac{\max_{\mathbf{q},f}\left|\sum_\nu S_\nu(\mathbf{q},f)-S_{\mathrm{ref}}(\mathbf{q},f)\right|}
+        {\max_{\mathbf{q},f}\left|S_{\mathrm{ref}}(\mathbf{q},f)\right|}
+   \le 10^{-6}.
+
+The denominator is the global peak of the unprojected reference SED. This check
+verifies numerical completeness of the projection; it does not evaluate the
+physical accuracy of the harmonic reference model. See :doc:`mode_resolved_sed`
+for the end-to-end workflow and reference-matching requirements.
 
 Partial SED
 -----------
@@ -426,7 +470,6 @@ References
 Units and output conventions
 ----------------------------
 
-.. toctree::
-   :maxdepth: 1
-
-   sed_units
+See :doc:`sed_units` for the physical SED normalization (``eV/THz``),
+one-sided frequency folding, logarithmic colorbar conventions, and the optional
+legacy 2.x output scale.

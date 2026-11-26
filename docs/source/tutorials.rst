@@ -5,7 +5,7 @@ Start with :doc:`starting` to calculate and plot SED from an MD trajectory.
 Then choose the analysis you need:
 
 * **Individual phonon modes:**
-  :doc:`use Phonopy eigenvectors <input_parameters/eigenvector_file>` to
+  follow :doc:`mode_resolved_sed` to prepare Phonopy eigenvectors and
   calculate, plot and fit each mode, or all modes in one run.
 * **Phonon lifetimes:** follow :doc:`peak_fitting` to select peaks, inspect
   fits and update lifetime summaries.
@@ -27,5 +27,4 @@ The MoS\ :sub:`2` notebook provides a step-by-step example. The
 .. toctree::
    :maxdepth: 1
 
-   peak_fitting
    notebook/SED_MoS2.ipynb

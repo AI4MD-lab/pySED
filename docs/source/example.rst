@@ -330,6 +330,6 @@ Additional examples and older LAMMPS workflows are available in the
 Related instructions
 --------------------
 
-See :doc:`sed_workflow` for a small executable example, trajectory reading
-and CPU/GPU execution. Use :doc:`input_parameters/eigenvector_file` for
-individual phonon modes and :doc:`peak_fitting` for lifetime fitting.
+See :doc:`sed_workflow` for trajectory reading, NetCDF caching, and CPU/GPU
+execution. Use :doc:`mode_resolved_sed` for individual phonon modes and
+:doc:`peak_fitting` for lifetime fitting.

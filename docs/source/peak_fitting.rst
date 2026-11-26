@@ -179,7 +179,7 @@ To draw every saved mode's SED without fitting, use ``action = plot`` and
 ``plot_all_modes = 1``. Add ``plot_slice = 1`` and ``qpoint_slice_index``
 to also draw each mode at one q point. Each mode is saved as a separate
 figure under ``mode-resoved-SED/``; ``max_cores`` does not parallelize this
-plotting loop. See :doc:`input_parameters/eigenvector_file` for filenames.
+plotting loop. See :doc:`mode_resolved_sed` for filenames.
 
 Line-shape choices
 ------------------

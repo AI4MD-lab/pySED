@@ -19,5 +19,5 @@ pySED input.in
 ```
 
 The migrated cell is `30 x 4 x 4` with 88 basis atoms and 42,240 total
-atoms. Historical v2.4 results are under
-`../../legacy/pySED-2.4/outputs/For_old_version_example/PTCDI-C8/`.
+atoms. Historical v2.4 results remain available on the
+[`legacy/2.4` branch](https://github.com/AI4MD-lab/pySED/tree/legacy/2.4).
