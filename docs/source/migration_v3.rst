@@ -32,7 +32,7 @@ Parameter replacements
      - ``lorentz_fit_freq_min`` and ``lorentz_fit_freq_max``.
    * - ``with_eigs``
      - Supply ``eigenvector_file`` and ``reference_structure_file`` for
-       mode-resolved SED; see :doc:`input_parameters/eigenvector_file`.
+       mode-resolved SED; see :doc:`mode_resolved_sed`.
 
 Old parameter names are rejected with migration guidance. SED output is
 eV/THz by default. The temporary :doc:`legacy_unit <input_parameters/legacy_unit>`

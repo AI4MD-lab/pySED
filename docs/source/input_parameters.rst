@@ -64,6 +64,13 @@ its syntax, default and use.
        "lorentz-fit-freq-max": "input_parameters/lorentz_fit_freq_max.html",
        "fitting-function": "input_parameters/fitting_function.html",
        "peak-min-significance": "input_parameters/peak_min_significance.html",
+       "eigenvector-file": "input_parameters/eigenvector_file.html",
+       "reference-structure-file": "input_parameters/reference_structure_file.html",
+       "mode-index": "input_parameters/mode_index.html",
+       "plot-all-modes": "input_parameters/plot_all_modes.html",
+       "fit-all-modes": "input_parameters/fit_all_modes.html",
+       "fit-reference-peak": "input_parameters/fit_reference_peak.html",
+       "fit-reference-window": "input_parameters/fit_reference_window.html",
        "num-blocks": "input_parameters/num_blocks.html",
        "num-splits": "input_parameters/num_blocks.html",
        "compress": "input_parameters/trajectory_read_mode.html",
@@ -220,8 +227,8 @@ Crystal structure and q path
    * - :doc:`q_path <input_parameters/q_path>`
      - High-symmetry q-points in reduced coordinates.
 
-Elements and phonon modes
--------------------------
+Partial SED (elements and directions)
+-------------------------------------
 
 .. toctree::
    :hidden:
@@ -230,11 +237,6 @@ Elements and phonon modes
    input_parameters/output_partial
    input_parameters/plot_partial_SED
    input_parameters/save_partial_SED
-   input_parameters/eigenvector_file
-   input_parameters/reference_structure_file
-   input_parameters/mode_index
-   input_parameters/plot_all_modes
-   input_parameters/fit_all_modes
 
 .. rst-class:: parameter-index
 
@@ -245,21 +247,11 @@ Elements and phonon modes
    * - Parameter
      - Purpose
    * - :doc:`output_partial <input_parameters/output_partial>`
-     - Write element and direction-resolved SED files.
+     - Write element- and direction-resolved SED files.
    * - :doc:`plot_partial_SED <input_parameters/plot_partial_SED>`
-     - Select elements and directions with + for partial SED plotting or fitting.
+     - Select elements and directions with ``+`` for partial SED plotting or fitting.
    * - :doc:`save_partial_SED <input_parameters/save_partial_SED>`
      - Write the selected combination of elements and directions to a file.
-   * - :doc:`eigenvector_file <input_parameters/eigenvector_file>`
-     - Read Phonopy eigenvectors to calculate individual phonon mode spectra.
-   * - :doc:`reference_structure_file <input_parameters/reference_structure_file>`
-     - Give the primitive POSCAR or extended XYZ used to build the MD structure.
-   * - :doc:`mode_index <input_parameters/mode_index>`
-     - Choose a saved phonon mode by number, starting at 1.
-   * - :doc:`plot_all_modes <input_parameters/plot_all_modes>`
-     - Plot each saved phonon mode in a separate figure.
-   * - :doc:`fit_all_modes <input_parameters/fit_all_modes>`
-     - Fit every saved mode at the selected q point or all q points.
 
 Plot settings
 -------------
@@ -313,8 +305,6 @@ Peak fitting and lifetimes
    :maxdepth: 1
 
    input_parameters/fitting_function
-   input_parameters/fit_reference_peak
-   input_parameters/fit_reference_window
    input_parameters/peak_min_significance
    input_parameters/lorentz_fit_freq_min
    input_parameters/lorentz_fit_freq_max
@@ -334,10 +324,6 @@ Peak fitting and lifetimes
      - Purpose
    * - :doc:`fitting_function <input_parameters/fitting_function>`
      - Fit a Lorentzian, a damped harmonic oscillator, or choose automatically.
-   * - :doc:`fit_reference_peak <input_parameters/fit_reference_peak>`
-     - For individual modes calculated with eigenvectors, fit the highest local peak near the expected mode frequency.
-   * - :doc:`fit_reference_window <input_parameters/fit_reference_window>`
-     - For eigenvector modes with ``fit_reference_peak = 1``, set how far to search on either side of the expected frequency (THz).
    * - :doc:`peak_min_significance <input_parameters/peak_min_significance>`
      - Adjust how strongly a peak must stand out from nearby noise.
    * - :doc:`lorentz_fit_freq_min <input_parameters/lorentz_fit_freq_min>`
@@ -354,3 +340,54 @@ Peak fitting and lifetimes
      - Fit all saved q points or only the one selected by qpoint_slice_index.
    * - :doc:`re_output_total_freq_lifetime <input_parameters/re_output_total_freq_lifetime>`
      - Rebuild total frequency-lifetime output after refitting.
+
+For mode-specific fitting controls (``fit_all_modes``, ``fit_reference_peak``,
+``fit_reference_window``), see :ref:`mode-resolved-sed-parameters` below.
+
+.. _mode-resolved-sed-parameters:
+
+Mode-resolved SED (Phonopy eigenvectors, optional)
+--------------------------------------------------
+
+.. note::
+
+   All parameters in this group apply **only** when calculating, plotting, or
+   fitting individual phonon modes with Phonopy eigenvectors (see
+   :doc:`mode_resolved_sed`). If you do not have eigenvectors and run ordinary
+   total or partial SED, you can ignore this entire group and leave every
+   parameter unset or at its default.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   input_parameters/eigenvector_file
+   input_parameters/reference_structure_file
+   input_parameters/mode_index
+   input_parameters/plot_all_modes
+   input_parameters/fit_all_modes
+   input_parameters/fit_reference_peak
+   input_parameters/fit_reference_window
+
+.. rst-class:: parameter-index
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Parameter
+     - Purpose
+   * - :doc:`eigenvector_file <input_parameters/eigenvector_file>`
+     - Path to Phonopy ``band.yaml`` with eigenvectors for mode-resolved SED.
+   * - :doc:`reference_structure_file <input_parameters/reference_structure_file>`
+     - Primitive POSCAR or extended XYZ used to generate ``basis.in``.
+   * - :doc:`mode_index <input_parameters/mode_index>`
+     - Select one saved phonon mode by 1-based number for plotting or fitting.
+   * - :doc:`plot_all_modes <input_parameters/plot_all_modes>`
+     - Plot every saved phonon mode into a separate figure.
+   * - :doc:`fit_all_modes <input_parameters/fit_all_modes>`
+     - Fit every saved phonon mode at one q point or all q points.
+   * - :doc:`fit_reference_peak <input_parameters/fit_reference_peak>`
+     - Fit the highest local peak near each mode's saved reference frequency.
+   * - :doc:`fit_reference_window <input_parameters/fit_reference_window>`
+     - Half-width (THz) of the search window around each mode's reference frequency.

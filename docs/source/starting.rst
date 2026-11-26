@@ -73,7 +73,7 @@ Recommended Workflow
    ``fitting_function = lorentz``. After a good single-q fit, set
    ``lorentz_fit_all_qpoint = 1``.
 
-For individual modes, see :doc:`input_parameters/eigenvector_file`. The
+For individual modes, see :doc:`mode_resolved_sed`. The
 :doc:`peak_fitting` guide covers reference-frequency selection, parallel
 fitting and updating summaries after refitting one q point.
 
@@ -189,16 +189,13 @@ Start with an existing example before applying pySED to a new system:
 
 The illustrated 2.4 results show the expected dispersion features. Recompute
 the data with 3.0 before comparing intensities or fitting lifetimes; the
-normalization and fitting controls changed. A small executable check is
-available at :doc:`sed_workflow`.
+normalization and fitting controls changed.
 
 Further instructions
 --------------------
 
-.. toctree::
-   :maxdepth: 1
-
-   command_line
-   structure_generation
-   sed_workflow
-   output_files
+- :doc:`command_line` — CLI commands, workflow actions, and exit codes.
+- :doc:`structure_generation` — build supercells, ``basis.in``, and random vacancies.
+- :doc:`sed_workflow` — trajectory formats, NetCDF caching, and fixed spatial references.
+- :doc:`mode_resolved_sed` — project individual phonon modes with Phonopy eigenvectors.
+- :doc:`output_files` — numerical data, figures, and lifetime summaries.

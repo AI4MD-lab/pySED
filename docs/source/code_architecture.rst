@@ -21,6 +21,7 @@ Module responsibilities
      pipeline.py         Select compute, plot, fit, or thinking
      sed/
        construct_BZ.py   Crystal geometry, basis mapping, and Q paths
+       mode_projection.py Phonopy eigenvector loading, site alignment, and weights
        Phonon.py         Prepare topology; calculate and average time blocks
        sed_kernel.py     Spatial projection, FFT, power, and normalization
      postprocess/
@@ -248,10 +249,6 @@ above. Trajectory readers remain under ``pySED.io``, CPU/GPU execution under
 ``pySED.backends``, and structure generation under ``pySED.structure``.
 The directory reorganization leaves input parameters, CLI commands, SED units,
 fitting models, and output filenames unchanged.
-
-For synchronization from MDtrace, port a mathematical change into the kernel
-and a resource-management change into the corresponding backend. Do not copy
-the upstream ``Phonon.py`` wholesale over the split implementation.
 
 Run the regression suite from the repository root:
 

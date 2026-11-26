@@ -119,7 +119,7 @@ See :ref:`mode-refitting-workflow` to update these summaries after refitting.
 
 An ordinary SED calculated alongside the modes is saved under
 ``no-eigenvector-SED/`` for comparison. Plotting and fitting use the main
-output by default; see :doc:`input_parameters/eigenvector_file` to select
+output by default; see :doc:`mode_resolved_sed` to select
 the comparison spectrum instead.
 
 Trajectory cache

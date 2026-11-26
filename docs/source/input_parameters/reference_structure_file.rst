@@ -3,18 +3,36 @@ reference_structure_file
 
 **Syntax**
 
-.. code-block:: text
+.. code-block:: ini
 
    reference_structure_file = ../structure/POSCAR
 
 **Meaning**
-   Supply the primitive structure used to generate ``basis.in`` when computing
-   SED with Phonopy eigenvectors. Use the original atom order and cell axes.
-   pySED accepts a VASP 5-style POSCAR or an extended XYZ with species,
-   positions and lattice vectors. Relative paths start at the input file's directory.
+   Path to the primitive structure file used to generate ``basis.in`` when
+   computing mode-resolved SED with :doc:`eigenvector_file`. Accepts a VASP
+   5-style POSCAR (Direct or Cartesian, without ``Selective dynamics``) or an
+   extended XYZ (``.xyz`` / ``.extxyz``) containing ``Lattice`` and
+   ``Properties`` for species and positions.
+
+   Relative paths are resolved from the directory containing ``input_SED.in``.
 
 **Default**
-   Omitted. Required when computing mode spectra with :doc:`eigenvector_file`.
-   Plotting and fitting read the saved spectra.
+   Unset (``None``). Required when computing with :doc:`eigenvector_file`;
+   ignore this parameter if you do not use eigenvectors.
 
-See :ref:`the mode workflow <workflow-reference-matching>` for details.
+**Notes**
+   - Keep the exact primitive cell axes, Cartesian orientation, and atom order
+     used to generate ``basis.in`` (row *b* defines basis *b*).
+   - Only required during ``action = compute``; plotting and fitting read saved
+     mode spectra directly.
+   - See :ref:`workflow-reference-matching` in :doc:`../mode_resolved_sed` for
+     cell, site, mass, and first-frame consistency checks.
+
+:doc:`Back to Parameter Index <../input_parameters>`
+
+Related parameters
+------------------
+
+- :doc:`eigenvector_file <eigenvector_file>`
+- :doc:`basis_lattice_file <basis_lattice_file>`
+- :doc:`prim_unitcell <prim_unitcell>`
